@@ -86,13 +86,6 @@ fi
 
 "${progDir}/aws-preflight" || exit "$?"
 
-# Figure out the correct image ID.
-imageId="$(${progDir}/find-image-id)"
-
-if [[ $? != 0 ]]; then
-    exit "$?"
-fi
-
 # Stuff goes here!
 echo '### Stuff goes here!'
 exit 1
