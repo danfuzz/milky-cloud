@@ -103,13 +103,38 @@ fi
 inRegion="$(${progDir}/region-from-zone "${inLocation}")" \
 || exit "$?"
 
+awsArgs="$(
+jq -n \
+    --arg inLocation "${inLocation}" \
+    --arg instanceType "${instanceType}" \
+'
+    {
+        LocationType: "availability-zone",
+        Filters: [
+            {
+                Name: "location",
+                Values: [$inLocation]
+            },
+            {
+                Name: "instance-type",
+                Values: [$instanceType]
+            }
+        ]
+    }
+')"
+
+awsResult="$(
 aws ec2 describe-instance-type-offerings \
-    --output=text \
     --region="${inRegion}" \
-    --location-type=availability-zone \
-    --filters=Name=location,Values="${inLocation}" \
-    --filters=Name=instance-type,Values="${instanceType}" \
-|| exit "$?"
+    --cli-input-json="${awsArgs}" \
+    --query='length(InstanceTypeOfferings[])' \
+|| echo '0'
+)"
+
+if (( ${awsResult} == 0 )); then
+    echo 1>&2 "No such instance type: ${instanceType}"
+    exit 1
+fi
 
 # Stuff goes here!
 echo '### Stuff goes here!'
