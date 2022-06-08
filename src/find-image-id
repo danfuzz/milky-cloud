@@ -158,17 +158,59 @@ aws ec2 describe-instance-types \
 
 # Get a single `x86_64` or `arm64` from the supported architectures, or `error`
 # if neither seems to be supported.
-arch="$(
+architecture="$(
 jq -n --raw-output \
     --argjson archList "${awsResult}" \
 '
     $archList | map(select(. == "x86_64" or . == "arm64")) | .[0] // "error"
 ')"
 
-if [[ ${arch} == 'error' ]]; then
+if [[ ${architecture} == 'error' ]]; then
     echo 1>&2 "Unsupported architecture for instance type: ${instanceType}"
     exit 1
 fi
+
+# aws ec2 describe-images ...
+
+awsArgs="$(
+jq -n \
+    --arg architecture "${architecture}" \
+'
+    {
+        ExecutableUsers: ["all"],
+        Owners: ["amazon"],
+        Filters: [
+            {
+                Name: "architecture",
+                Values: [$architecture]
+            },
+            {
+                Name: "image-type",
+                Values: ["machine"]
+            },
+            {
+                Name: "root-device-type",
+                Values: ["ebs"]
+            },
+            {
+                Name: "name",
+                Values: ["amzn2-ami-kernel-*"]
+            },
+            {
+                Name: "creation-date",
+                Values: ["2021*", "2022*"]
+            }
+        ]
+    }
+')"
+
+awsResult="$(
+aws ec2 describe-images \
+    --cli-input-json="${awsArgs}" \
+    --query='sort_by(Images, &CreationDate)[].Name' \
+)"
+
+echo "${awsResult}"
 
 # Stuff goes here!
 echo '### Stuff goes here!'
