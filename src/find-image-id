@@ -4,7 +4,7 @@
 # Licensed AS IS and WITHOUT WARRANTY under the Apache License,
 # Version 2.0. Details: <http://www.apache.org/licenses/LICENSE-2.0>
 #
-# This launches a Dan-standard AWS instance.
+# Finds an image ID to use when launching an instance.
 
 # Set `progName` to the program name, `progDir` to its directory, and `baseDir`
 # to `progDir`'s directory. Follows symlinks.
@@ -33,7 +33,7 @@ argError=0
 showHelp=0
 
 # Instance type.
-instanceType='t3.nano'
+instanceType=''
 
 while true; do
     case $1 in
@@ -60,17 +60,22 @@ while true; do
     shift
 done
 
+if [[ ${instanceType} == '' ]]; then
+    echo 1>&2 'Missing option: --instance-type'
+    argError=1
+fi
+
 if (( ${showHelp} || ${argError} )); then
     echo 'Usage:'
     echo ''
     echo "${progName} [<opt> ...]"
-    echo '  Launches a standard-configured instance.'
+    echo '  Finds an image ID to use when launching an instance.'
     echo ''
     echo '  --instance-type=<type>'
-    echo '    What type of instance to install. Defaults to `t3.nano`.'
+    echo '    What type of instance to install. Must be specified.'
     echo ''
     echo "${progName} [--help | -h]"
-    echo '  Display this message.'
+    echo '  Displays this message.'
     exit ${argError}
 fi
 
@@ -82,7 +87,7 @@ fi
 "${progDir}/aws-preflight" || exit "$?"
 
 # Figure out the correct image ID.
-imageId="$(${progDir}/find-image-id --instance-type="${instanceType}")"
+imageId="$(${progDir}/find-image-id)"
 
 if [[ $? != 0 ]]; then
     exit "$?"
@@ -91,7 +96,3 @@ fi
 # Stuff goes here!
 echo '### Stuff goes here!'
 exit 1
-
-aws ec2 run-instances \
-    --image-id="${imageId}" \
-    --instance-type="${instanceType}"
