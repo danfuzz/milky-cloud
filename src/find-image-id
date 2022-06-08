@@ -100,8 +100,11 @@ fi
 "${progDir}/aws-preflight" \
 || exit "$?"
 
-inRegion="$(${progDir}/region-from-zone "${inLocation}")" \
+AWS_REGION="$(${progDir}/region-from-zone "${inLocation}")" \
 || exit "$?"
+export AWS_REGION
+
+# aws ec2 describe-instance-type-offerings ...
 
 awsArgs="$(
 jq -n \
@@ -125,7 +128,6 @@ jq -n \
 
 awsResult="$(
 aws ec2 describe-instance-type-offerings \
-    --region="${inRegion}" \
     --cli-input-json="${awsArgs}" \
     --query='length(InstanceTypeOfferings[])' \
 || echo '0'
@@ -133,6 +135,38 @@ aws ec2 describe-instance-type-offerings \
 
 if (( ${awsResult} == 0 )); then
     echo 1>&2 "No such instance type: ${instanceType}"
+    exit 1
+fi
+
+# aws ec2 describe-instance-types ...
+
+awsArgs="$(
+jq -n \
+    --arg instanceType "${instanceType}" \
+'
+    {
+        InstanceTypes: [$instanceType]
+    }
+')"
+
+awsResult="$(
+aws ec2 describe-instance-types \
+    --cli-input-json="${awsArgs}" \
+    --query='InstanceTypes[0].ProcessorInfo.SupportedArchitectures' \
+|| echo '[]'
+)"
+
+# Get a single `x86_64` or `arm64` from the supported architectures, or `error`
+# if neither seems to be supported.
+arch="$(
+jq -n --raw-output \
+    --argjson archList "${awsResult}" \
+'
+    $archList | map(select(. == "x86_64" or . == "arm64")) | .[0] // "error"
+')"
+
+if [[ ${arch} == 'error' ]]; then
+    echo 1>&2 "Unsupported architecture for instance type: ${instanceType}"
     exit 1
 fi
 
