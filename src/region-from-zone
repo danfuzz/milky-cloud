@@ -31,22 +31,13 @@ argError=0
 showHelp=0
 
 # Location (availability zone).
-inLocation='us-west-2a'
-
-# Instance type.
-instanceType='t3.nano'
+inLocation=''
 
 while true; do
     case $1 in
         -h|--help)
             showHelp=1
             break
-            ;;
-        --in=?*)
-            inLocation="${1#*=}"
-            ;;
-        --instance-type=?*)
-            instanceType="${1#*=}"
             ;;
         --) # End of all options
             shift
@@ -64,19 +55,22 @@ while true; do
     shift
 done
 
+if [[ $# < 1 ]]; then
+    echo 1>&2 'Missing argument: availability zone'
+    argError=1
+else
+    inLocation="$1"
+    shift
+fi
+
 if (( ${showHelp} || ${argError} )); then
     echo 'Usage:'
     echo ''
-    echo "${progName} [<opt> ...]"
-    echo '  Launches a standard-configured instance.'
-    echo ''
-    echo '  --in=<availability-zone>'
-    echo '    Where to launch.'
-    echo '  --instance-type=<type>'
-    echo '    What type of instance to install.'
+    echo "${progName} <zone>"
+    echo '  Prints the region associated with an availability zone.'
     echo ''
     echo "${progName} [--help | -h]"
-    echo '  Display this message.'
+    echo '  Displays this message.'
     exit ${argError}
 fi
 
@@ -85,20 +79,12 @@ fi
 # Main script
 #
 
-"${progDir}/aws-preflight" || exit "$?"
+# All we really need to do (at least for now) is drop the last character
+# of the zone.
 
-# Figure out the correct image ID.
-imageId="$(${progDir}/find-image-id \
-    --in="${inLocation}" --instance-type="${instanceType}")"
-
-if [[ $? != 0 ]]; then
-    exit "$?"
+if [[ ${inLocation} =~ ^(..*).$ ]]; then
+    echo "${BASH_REMATCH[1]}"
+else
+    echo 1>&2 'Unparseable input.'
+    exit 1
 fi
-
-# Stuff goes here!
-echo '### Stuff goes here!'
-exit 1
-
-aws ec2 run-instances \
-    --image-id="${imageId}" \
-    --instance-type="${instanceType}"
