@@ -31,7 +31,7 @@ argError=0
 showHelp=0
 
 while true; do
-    case $1 in
+    case "$1" in
         -h|--help)
             showHelp=1
             break

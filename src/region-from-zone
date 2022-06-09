@@ -34,7 +34,7 @@ showHelp=0
 inLocation=''
 
 while true; do
-    case $1 in
+    case "$1" in
         -h|--help)
             showHelp=1
             break

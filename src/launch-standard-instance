@@ -37,7 +37,7 @@ inLocation='us-west-2a'
 instanceType='t3.nano'
 
 while true; do
-    case $1 in
+    case "$1" in
         -h|--help)
             showHelp=1
             break
