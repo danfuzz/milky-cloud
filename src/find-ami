@@ -88,7 +88,8 @@ if (( ${showHelp} || ${argError} )); then
     echo 'Usage:'
     echo ''
     echo "${progName} [<opt> ...]"
-    echo '  Finds an image ID to use when launching an instance.'
+    echo '  Finds an AMI to use when launching an instance. On success, prints'
+    echo '  a JSON object of the salient info.'
     echo ''
     echo '  --in=<availability-zone>'
     echo '    Where to launch. Must be specified.'
