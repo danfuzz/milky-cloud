@@ -19,6 +19,14 @@ function init-prog {
 }
 init-prog
 
+#
+# Parameters for occasional update.
+#
+
+# Pattern for the AMI name to select. This includes, for example, the version
+# of the kernel we want to find.
+amiNamePattern='amzn2-ami-kernel-5.10-hvm-*-gp2'
+
 
 #
 # Argument parsing
@@ -37,7 +45,7 @@ instanceType=''
 inLocation=''
 
 while true; do
-    case $1 in
+    case "$1" in
         -h|--help)
             showHelp=1
             break
@@ -134,7 +142,7 @@ aws ec2 describe-instance-type-offerings \
 )"
 
 if (( ${awsResult} == 0 )); then
-    echo 1>&2 "No such instance type: ${instanceType}"
+    echo 1>&2 "No such instance type: ${instanceType} in ${inLocation}"
     exit 1
 fi
 
@@ -165,16 +173,15 @@ jq -n --raw-output \
     $archList | map(select(. == "x86_64" or . == "arm64")) | .[0] // "error"
 ')"
 
-if [[ ${architecture} == 'error' ]]; then
-    echo 1>&2 "Unsupported architecture for instance type: ${instanceType}"
-    exit 1
-fi
-
 # aws ec2 describe-images ...
+
+thisYear="$(date "+%Y")"
 
 awsArgs="$(
 jq -n \
+    --arg amiNamePattern "${amiNamePattern}" \
     --arg architecture "${architecture}" \
+    --argjson thisYear "${thisYear}" \
 '
     {
         ExecutableUsers: ["all"],
@@ -194,11 +201,14 @@ jq -n \
             },
             {
                 Name: "name",
-                Values: ["amzn2-ami-kernel-*"]
+                Values: [$amiNamePattern]
             },
             {
                 Name: "creation-date",
-                Values: ["2021*", "2022*"]
+                Values: [
+                    ($thisYear | tostring) + "*",
+                    ($thisYear - 1 | tostring) + "*"
+                ]
             }
         ]
     }
@@ -207,11 +217,11 @@ jq -n \
 awsResult="$(
 aws ec2 describe-images \
     --cli-input-json="${awsArgs}" \
-    --query='sort_by(Images, &CreationDate)[].Name' \
+    --query='max_by(Images, &CreationDate)' \
 )"
 
-echo "${awsResult}"
-
-# Stuff goes here!
-echo '### Stuff goes here!'
-exit 1
+jq -n \
+    --argjson imageInfo "${awsResult}" \
+'
+    $imageInfo | { Description: .Description, ImageId: .ImageId, Name: .Name}
+'
