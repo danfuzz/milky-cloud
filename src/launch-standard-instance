@@ -36,6 +36,9 @@ inLocation='us-west-2a'
 # Instance type.
 instanceType='t3.nano'
 
+# Name for the SSH keypair that allows for login access.
+keyName=''
+
 while true; do
     case "$1" in
         -h|--help)
@@ -47,6 +50,9 @@ while true; do
             ;;
         --instance-type=?*)
             instanceType="${1#*=}"
+            ;;
+        --key-name=?*)
+            keyName="${1#*=}"
             ;;
         --) # End of all options
             shift
@@ -87,18 +93,62 @@ fi
 
 "${progDir}/aws-preflight" || exit "$?"
 
-# Figure out the correct image ID.
-imageId="$(${progDir}/find-image-id \
-    --in="${inLocation}" --instance-type="${instanceType}")"
+inRegion="$(${progDir}/region-from-zone "${inLocation}")" \
+|| exit "$?"
+
+echo "launching: ${instanceType}"
+echo "in:        ${inRegion} / ${inLocation}"
+
+# Figure out the correct AMI.
+amiInfo="$(
+${progDir}/find-ami \
+    --in="${inLocation}" --instance-type="${instanceType}"
+)"
 
 if [[ $? != 0 ]]; then
     exit "$?"
 fi
 
-# Stuff goes here!
-echo '### Stuff goes here!'
-exit 1
+# Form the main command, and do it!
+
+jq -n --raw-output \
+    --argjson amiInfo "${amiInfo}" \
+'
+    $amiInfo | (
+        "Using AMI:",
+        "  desc: " + .Description,
+        "  name: " + .Name,
+        "  id:   " + .ImageId
+    )
+'
+
+imageId="$(
+    jq -n --raw-output --argjson amiInfo "${amiInfo}" '$amiInfo | .ImageId'
+)"
+
+awsArgs="$(
+jq -n \
+    --arg imageId "${imageId}" \
+    --arg inLocation "${inLocation}" \
+    --arg instanceType "${instanceType}" \
+    --arg keyName "${keyName}" \
+'
+    {
+        ImageId:      $imageId,
+        InstanceType: $instanceType,
+        KeyName:      $keyName,
+        MaxCount:     1,
+        Placement:    { AvailabilityZone: $inLocation }
+    }
+    +
+    if $keyName == "" then {} else { KeyName: $keyName } end
+')"
+
+
+echo ''
+echo 'Launch arguments:'
+echo "${awsArgs}"
 
 aws ec2 run-instances \
-    --image-id="${imageId}" \
-    --instance-type="${instanceType}"
+    --region="${inRegion}" \
+    --cli-input-json "${awsArgs}"
