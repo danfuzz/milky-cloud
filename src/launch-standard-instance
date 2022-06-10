@@ -39,7 +39,7 @@ instanceType='t3.nano'
 # Name for the SSH keypair that allows for login access.
 keyName=''
 
-# Security group to use (id, not name), if any.
+# Security group to use (name or id), if any.
 securityGroup=''
 
 while true; do
@@ -88,8 +88,8 @@ if (( ${showHelp} || ${argError} )); then
     echo '    What type of instance to install.'
     echo '  --key-name=<name>'
     echo '    Name of the keypair to use for SSH access.'
-    echo '  --security-group=<id>'
-    echo '    ID of the security group to use for network access control.'
+    echo '  --security-group=<name-or-id>'
+    echo '    Name or ID of the security group to use for network access control.'
     echo ''
     echo "${progName} [--help | -h]"
     echo '  Display this message.'
@@ -110,13 +110,21 @@ echo "launching: ${instanceType}"
 echo "in:        ${inRegion} / ${inLocation}"
 
 # Figure out the correct AMI.
+
 amiInfo="$(
 ${progDir}/find-ami \
     --in="${inLocation}" --instance-type="${instanceType}"
 )"
 
-if [[ $? != 0 ]]; then
+if (( $? != 0 )); then
     exit "$?"
+fi
+
+# Derive the security group ID, if necessary.
+
+if [[ ${securityGroup} != '' ]]; then
+    securityGroup="$(${progDir}/find-security-group --in="${inLocation}" "${securityGroup}")" \
+    || exit 1
 fi
 
 # Form the main command, and do it!
@@ -160,6 +168,25 @@ echo ''
 echo 'Launch arguments:'
 echo "${awsArgs}"
 
+awsResult="$(
 aws ec2 run-instances \
     --region="${inRegion}" \
     --cli-input-json "${awsArgs}"
+)"
+
+if (( $? != 0 )); then
+    exit "$?"
+fi
+
+# Note: Public IP and DNS are de facto (usually?) not set in the output from
+# `ec2 run-instances`.
+jq -n --raw-output \
+    --argjson info "${awsResult}" \
+'
+    $info | .Instances[0] |
+    {
+        InstanceId: .InstanceId,
+        PrivateDnsName: .PrivateDnsName,
+        PrivateIpAddress: .PrivateIpAddress
+    }
+'
