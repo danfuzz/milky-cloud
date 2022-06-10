@@ -1,0 +1,160 @@
+#!/bin/bash
+#
+# Copyright 2022 Dan Bornstein.
+# Licensed AS IS and WITHOUT WARRANTY under the Apache License,
+# Version 2.0. Details: <http://www.apache.org/licenses/LICENSE-2.0>
+
+# Set `progName` to the program name, `progDir` to its directory, and `baseDir`
+# to `progDir`'s directory. Follows symlinks.
+function init-prog {
+    local newp p="$0"
+
+    while newp="$(readlink "$p")"; do
+        [[ ${newp} =~ ^/ ]] && p="${newp}" || p="$(dirname "$p")/${newp}"
+    done
+
+    progName="${p##*/}"
+    progDir="$(cd "$(dirname "$p")"; /bin/pwd -P)"
+    baseDir="$(cd "${progDir}/.."; /bin/pwd -P)"
+}
+init-prog
+
+
+#
+# Argument parsing
+#
+
+# Error during argument processing?
+argError=0
+
+# Need help?
+showHelp=0
+
+# Location (availability zone or region).
+inLocation=''
+
+# Required input type.
+inputType='any'
+
+# Desired output.
+printItem='none'
+
+while true; do
+    case "$1" in
+        -h|--help)
+            showHelp=1
+            break
+            ;;
+        --input-region)
+            inputType='region'
+            ;;
+        --input-zone)
+            inputType='zone'
+            ;;
+        --print-region)
+            printItem='region'
+            ;;
+        --print-zone)
+            printItem='zone'
+            ;;
+        --print-zone-suffix)
+            printItem='zone-suffix'
+            ;;
+        --) # End of all options
+            shift
+            break
+            ;;
+        -?*)
+            echo 1>&2 "Unknown option: $1"
+            argError=1
+            break
+            ;;
+        *)  # Default case: No more options, break out of the loop.
+            break
+    esac
+
+    shift
+done
+
+if [[ ${printItem} =~ ^zone ]]; then
+    # Don't allow region input if we are to print a zone-ish thing.
+    inputType='zone'
+fi
+
+if [[ $# < 1 ]]; then
+    echo 1>&2 'Missing argument: zone or region'
+    argError=1
+else
+    inLocation="$1"
+    shift
+fi
+
+if (( ${showHelp} || ${argError} )); then
+    echo 'Usage:'
+    echo ''
+    echo "${progName} <zone-or-region>"
+    echo '  Parses a location -- a region or availability zone -- and if'
+    echo '  valid then optionally prints out one of the components. Note that'
+    echo '  only one each `--input-` and `--print-` option has any effect (the'
+    echo '  last specified).'
+    echo ''
+    echo '  --input-zone'
+    echo '    Require an availibility zone as input.'
+    echo '  --input-region'
+    echo '    Require a region as input.'
+    echo '  --print-region'
+    echo '    Print the parsed region.'
+    echo '  --print-zone'
+    echo '    Print the full zone (which will be the same as the input).'
+    echo '    Implies `--input-zone`.'
+    echo '  --print-zone-suffix'
+    echo '    Print the zone suffix (everything after the region).'
+    echo '    Implies `--input-zone`.'
+    echo ''
+    echo "${progName} [--help | -h]"
+    echo '  Displays this message.'
+    exit ${argError}
+fi
+
+
+#
+# Main script
+#
+
+# Split into region and zone suffix, or die trying.
+if [[ ! ${inLocation} =~ ^([a-z]{2}-[a-z]+-[0-9]+)([a-z]|-[a-z]+-[0-9][a-z])?$ ]]; then
+    echo 1>&2 'Unparseable input.'
+    exit 1
+fi
+
+region="${BASH_REMATCH[1]}"
+zoneSuffix="${BASH_REMATCH[2]}"
+
+# Validate the required input type, if needed.
+case "${inputType}" in
+    region)
+        if [[ ${zoneSuffix} != '' ]]; then
+            echo 1>&2 'Region input required; got zone.'
+            exit 1
+        fi
+        ;;
+    zone)
+    if [[ ${zoneSuffix} == '' ]]; then
+        echo 1>&2 'Zone input required; got region.'
+        exit 1
+    fi
+    ;;
+esac
+
+# Output whatever is requested, if anything.
+case "${printItem}" in
+    region)
+        echo "${region}"
+        ;;
+    zone)
+        echo "${inLocation}"
+        ;;
+    zone-suffix)
+        echo "${zoneSuffix}"
+        ;;
+esac
