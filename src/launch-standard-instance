@@ -39,6 +39,9 @@ instanceType='t3.nano'
 # Name for the SSH keypair that allows for login access.
 keyName=''
 
+# Security group to use (id, not name), if any.
+securityGroup=''
+
 while true; do
     case "$1" in
         -h|--help)
@@ -53,6 +56,9 @@ while true; do
             ;;
         --key-name=?*)
             keyName="${1#*=}"
+            ;;
+        --security-group=?*)
+            securityGroup="${1#*=}"
             ;;
         --) # End of all options
             shift
@@ -80,6 +86,10 @@ if (( ${showHelp} || ${argError} )); then
     echo '    Where to launch.'
     echo '  --instance-type=<type>'
     echo '    What type of instance to install.'
+    echo '  --key-name=<name>'
+    echo '    Name of the keypair to use for SSH access.'
+    echo '  --security-group=<id>'
+    echo '    ID of the security group to use for network access control.'
     echo ''
     echo "${progName} [--help | -h]"
     echo '  Display this message.'
@@ -132,6 +142,7 @@ jq -n \
     --arg inLocation "${inLocation}" \
     --arg instanceType "${instanceType}" \
     --arg keyName "${keyName}" \
+    --arg securityGroup "${securityGroup}" \
 '
     {
         ImageId:      $imageId,
@@ -140,8 +151,8 @@ jq -n \
         MaxCount:     1,
         Placement:    { AvailabilityZone: $inLocation }
     }
-    +
-    if $keyName == "" then {} else { KeyName: $keyName } end
+    + if $keyName == "" then {} else { KeyName: $keyName } end
+    + if $securityGroup == "" then {} else { SecurityGroupIds: [$securityGroup] } end
 ')"
 
 
