@@ -79,12 +79,4 @@ fi
 # Main script
 #
 
-# All we really need to do (at least for now) is drop the last character
-# of the zone.
-
-if [[ ${inLocation} =~ ^(..*).$ ]]; then
-    echo "${BASH_REMATCH[1]}"
-else
-    echo 1>&2 'Unparseable input.'
-    exit 1
-fi
+exec "${progDir}/parse-location" --input-zone --print-region "${inLocation}"
