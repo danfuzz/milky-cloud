@@ -80,8 +80,9 @@ if (( ${showHelp} || ${argError} )); then
     echo '  Finds a VPC by name or validates the existence of one by ID. On'
     echo '  success, prints the VPC ID.'
     echo ''
-    echo '  --in=<zone-or-id>'
-    echo '    Where to look. Must be specified.'
+    echo '  --in=<region-or-zone>'
+    echo '    Where to look. Must be specified. If specified as an availability'
+    echo '    zone, only the region portion matters.'
     echo ''
     echo "${progName} [--help | -h]"
     echo '  Displays this message.'
