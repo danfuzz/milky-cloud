@@ -39,6 +39,9 @@ instanceType='t3.nano'
 # Name for the SSH keypair that allows for login access.
 keyName=''
 
+# Name for the resulting instance.
+name=''
+
 # Security group to use (name or id), if any.
 securityGroup=''
 
@@ -56,6 +59,9 @@ while true; do
             ;;
         --key-name=?*)
             keyName="${1#*=}"
+            ;;
+        --name=?*)
+            name="${1#*=}"
             ;;
         --security-group=?*)
             securityGroup="${1#*=}"
@@ -88,6 +94,8 @@ if (( ${showHelp} || ${argError} )); then
     echo '    What type of instance to install.'
     echo '  --key-name=<name>'
     echo '    Name of the keypair to use for SSH access.'
+    echo '  --name=<name>'
+    echo '    Name (label) for the resulting instance.'
     echo '  --security-group=<name-or-id>'
     echo '    Name or ID of the security group to use for network access control.'
     echo ''
@@ -161,6 +169,7 @@ jq -n \
     --arg inLocation "${inLocation}" \
     --arg instanceType "${instanceType}" \
     --arg keyName "${keyName}" \
+    --arg name "${name}" \
     --arg securityGroup "${securityGroup}" \
     --arg subnetId "${subnetId}" \
 '
@@ -172,6 +181,21 @@ jq -n \
         Placement:    { AvailabilityZone: $inLocation }
     }
     + if $keyName == "" then {} else { KeyName: $keyName } end
+    + if $name == "" then {}
+      else {
+          TagSpecifications: [
+              {
+                  ResourceType: "instance",
+                  Tags: [
+                      {
+                          Key: "Name",
+                          Value: $name
+                      }
+                  ]
+              }
+          ]
+      }
+      end
     + if $securityGroup == "" then {} else { SecurityGroupIds: [$securityGroup] } end
     + if $subnetId == "" then {} else { SubnetId: $subnetId } end
 ')"
