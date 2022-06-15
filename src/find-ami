@@ -109,9 +109,8 @@ fi
 "${progDir}/aws-preflight" \
 || exit "$?"
 
-AWS_REGION="$("${progDir}/region-from-zone" "${inLocation}")" \
+awsRegion="$("${progDir}/region-from-zone" "${inLocation}")" \
 || exit "$?"
-export AWS_REGION
 
 # aws ec2 describe-instance-type-offerings ...
 
@@ -137,6 +136,7 @@ jq -n \
 
 awsResult="$(
 aws ec2 describe-instance-type-offerings \
+    --region="${awsRegion}" \
     --cli-input-json="${awsArgs}" \
     --query='length(InstanceTypeOfferings[])' \
 || echo '0'
@@ -160,6 +160,7 @@ jq -n \
 
 awsResult="$(
 aws ec2 describe-instance-types \
+    --region="${awsRegion}" \
     --cli-input-json="${awsArgs}" \
     --query='InstanceTypes[0].ProcessorInfo.SupportedArchitectures' \
 || echo '[]'
@@ -217,6 +218,7 @@ jq -n \
 
 awsResult="$(
 aws ec2 describe-images \
+    --region="${awsRegion}" \
     --cli-input-json="${awsArgs}" \
     --query='max_by(Images, &CreationDate)' \
 )"
