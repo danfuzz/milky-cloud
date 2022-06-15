@@ -103,7 +103,7 @@ fi
 
 "${progDir}/aws-preflight" || exit "$?"
 
-inRegion="$(${progDir}/region-from-zone "${inLocation}")" \
+inRegion="$("${progDir}/region-from-zone" "${inLocation}")" \
 || exit "$?"
 
 echo "launching: ${instanceType}"
@@ -123,7 +123,7 @@ fi
 # Derive the security group ID, if necessary.
 
 if [[ ${securityGroup} != '' ]]; then
-    securityGroup="$(${progDir}/find-security-group --in="${inLocation}" "${securityGroup}")" \
+    securityGroup="$("${progDir}/find-security-group" --in="${inLocation}" "${securityGroup}")" \
     || exit 1
 fi
 

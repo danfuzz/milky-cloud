@@ -109,7 +109,7 @@ fi
 "${progDir}/aws-preflight" \
 || exit "$?"
 
-AWS_REGION="$(${progDir}/region-from-zone "${inLocation}")" \
+AWS_REGION="$("${progDir}/region-from-zone" "${inLocation}")" \
 || exit "$?"
 export AWS_REGION
 
