@@ -19,14 +19,6 @@ function init-prog {
 }
 init-prog
 
-#
-# Parameters for occasional update.
-#
-
-# Pattern for the AMI name to select. This includes, for example, the version
-# of the kernel we want to find.
-amiNamePattern='amzn2-ami-kernel-5.10-hvm-*-gp2'
-
 
 #
 # Argument parsing
@@ -88,12 +80,13 @@ if (( ${showHelp} || ${argError} )); then
     echo '  Finds a security group by name or validates the existence of one by'
     echo '  ID. On success, prints the security group ID.'
     echo ''
-    echo '  --in=<zone-or-id>'
-    echo '    Where to look. Must be specified.'
+    echo '  --in=<region-or-zone>'
+    echo '    Where to look. Must be specified. If specified as an availability'
+    echo '    zone, only the region portion matters.'
     echo ''
     echo "${progName} [--help | -h]"
     echo '  Displays this message.'
-    exit ${argError}
+    exit "${argError}"
 fi
 
 
@@ -110,7 +103,7 @@ awsRegion="$(${progDir}/region-from-location "${inLocation}")" \
 # aws ec2 describe-security-groups ...
 
 if [[ ${nameOrId} =~ ^sg- ]]; then
-    # It looks like a security group ID.
+    # It looks like an ID.
     filterName='group-id'
 else
     # It's expected to be a name.
@@ -161,7 +154,7 @@ if [[ ${groupId} == 'sg-none' ]]; then
     echo 1>&2 'No such security group.'
     exit 1
 elif [[ ${groupId} == 'sg-ambiguous' ]]; then
-    echo 1>&2 'Ambiguous name or id matches all of:'
+    echo 1>&2 'Ambiguous name or ID matches all of:'
     jq 1>&2 -n --raw-output \
         --argjson info "${awsResult}" \
     '
