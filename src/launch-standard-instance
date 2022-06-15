@@ -93,7 +93,7 @@ if (( ${showHelp} || ${argError} )); then
     echo ''
     echo "${progName} [--help | -h]"
     echo '  Display this message.'
-    exit ${argError}
+    exit "${argError}"
 fi
 
 
