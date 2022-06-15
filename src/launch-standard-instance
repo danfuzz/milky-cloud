@@ -106,7 +106,7 @@ fi
 inRegion="$("${progDir}/region-from-zone" "${inLocation}")" \
 || exit "$?"
 
-echo "launching: ${instanceType}"
+echo "type:      ${instanceType}"
 echo "in:        ${inRegion} / ${inLocation}"
 
 # Figure out the correct AMI.
@@ -120,15 +120,6 @@ if (( $? != 0 )); then
     exit "$?"
 fi
 
-# Derive the security group ID, if necessary.
-
-if [[ ${securityGroup} != '' ]]; then
-    securityGroup="$("${progDir}/find-security-group" --in="${inLocation}" "${securityGroup}")" \
-    || exit 1
-fi
-
-# Form the main command, and do it!
-
 jq -n --raw-output \
     --argjson amiInfo "${amiInfo}" \
 '
@@ -140,10 +131,30 @@ jq -n --raw-output \
     )
 '
 
+# Resolve the security group and subnet IDs, if necessary.
+
+subnetId=''
+if [[ ${securityGroup} != '' ]]; then
+    securityGroup="$("${progDir}/find-security-group" --in="${inLocation}" "${securityGroup}")" \
+    || exit 1
+    vpcId="$("${progDir}/find-vpc" --in="${inLocation}" "${securityGroup}")" \
+    || exit 1
+    echo "VPC:       ${vpcId}"
+    subnetId="$("${progDir}/find-vpc-subnet" --in="${inLocation}" --vpc="${vpcId}")" \
+    || exit 1
+    echo "subnet:    ${subnetId}"
+fi
+
+# Form the main command, and do it!
+
 imageId="$(
     jq -n --raw-output --argjson amiInfo "${amiInfo}" '$amiInfo | .ImageId'
 )"
 
+# Note: If a subnet ID is provided, then it implies the availability zone, in
+# which case one doesn't also need to specify the availability zone explicitly.
+# However, it's easier just to include it because this script is also meant to
+# work when a security group and subnet aren't specified.
 awsArgs="$(
 jq -n \
     --arg imageId "${imageId}" \
@@ -151,6 +162,7 @@ jq -n \
     --arg instanceType "${instanceType}" \
     --arg keyName "${keyName}" \
     --arg securityGroup "${securityGroup}" \
+    --arg subnetId "${subnetId}" \
 '
     {
         ImageId:      $imageId,
@@ -161,6 +173,7 @@ jq -n \
     }
     + if $keyName == "" then {} else { KeyName: $keyName } end
     + if $securityGroup == "" then {} else { SecurityGroupIds: [$securityGroup] } end
+    + if $subnetId == "" then {} else { SubnetId: $subnetId } end
 ')"
 
 
