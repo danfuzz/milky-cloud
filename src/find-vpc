@@ -1,0 +1,165 @@
+#!/bin/bash
+#
+# Copyright 2022 Dan Bornstein.
+# Licensed AS IS and WITHOUT WARRANTY under the Apache License,
+# Version 2.0. Details: <http://www.apache.org/licenses/LICENSE-2.0>
+
+# Set `progName` to the program name, `progDir` to its directory, and `baseDir`
+# to `progDir`'s directory. Follows symlinks.
+function init-prog {
+    local newp p="$0"
+
+    while newp="$(readlink "$p")"; do
+        [[ ${newp} =~ ^/ ]] && p="${newp}" || p="$(dirname "$p")/${newp}"
+    done
+
+    progName="${p##*/}"
+    progDir="$(cd "$(dirname "$p")"; /bin/pwd -P)"
+    baseDir="$(cd "${progDir}/.."; /bin/pwd -P)"
+}
+init-prog
+
+
+#
+# Argument parsing
+#
+
+# Error during argument processing?
+argError=0
+
+# Need help?
+showHelp=0
+
+# Location (region or availability zone).
+inLocation=''
+
+while true; do
+    case "$1" in
+        -h|--help)
+            showHelp=1
+            break
+            ;;
+        --in=?*)
+            inLocation="${1#*=}"
+            ;;
+        --) # End of all options
+            shift
+            break
+            ;;
+        -?*)
+            echo 1>&2 "Unknown option: $1"
+            argError=1
+            break
+            ;;
+        *)  # Default case: No more options, break out of the loop.
+            break
+    esac
+
+    shift
+done
+
+if [[ $# < 1 ]]; then
+    echo 1>&2 'Missing argument: name or ID'
+    argError=1
+else
+    nameOrId="$1"
+    shift
+fi
+
+if (( !${argError} )); then
+    if [[ ${inLocation} == '' ]]; then
+        echo 1>&2 'Missing option: --in'
+        argError=1
+    fi
+fi
+
+if (( ${showHelp} || ${argError} )); then
+    echo 'Usage:'
+    echo ''
+    echo "${progName} [<opt> ...] <name-or-id>"
+    echo '  Finds a VPC by name or validates the existence of one by ID. On'
+    echo '  success, prints the VPC ID.'
+    echo ''
+    echo '  --in=<zone-or-id>'
+    echo '    Where to look. Must be specified.'
+    echo ''
+    echo "${progName} [--help | -h]"
+    echo '  Displays this message.'
+    exit "${argError}"
+fi
+
+
+#
+# Main script
+#
+
+"${progDir}/aws-preflight" \
+|| exit "$?"
+
+awsRegion="$(${progDir}/region-from-location "${inLocation}")" \
+|| exit "$?"
+
+# aws ec2 describe-vpcs ...
+
+if [[ ${nameOrId} =~ ^vpc- ]]; then
+    # It looks like an ID.
+    filterName='vpc-id'
+else
+    # It's expected to be a name.
+    filterName='tag:Name'
+fi
+
+awsArgs="$(
+jq -n \
+    --arg filterName "${filterName}" \
+    --arg nameOrId "${nameOrId}" \
+'
+    {
+        Filters: [
+            {
+                Name: $filterName,
+                Values: [$nameOrId]
+            }
+        ]
+    }
+')"
+
+awsResult="$(
+aws ec2 describe-vpcs \
+    --region="${awsRegion}" \
+    --cli-input-json="${awsArgs}" \
+|| echo 'error'
+)"
+
+if [[ ${awsResult} == 'error' ]]; then
+    # In this case, `aws` will have spewed an error message of some sort, we
+    # hope!
+    exit 1
+fi
+
+vpcId="$(jq -n --raw-output \
+    --argjson info "${awsResult}" \
+'
+    $info 
+    | .Vpcs
+    | 
+    if length == 0 then "vpc-none"
+    elif length == 1 then .[0].VpcId
+    else "vpc-ambiguous"
+    end
+')"
+
+if [[ ${vpcId} == 'vpc-none' ]]; then
+    echo 1>&2 'No such VPC.'
+    exit 1
+elif [[ ${vpcId} == 'vpc-ambiguous' ]]; then
+    echo 1>&2 'Ambiguous name or ID matches all of:'
+    jq 1>&2 -n --raw-output \
+        --argjson info "${awsResult}" \
+    '
+        $info | .Vpcs | .[] | "  " + .VpcId
+    '
+    exit 1
+fi
+
+echo "${vpcId}"
