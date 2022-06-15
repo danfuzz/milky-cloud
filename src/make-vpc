@@ -1,0 +1,133 @@
+#!/bin/bash
+#
+# Copyright 2022 Dan Bornstein.
+# Licensed AS IS and WITHOUT WARRANTY under the Apache License,
+# Version 2.0. Details: <http://www.apache.org/licenses/LICENSE-2.0>
+
+# Set `progName` to the program name, `progDir` to its directory, and `baseDir`
+# to `progDir`'s directory. Follows symlinks.
+function init-prog {
+    local newp p="$0"
+
+    while newp="$(readlink "$p")"; do
+        [[ ${newp} =~ ^/ ]] && p="${newp}" || p="$(dirname "$p")/${newp}"
+    done
+
+    progName="${p##*/}"
+    progDir="$(cd "$(dirname "$p")"; /bin/pwd -P)"
+    baseDir="$(cd "${progDir}/.."; /bin/pwd -P)"
+}
+init-prog
+
+
+#
+# Argument parsing
+#
+
+# Error during argument processing?
+argError=0
+
+# Need help?
+showHelp=0
+
+# Location (region or availability zone).
+inLocation=''
+
+# Name of the VPC.
+name=''
+
+while true; do
+    case "$1" in
+        -h|--help)
+            showHelp=1
+            break
+            ;;
+        --in=?*)
+            inLocation="${1#*=}"
+            ;;
+        --name=?*)
+            name="${1#*=}"
+            ;;
+        --) # End of all options
+            shift
+            break
+            ;;
+        -?*)
+            echo 1>&2 "Unknown option: $1"
+            argError=1
+            break
+            ;;
+        *)  # Default case: No more options, break out of the loop.
+            break
+    esac
+
+    shift
+done
+
+if (( !${argError} )); then
+    if [[ ${inLocation} == '' ]]; then
+        echo 1>&2 'Missing option: --in'
+        argError=1
+    fi
+    if [[ ${name} == '' ]]; then
+        echo 1>&2 'Missing option: --name'
+        argError=1
+    fi
+fi
+
+if (( ${showHelp} || ${argError} )); then
+    echo 'Usage:'
+    echo ''
+    echo "${progName} [<opt> ...]"
+    echo '  Makes a new VPC.'
+    echo ''
+    echo '  --in=<region-or-zone>'
+    echo '    What region to make the VPC in. Must be specified. If specified as'
+    echo '    an availability zone, only the region portion matters.'
+    echo '  --name=<name>'
+    echo '    Name to assign to the constructed VPC. Must be specified.'
+    echo ''
+    echo "${progName} [--help | -h]"
+    echo '  Displays this message.'
+    exit ${argError}
+fi
+
+
+#
+# Main script
+#
+
+"${progDir}/aws-preflight" \
+|| exit "$?"
+
+inRegion="$(${progDir}/region-from-location "${inLocation}")" \
+|| exit "$?"
+
+# aws vpc create-vpc
+
+awsArgs="$(
+jq -n \
+    --arg inLocation "${inLocation}" \
+    --arg name "${name}" \
+'
+    {
+        CidrBlock: "10.1.0.0/16",
+        AmazonProvidedIpv6CidrBlock: true,
+        InstanceTenancy: "default",
+        TagSpecifications: [
+            {
+                ResourceType: "vpc",
+                Tags: [
+                    {
+                        Key: "Name",
+                        Value: $name
+                    }
+                ]
+            }
+        ]
+    }
+')"
+
+aws ec2 create-vpc \
+    --region="${inRegion}" \
+    --cli-input-json="${awsArgs}"
