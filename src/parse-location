@@ -39,7 +39,7 @@ inputType='any'
 # Desired output.
 printItem='none'
 
-while true; do
+while (( $# > 0 )); do
     case "$1" in
         -h|--help)
             showHelp=1

@@ -45,7 +45,7 @@ name=''
 # Security group to use (name or id), if any.
 securityGroup=''
 
-while true; do
+while (( $# > 0 )); do
     case "$1" in
         -h|--help)
             showHelp=1
