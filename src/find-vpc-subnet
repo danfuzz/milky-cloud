@@ -146,9 +146,9 @@ fi
 subnetId="$(jq -n --raw-output \
     --argjson info "${awsResult}" \
 '
-    $info 
+    $info
     | .Subnets
-    | 
+    |
     if length == 0 then "subnet-none"
     elif length == 1 then .[0].SubnetId
     else "subnet-ambiguous"

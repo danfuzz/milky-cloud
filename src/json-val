@@ -97,7 +97,7 @@ while (( $# > 0 && !${argError} )); do
     fi
 
     varTypes+=("${varType}")
-    
+
     shift
 done
 
@@ -163,7 +163,7 @@ for (( i = 0; ${i} < ${#varTypes[@]}; i++ )); do
             exit 1
             ;;
     esac
-    
+
     jqArgs+=("${varNames[${i}]}" "${varValues[${i}]}")
 done
 
