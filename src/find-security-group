@@ -103,8 +103,6 @@ fi
 awsRegion="$("${progDir}/region-from-location" "${inLocation}")" \
 || exit "$?"
 
-# aws ec2 describe-security-groups ...
-
 if [[ ${nameOrId} =~ ^sg- ]]; then
     # It looks like an ID.
     filterName='group-id'
@@ -113,57 +111,43 @@ else
     filterName='group-name'
 fi
 
-awsArgs="$(
-jq -n \
-    --arg filterName "${filterName}" \
-    --arg nameOrId "${nameOrId}" \
-'
-    {
+result="$(
+"${progDir}/aws-json" \
+    --in="${awsRegion}" \
+    ec2 describe-security-groups \
+    filterName="${filterName}" \
+    nameOrId="${nameOrId}" \
+    '{
         Filters: [
             {
                 Name: $filterName,
                 Values: [$nameOrId]
             }
         ]
-    }
-')"
+    }' \
+    : \
+    '
+        $result | .SecurityGroups | map({ id: .GroupId, name: .GroupName })
+        |
+        {
+            count: (. | length),
+            id:    (.[0].id // "none"),
+            all:   map(.id + " " + (.name | tojson))
+        }
+    '
+)" \
+|| exit "$?"
 
-awsResult="$(
-aws ec2 describe-security-groups \
-    --region="${awsRegion}" \
-    --cli-input-json="${awsArgs}" \
-|| echo 'error'
-)"
+count="$("${progDir}/json-val" "${result}" '.count')"
+id="$("${progDir}/json-val" "${result}" '.id')"
 
-if [[ ${awsResult} == 'error' ]]; then
-    # In this case, `aws` will have spewed an error message of some sort, we
-    # hope!
-    exit 1
-fi
-
-groupId="$(jq -n --raw-output \
-    --argjson info "${awsResult}" \
-'
-    $info 
-    | .SecurityGroups
-    | 
-    if length == 0 then "sg-none"
-    elif length == 1 then .[0].GroupId
-    else "sg-ambiguous"
-    end
-')"
-
-if [[ ${groupId} == 'sg-none' ]]; then
+if (( ${count} == 0 )); then
     echo 1>&2 'No such security group.'
     exit 1
-elif [[ ${groupId} == 'sg-ambiguous' ]]; then
+elif (( ${count} != 1 )); then
     echo 1>&2 'Ambiguous name or ID matches all of:'
-    jq 1>&2 -n --raw-output \
-        --argjson info "${awsResult}" \
-    '
-        $info | .SecurityGroups | .[] | "  " + .GroupId + " " + .GroupName
-    '
+    "${progDir}/json-val" --raw 1>&2 "${result}" '.all[] | "  " + .'
     exit 1
 fi
 
-echo "${groupId}"
+echo "${id}"
