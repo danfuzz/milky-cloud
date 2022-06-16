@@ -1,0 +1,164 @@
+#!/bin/bash
+#
+# Copyright 2022 Dan Bornstein.
+# Licensed AS IS and WITHOUT WARRANTY under the Apache License,
+# Version 2.0. Details: <http://www.apache.org/licenses/LICENSE-2.0>
+
+# Set `progName` to the program name, `progDir` to its directory, and `baseDir`
+# to `progDir`'s directory. Follows symlinks.
+function init-prog {
+    local newp p="$0"
+
+    while newp="$(readlink "$p")"; do
+        [[ ${newp} =~ ^/ ]] && p="${newp}" || p="$(dirname "$p")/${newp}"
+    done
+
+    progName="${p##*/}"
+    progDir="$(cd "$(dirname "$p")"; /bin/pwd -P)"
+    baseDir="$(cd "${progDir}/.."; /bin/pwd -P)"
+}
+init-prog
+
+
+#
+# Argument parsing
+#
+
+# Error during argument processing?
+argError=0
+
+# Need help?
+showHelp=0
+
+# Location (region or availability zone).
+inLocation=''
+
+# AWS command and subcommand.
+awsCommand=''
+awsSubcommand=''
+
+# Assignments and expression arguments to use with `json-val` to construct the
+# value to pass to the AWS command.
+argConstructor=()
+
+# Assignments and expression arguments to use with `json-val` to perform the
+# result postprocessing.
+resultConstructor=()
+
+while (( $# > 0 )); do
+    case "$1" in
+        -h|--help)
+            showHelp=1
+            break
+            ;;
+        --in=?*)
+            inLocation="${1#*=}"
+            ;;
+        --name=?*)
+            name="${1#*=}"
+            ;;
+        --)
+            # Explicit end of options
+            shift
+            break
+            ;;
+        -?*)
+            echo 1>&2 "Unknown option: $1"
+            argError=1
+            break
+            ;;
+        *)
+            # Non-option argument
+            break
+            ;;
+    esac
+
+    shift
+done
+
+if (( !${argError} )); then
+    if [[ ${inLocation} == '' ]]; then
+        echo 1>&2 'Missing option: --in'
+        argError=1
+    fi
+fi
+
+if (( $# < 2 && !${argError} )); then
+    echo 1>&2 'Missing command and/or subcommand.'
+    argError=1
+else
+    awsCommand="$1"
+    awsSubcommand="$2"
+    shift 2
+fi
+
+# "Parse" constructor arguments.
+while (( $# > 0 && !${argError} )); do
+    arg="$1"
+    if [[ ${arg} == ':' ]]; then
+        shift
+        break
+    fi
+
+    argConstructor+=("${arg}")
+    shift
+done
+
+# Collect postprocessor arguments, if any.
+resultConstructor=("$@")
+
+if (( ${showHelp} || ${argError} )); then
+    echo 'Usage:'
+    echo ''
+    echo "${progName} [<opt> ...] [--] <cmd> <subcommand> [<assignment> ...]"
+    echo '[<jq-expression> ...] [: <jq-expression> ...]'
+    echo '  Makes an AWS call with a JSON value constructed with `json-val`, and'
+    echo '  with successful result optionally post-processed through `json-val`.'
+    echo '  If no argument expression is supplied, the value `{}` (an empty object)'
+    echo '  is passed to the command. When post-processing, the original result is'
+    echo '  available as `$result`.'
+    echo ''
+    echo '  <cmd> <subcommand>'
+    echo '    The AWS command and subcommand to call, e.g. `ec2 run-instances`.'
+    echo ''
+    echo '  --in=<region-or-zone>'
+    echo '    What region to make the call in. Must be specified. If specified as'
+    echo '    an availability zone, only the region portion matters.'
+    echo ''
+    echo "${progName} [--help | -h]"
+    echo '  Displays this message.'
+    exit "${argError}"
+fi
+
+
+#
+# Main script
+#
+
+inRegion="$("${progDir}/region-from-location" "${inLocation}")" \
+|| exit "$?"
+
+jsonArg='{}'
+if (( ${#argConstructor[@]} > 0 )); then
+    jsonArg="$("${progDir}/json-val" -- "${argConstructor[@]}")" \
+    || exit "$?"
+fi
+
+awsCommand=(
+    'aws' "${awsCommand}" "${awsSubcommand}"
+    --region="${inRegion}"
+    --cli-input-json="${jsonArg}"
+)
+
+if (( ${#resultConstructor[@]} == 0 )); then
+    # No postprocessing, so just exec the AWS command.
+    exec "${awsCommand[@]}"
+    # Never returns here.
+fi
+
+awsResult="$("${awsCommand[@]}")" \
+|| exit "$?"
+
+exec "${progDir}/json-val" -- \
+    result:json="${awsResult}" \
+    "${resultConstructor[@]}"
