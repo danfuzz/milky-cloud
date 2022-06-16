@@ -24,8 +24,8 @@ init-prog
 # Argument parsing
 #
 
-# Compact output?
-compact=0
+# Output style.
+outputStyle=normal
 
 # List of variable assignments, as parallel arrays of type, name, and value.
 varTypes=()
@@ -49,7 +49,10 @@ while (( $# > 0 )); do
             break
             ;;
         --compact)
-            compact=1
+            outputStyle=compact
+            ;;
+        --raw)
+            outputStyle=raw
             ;;
         --)
             # Explicit end of options
@@ -121,7 +124,9 @@ if (( ${showHelp} || ${argError} )); then
     echo '    <name>:json=<value> Assign `$name` to be the indicated parsed JSON value.'
     echo ''
     echo '  --compact'
-    echo '    Output in compact form (not multiline).'
+    echo '    Output in compact form (not multiline JSON).'
+    echo '  --raw'
+    echo '    Output raw strings (and other values compactly).'
     echo ''
     echo "${progName} [--help | -h]"
     echo '  Displays this message.'
@@ -135,9 +140,14 @@ fi
 
 jqArgs=('--null-input')
 
-if (( ${compact} )); then
-    jqArgs+=('--compact-output')
-fi
+case "${outputStyle}" in
+    compact)
+        jqArgs+=('--compact-output')
+        ;;
+    raw)
+        jqArgs+=('--raw-output' '--compact-output')
+        ;;
+esac
 
 for (( i = 0; ${i} < ${#varTypes[@]}; i++ )); do
     varType="${varTypes[${i}]}"
