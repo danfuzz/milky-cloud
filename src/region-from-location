@@ -49,8 +49,10 @@ while (( $# > 0 )); do
             argError=1
             break
             ;;
-        *)  # Default case: No more options, break out of the loop.
+        *)
+            # Non-option argument
             break
+            ;;
     esac
 
     shift

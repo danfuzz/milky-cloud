@@ -49,6 +49,7 @@ while (( $# > 0 )); do
         *)
             # Non-option argument
             break
+            ;;
     esac
 
     shift
