@@ -51,7 +51,8 @@ while (( $# > 0 )); do
         --compact)
             compact=1
             ;;
-        --) # End of all options
+        --)
+            # Explicit end of options
             shift
             break
             ;;

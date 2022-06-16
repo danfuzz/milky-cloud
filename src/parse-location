@@ -60,7 +60,8 @@ while (( $# > 0 )); do
         --print-zone-suffix)
             printItem='zone-suffix'
             ;;
-        --) # End of all options
+        --)
+            # Explicit end of options
             shift
             break
             ;;

@@ -36,7 +36,8 @@ while (( $# > 0 )); do
             showHelp=1
             break
             ;;
-        --) # End of all options
+        --)
+            # Explicit end of options
             shift
             break
             ;;
@@ -45,7 +46,8 @@ while (( $# > 0 )); do
             argError=1
             break
             ;;
-        *)  # Default case: No more options, break out of the loop.
+        *)
+            # Non-option argument
             break
     esac
 

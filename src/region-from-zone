@@ -39,7 +39,8 @@ while (( $# > 0 )); do
             showHelp=1
             break
             ;;
-        --) # End of all options
+        --)
+            # Explicit end of options
             shift
             break
             ;;
