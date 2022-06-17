@@ -115,14 +115,16 @@ fi
 awsRegion="$("${progDir}/region-from-zone" "${inLocation}")" \
 || exit "$?"
 
-# aws ec2 describe-instance-type-offerings ...
+# Check to see if the indicated instance type is available in the availability
+# zone.
 
-awsArgs="$(
-jq -n \
-    --arg inLocation "${inLocation}" \
-    --arg instanceType "${instanceType}" \
-'
-    {
+foundInstanceType="$(
+"${progDir}/aws-json" \
+    --in="${awsRegion}" \
+    ec2 describe-instance-type-offerings \
+    inLocation="${inLocation}" \
+    instanceType="${instanceType}" \
+    '{
         LocationType: "availability-zone",
         Filters: [
             {
@@ -134,61 +136,50 @@ jq -n \
                 Values: [$instanceType]
             }
         ]
-    }
-')"
+    }' \
+    : '$result.InstanceTypeOfferings | length'
+)" \
+|| exit "$?"
 
-awsResult="$(
-aws ec2 describe-instance-type-offerings \
-    --region="${awsRegion}" \
-    --cli-input-json="${awsArgs}" \
-    --query='length(InstanceTypeOfferings[])' \
-|| echo '0'
-)"
-
-if (( ${awsResult} == 0 )); then
+if (( !${foundInstanceType} )); then
     echo 1>&2 "No such instance type: ${instanceType} in ${inLocation}"
     exit 1
 fi
 
-# aws ec2 describe-instance-types ...
+# `aws ec2 describe-instance-types` to extract the supported architecture,
+# ignoring `i386` which we don't care about (`x86_64` is the modern choice).
 
-awsArgs="$(
-jq -n \
-    --arg instanceType "${instanceType}" \
-'
-    {
-        InstanceTypes: [$instanceType]
-    }
-')"
-
-awsResult="$(
-aws ec2 describe-instance-types \
-    --region="${awsRegion}" \
-    --cli-input-json="${awsArgs}" \
-    --query='InstanceTypes[0].ProcessorInfo.SupportedArchitectures' \
-|| echo '[]'
-)"
-
-# Get a single `x86_64` or `arm64` from the supported architectures, or `error`
-# if neither seems to be supported.
 architecture="$(
-jq -n --raw-output \
-    --argjson archList "${awsResult}" \
-'
-    $archList | map(select(. == "x86_64" or . == "arm64")) | .[0] // "error"
-')"
+"${progDir}/aws-json" \
+    --in="${awsRegion}" \
+    ec2 describe-instance-types \
+    instanceType="${instanceType}" \
+    '{ InstanceTypes: [$instanceType] }' \
+    : '
+        $result.InstanceTypes[0].ProcessorInfo.SupportedArchitectures
+        | map(select(. != "i386"))
+        | .[0] // "error"
+    '
+)" \
+|| exit "$?"
 
-# aws ec2 describe-images ...
+# Note: Quoted `"error"` because the value is JSON (not a raw string).
+if [[ ${architecture} == '"error"' ]]; then
+    echo 1>&2 "Unsupported instance type: ${instanceType} in ${inLocation}"
+    exit 1
+fi
+
+# `aws ec2 describe-images` to find the most recent salient AMI.
 
 thisYear="$(date "+%Y")"
 
-awsArgs="$(
-jq -n \
-    --arg amiNamePattern "${amiNamePattern}" \
-    --arg architecture "${architecture}" \
-    --argjson thisYear "${thisYear}" \
-'
-    {
+"${progDir}/aws-json" \
+    --in="${awsRegion}" \
+    ec2 describe-images \
+    amiNamePattern="${amiNamePattern}" \
+    architecture:json="${architecture}" \
+    thisYear:json="${thisYear}" \
+    '{
         ExecutableUsers: ["all"],
         Owners: ["amazon"],
         Filters: [
@@ -216,18 +207,12 @@ jq -n \
                 ]
             }
         ]
-    }
-')"
-
-awsResult="$(
-aws ec2 describe-images \
-    --region="${awsRegion}" \
-    --cli-input-json="${awsArgs}" \
-    --query='max_by(Images, &CreationDate)' \
-)"
-
-jq -n \
-    --argjson imageInfo "${awsResult}" \
-'
-    $imageInfo | { Description: .Description, ImageId: .ImageId, Name: .Name}
-'
+    }' \
+    : '
+    $result.Images | max_by(.CreationDate)
+    |
+    {
+        Description:  .Description,
+        ImageId:      .ImageId,
+        Name:         .Name
+    }'
