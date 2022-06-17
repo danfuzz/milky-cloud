@@ -95,7 +95,7 @@ fi
 # "Parse" constructor arguments.
 while (( $# > 0 && !${argError} )); do
     arg="$1"
-    if [[ ${arg} == ':' ]]; then
+    if [[ ${arg} == '::' ]]; then
         shift
         break
     fi
@@ -111,7 +111,7 @@ if (( ${showHelp} || ${argError} )); then
     echo 'Usage:'
     echo ''
     echo "${progName} [<opt> ...] [--] <cmd> <subcommand> [<assignment> ...]"
-    echo '[<jq-expression> ...] [: <jq-expression> ...]'
+    echo '[<jq-expression> ...] [:: <jq-expression> ...]'
     echo '  Makes an AWS call with a JSON value constructed with `json-val`, and'
     echo '  with successful result optionally post-processed through `json-val`.'
     echo '  If no argument expression is supplied, the value `{}` (an empty object)'

@@ -125,7 +125,7 @@ result="$(
             }
         ]
     }' \
-    : \
+    :: \
     '
         $result | .SecurityGroups | map({ id: .GroupId, name: .GroupName })
         |

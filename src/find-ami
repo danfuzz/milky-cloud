@@ -137,7 +137,7 @@ foundInstanceType="$(
             }
         ]
     }' \
-    : '$result.InstanceTypeOfferings | length'
+    :: '$result.InstanceTypeOfferings | length'
 )" \
 || exit "$?"
 
@@ -155,7 +155,7 @@ architecture="$(
     ec2 describe-instance-types \
     instanceType="${instanceType}" \
     '{ InstanceTypes: [$instanceType] }' \
-    : '
+    :: '
         $result.InstanceTypes[0].ProcessorInfo.SupportedArchitectures
         | map(select(. != "i386"))
         | .[0] // "error"
@@ -208,11 +208,11 @@ thisYear="$(date "+%Y")"
             }
         ]
     }' \
-    : '
+    :: '
     $result.Images | max_by(.CreationDate)
     |
     {
-        Description:  .Description,
-        ImageId:      .ImageId,
-        Name:         .Name
+        Description: .Description,
+        ImageId:     .ImageId,
+        Name:        .Name
     }'
