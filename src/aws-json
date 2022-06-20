@@ -30,12 +30,18 @@ argError=0
 # Need help?
 showHelp=0
 
+# AWS command and subcommand. These are expected before any dashed options.
+if ! ( (( $# >= 2 )) && [[ $1 =~ ^[a-z] ]] && [[ $2 =~ ^[a-z] ]] ); then
+    echo 1>&2 'Missing AWS command and/or subcommand.'
+    argError=1
+else
+    awsCommand="$1"
+    awsSubcommand="$2"
+    shift 2
+fi
+
 # Location (region or availability zone).
 inLocation=''
-
-# AWS command and subcommand.
-awsCommand=''
-awsSubcommand=''
 
 # Assignments and expression arguments to use with `json-val` to construct the
 # value to pass to the AWS command.
@@ -53,9 +59,6 @@ while (( $# > 0 )); do
             ;;
         --in=?*)
             inLocation="${1#*=}"
-            ;;
-        --name=?*)
-            name="${1#*=}"
             ;;
         --)
             # Explicit end of options
@@ -83,15 +86,6 @@ if (( !${argError} )); then
     fi
 fi
 
-if (( $# < 2 && !${argError} )); then
-    echo 1>&2 'Missing command and/or subcommand.'
-    argError=1
-else
-    awsCommand="$1"
-    awsSubcommand="$2"
-    shift 2
-fi
-
 # "Parse" constructor arguments.
 while (( $# > 0 && !${argError} )); do
     arg="$1"
@@ -110,8 +104,8 @@ resultConstructor=("$@")
 if (( ${showHelp} || ${argError} )); then
     echo 'Usage:'
     echo ''
-    echo "${progName} [<opt> ...] [--] <cmd> <subcommand> [<assignment> ...]"
-    echo '[<jq-expression> ...] [:: <jq-expression> ...]'
+    echo "${progName} <cmd> <subcommand> [<opt> ...] [--] [<assignment> ...]"
+    echo '[<jq-expression> ...] [:: [<assignment> ...] <jq-expression> ...]'
     echo '  Makes an AWS call with a JSON value constructed with `json-val`, and'
     echo '  with successful result optionally post-processed through `json-val`.'
     echo '  If no argument expression is supplied, the value `{}` (an empty object)'
@@ -141,7 +135,10 @@ inRegion="$("${progDir}/region-from-location" "${inLocation}")" \
 jsonArg='{}'
 if (( ${#argConstructor[@]} > 0 )); then
     jsonArg="$("${progDir}/json-val" -- "${argConstructor[@]}")" \
-    || exit "$?"
+    || {
+        echo 1>&2 'Trouble parsing argument constructor.'
+        exit 1
+    }
 fi
 
 awsCommand=(
@@ -151,15 +148,18 @@ awsCommand=(
     --cli-input-json="${jsonArg}"
 )
 
-if (( ${#resultConstructor[@]} == 0 )); then
-    # No postprocessing, so just exec the AWS command.
-    exec "${awsCommand[@]}"
-    # Never returns here.
-fi
-
 awsResult="$("${awsCommand[@]}")" \
-|| exit "$?"
+|| {
+    echo 1>&2 'Trouble running AWS command.'
+    exit 1
+}
 
-exec "${progDir}/json-val" -- \
-    result:json="${awsResult}" \
-    "${resultConstructor[@]}"
+if (( ${#resultConstructor[@]} != 0 )); then
+    "${progDir}/json-val" -- \
+        result:json="${awsResult}" \
+        "${resultConstructor[@]}" \
+    || {
+        echo 1>&2 'Trouble parsing result filter.'
+        exit 1
+    }
+fi
