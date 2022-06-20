@@ -88,8 +88,8 @@ if (( ${showHelp} || ${argError} )); then
     echo '  Finds a VPC subnet that meets the indicated criteria. On success,'
     echo '  prints the subnet ID.'
     echo ''
-    echo '  --in=<region-or-zone>'
-    echo '    Where to look. Must be specified.'
+    echo '  --in=<availability-zone>'
+    echo '    What availibility zone to look in. Must be specified.'
     echo '  --vpc=<name-or-id>'
     echo '    Name or ID of the VPC to look in. Must be specified.'
     echo ''
@@ -106,7 +106,7 @@ fi
 awsRegion="$(lib region-from-zone "${inLocation}")" \
 || exit "$?"
 
-vpcId="$("${progDir}/find-vpc" --in="${awsRegion}" "${nameOrId}")" \
+vpcId="$(lib find-vpc --in="${awsRegion}" "${nameOrId}")" \
 || exit "$?"
 
 # aws ec2 describe-subnets
