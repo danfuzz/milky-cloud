@@ -147,12 +147,12 @@ jq -n --raw-output \
 
 subnetId=''
 if [[ ${securityGroup} != '' ]]; then
-    securityGroup="$("${progDir}/find-security-group" --in="${inLocation}" "${securityGroup}")" \
+    securityGroup="$(lib find-security-group --in="${inLocation}" "${securityGroup}")" \
     || exit 1
-    vpcId="$("${progDir}/find-vpc" --in="${inLocation}" "${securityGroup}")" \
+    vpcId="$(lib find-vpc --in="${inLocation}" "${securityGroup}")" \
     || exit 1
     echo "VPC:       ${vpcId}"
-    subnetId="$("${progDir}/find-vpc-subnet" --in="${inLocation}" --vpc="${vpcId}")" \
+    subnetId="$(lib find-vpc-subnet --in="${inLocation}" --vpc="${vpcId}")" \
     || exit 1
     echo "subnet:    ${subnetId}"
 fi
