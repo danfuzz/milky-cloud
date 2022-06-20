@@ -47,6 +47,3 @@ if [[ ${MILKY_CLOUD_PREREQUISITES_DONE} != 1 ]]; then
         exit 1
     fi
 fi
-
-# TODO: Remove this spew, once we're sure things are okay.
-echo 1>&2 '##### LIBRARY INITIALIZED' "${libDir}"
