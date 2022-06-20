@@ -28,9 +28,13 @@ function lib {
     if ! [[ ${name} =~ ^[-a-z]+$ ]]; then
         echo 1>&2 'Weird script name:' "${name}"
         return 1
+    elif [[ -x "${libDir}/${name}" ]]; then
+        # It's in the internal helper library.
+        "${libDir}/${name}" "$@"
+    elif [[ -x "${progDir}/${name}" ]]; then
+        # It's a "sibling" exposed script.
+        "${progDir}/${name}" "$@"
     fi
-
-    "${libDir}/${name}" "$@"
 }
 
 # Calls through to the prerequisite checker if it doesn't seem to have yet been
