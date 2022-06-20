@@ -19,6 +19,8 @@ function init-prog {
 }
 init-prog
 
+# Set up for library-internal usage.
+. "${progDir}/init" --lib
 
 #
 # Argument parsing

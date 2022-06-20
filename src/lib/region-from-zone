@@ -19,6 +19,9 @@ function init-prog {
 }
 init-prog
 
+# Set up for library-internal usage.
+. "${progDir}/init" --lib
+
 
 #
 # Argument parsing
@@ -82,4 +85,4 @@ fi
 # Main script
 #
 
-exec "${progDir}/parse-location" --input-zone --print-region "${inLocation}"
+lib parse-location --input-zone --print-region "${inLocation}"
