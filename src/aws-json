@@ -19,6 +19,9 @@ function init-prog {
 }
 init-prog
 
+# Load the helper library.
+. "${progDir}/lib/init"
+
 
 #
 # Argument parsing
@@ -129,7 +132,7 @@ fi
 # Main script
 #
 
-inRegion="$("${progDir}/region-from-location" "${inLocation}")" \
+inRegion="$(lib region-from-location "${inLocation}")" \
 || exit "$?"
 
 jsonArg='{}'

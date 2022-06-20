@@ -117,7 +117,7 @@ fi
 
 "${progDir}/aws-preflight" || exit "$?"
 
-inRegion="$("${progDir}/region-from-zone" "${inLocation}")" \
+inRegion="$(lib region-from-zone "${inLocation}")" \
 || exit "$?"
 
 echo "type:      ${instanceType}"

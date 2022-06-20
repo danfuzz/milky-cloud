@@ -106,7 +106,7 @@ fi
 "${progDir}/aws-preflight" \
 || exit "$?"
 
-awsRegion="$("${progDir}/region-from-zone" "${inLocation}")" \
+awsRegion="$(lib region-from-zone "${inLocation}")" \
 || exit "$?"
 
 vpcId="$("${progDir}/find-vpc" --in="${awsRegion}" "${nameOrId}")" \

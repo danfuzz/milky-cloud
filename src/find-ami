@@ -116,7 +116,7 @@ fi
 "${progDir}/aws-preflight" \
 || exit "$?"
 
-awsRegion="$("${progDir}/region-from-zone" "${inLocation}")" \
+awsRegion="$(lib region-from-zone "${inLocation}")" \
 || exit "$?"
 
 # Check to see if the indicated instance type is available in the availability

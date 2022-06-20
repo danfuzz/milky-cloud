@@ -219,7 +219,7 @@ function find-via-describe-security-groups {
 "${progDir}/aws-preflight" \
 || exit "$?"
 
-awsRegion="$("${progDir}/region-from-location" "${inLocation}")" \
+awsRegion="$(lib region-from-location "${inLocation}")" \
 || exit "$?"
 
 if [[ ${nameOrId} =~ ^vpc- ]]; then

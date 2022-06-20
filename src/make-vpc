@@ -106,7 +106,7 @@ fi
 "${progDir}/aws-preflight" \
 || exit "$?"
 
-inRegion="$("${progDir}/region-from-location" "${inLocation}")" \
+inRegion="$(lib region-from-location "${inLocation}")" \
 || exit "$?"
 
 # aws vpc create-vpc
