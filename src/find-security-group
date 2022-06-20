@@ -137,15 +137,15 @@ lib aws-json ec2 describe-security-groups \
 )" \
 || exit "$?"
 
-count="$("${progDir}/json-val" "${result}" '.count')"
-id="$("${progDir}/json-val" "${result}" '.id')"
+count="$(lib json-val "${result}" '.count')"
+id="$(lib json-val "${result}" '.id')"
 
 if (( ${count} == 0 )); then
     echo 1>&2 'No such security group.'
     exit 1
 elif (( ${count} != 1 )); then
     echo 1>&2 'Ambiguous name or ID matches all of:'
-    "${progDir}/json-val" --raw 1>&2 "${result}" '.all[] | "  " + .'
+    lib json-val --raw 1>&2 "${result}" '.all[] | "  " + .'
     exit 1
 fi
 
