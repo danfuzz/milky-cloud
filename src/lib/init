@@ -46,6 +46,9 @@ function lib {
     elif [[ -x "${progDir}/${name}" ]]; then
         # It's a "sibling" exposed script.
         "${progDir}/${name}" "$@"
+    else
+        echo 1>&2 'No such library script:' "${name}"
+        return 1
     fi
 }
 
