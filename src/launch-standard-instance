@@ -115,8 +115,6 @@ fi
 # Main script
 #
 
-"${progDir}/aws-preflight" || exit "$?"
-
 inRegion="$(lib region-from-zone "${inLocation}")" \
 || exit "$?"
 

@@ -216,9 +216,6 @@ function find-via-describe-security-groups {
 # Main script
 #
 
-"${progDir}/aws-preflight" \
-|| exit "$?"
-
 awsRegion="$(lib region-from-location "${inLocation}")" \
 || exit "$?"
 

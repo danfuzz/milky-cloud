@@ -33,5 +33,16 @@ function lib {
     "${libDir}/${name}" "$@"
 }
 
+# Calls through to the prerequisite checker if it doesn't seem to have yet been
+# run in this session.
+if [[ ${MILKY_CLOUD_PREREQUISITES_DONE} != 1 ]]; then
+    if lib check-prerequisites; then
+        export MILKY_CLOUD_PREREQUISITES_DONE=1
+    else
+        echo 1>&2 'Failed one or more prerequisite checks!'
+        exit 1
+    fi
+fi
+
 # TODO: Remove this spew, once we're sure things are okay.
 echo 1>&2 '##### LIBRARY INITIALIZED' "${libDir}"

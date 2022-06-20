@@ -59,8 +59,8 @@ if (( ${showHelp} || ${argError} )); then
     echo 'Usage:'
     echo ''
     echo "${progName} [<opt> ...]"
-    echo '  Performs standard preflight checks needed before running AWS'
-    echo '  commands.'
+    echo '  Performs standard preflight checks needed before running stuff in'
+    echo '  this library.'
     echo ''
     echo "${progName} [--help | -h]"
     echo '  Displays this message.'
