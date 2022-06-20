@@ -15,6 +15,12 @@ else
     libDir="${progDir}/lib"
 fi
 
+# Calls `aws-json ec2`. This combination is used enough to warrant having it be
+# easier to say than `lib aws-json ec2 ...`.
+function ec2-json {
+    lib aws-json ec2 "$@"
+}
+
 # Calls `json-val`. This script is used enough to warrant having it be easier to
 # say than `lib json-val ...`.
 function jval {
