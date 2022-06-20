@@ -19,6 +19,10 @@ function init-prog {
 }
 init-prog
 
+# Load the helper library.
+. "${progDir}/lib/milky-cloud-library"
+
+
 #
 # Parameters for occasional update.
 #
