@@ -126,7 +126,7 @@ fi
 
 # Split into region and zone suffix, or die trying.
 if [[ ! ${inLocation} =~ ^([a-z]{2}-[a-z]+-[0-9]+)([a-z]|-[a-z]+-[0-9][a-z])?$ ]]; then
-    echo 1>&2 'Unparseable input.'
+    echo 1>&2 'Unparseable location:' "${inLocation}"
     exit 1
 fi
 
