@@ -15,6 +15,12 @@ else
     libDir="${progDir}/lib"
 fi
 
+# Calls `json-val`. This script is used enough to warrant having it be easier to
+# say than `lib json-val ...`.
+function jval {
+    lib json-val "$@"
+}
+
 # Calls through to an arbitrary library script.
 function lib {
     if (( $# == 0 )); then
