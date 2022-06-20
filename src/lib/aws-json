@@ -19,8 +19,8 @@ function init-prog {
 }
 init-prog
 
-# Load the helper library.
-. "${progDir}/lib/init"
+# Set up for library-internal usage.
+. "${progDir}/init" --lib
 
 
 #

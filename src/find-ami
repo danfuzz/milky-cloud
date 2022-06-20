@@ -120,7 +120,7 @@ awsRegion="$(lib region-from-zone "${inLocation}")" \
 # zone.
 
 foundInstanceType="$(
-"${progDir}/aws-json" ec2 describe-instance-type-offerings \
+lib aws-json ec2 describe-instance-type-offerings \
     --in="${awsRegion}" \
     inLocation="${inLocation}" \
     instanceType="${instanceType}" \
@@ -150,7 +150,7 @@ fi
 # ignoring `i386` which we don't care about (`x86_64` is the modern choice).
 
 architecture="$(
-"${progDir}/aws-json" ec2 describe-instance-types \
+lib aws-json ec2 describe-instance-types \
     --in="${awsRegion}" \
     instanceType="${instanceType}" \
     '{ InstanceTypes: [$instanceType] }' \
@@ -172,7 +172,7 @@ fi
 
 thisYear="$(date "+%Y")"
 
-"${progDir}/aws-json" ec2 describe-images \
+lib aws-json ec2 describe-images \
     --in="${awsRegion}" \
     amiNamePattern="${amiNamePattern}" \
     architecture:json="${architecture}" \
