@@ -37,8 +37,8 @@ function lib {
     fi
 }
 
-# Calls through to the prerequisite checker if it doesn't seem to have yet been
-# run in this session.
+# Calls the prerequisite checker if it doesn't seem to have yet been run in this
+# session.
 if [[ ${MILKY_CLOUD_PREREQUISITES_DONE} != 1 ]]; then
     if lib check-prerequisites; then
         export MILKY_CLOUD_PREREQUISITES_DONE=1
