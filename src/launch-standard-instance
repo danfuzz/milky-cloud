@@ -175,7 +175,6 @@ jq -n \
     {
         ImageId:      $imageId,
         InstanceType: $instanceType,
-        KeyName:      $keyName,
         MaxCount:     1,
         Placement:    { AvailabilityZone: $inLocation }
     }
