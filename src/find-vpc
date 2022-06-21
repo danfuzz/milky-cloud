@@ -146,10 +146,9 @@ function do-describe-call {
             echo 1>&2 'No such VPC.'
             return 1
             ;;
-        *)
-            echo "${vpcId}"
-            ;;
     esac
+
+    echo "${vpcId}"
 }
 
 # Find a VPC by looking through all the VPCs.
