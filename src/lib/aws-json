@@ -169,7 +169,7 @@ fullCommand=(
 
 if [[ ${printArgumentsTo} != '' ]]; then
     # Use `jval` to get color output when appropriate.
-    jval -- "${jsonArg}" > "${printArgumentsTo}"
+    jval -- "${jsonArg}" >"${printArgumentsTo}"
 fi
 
 if [[ ${printCommandTo} != '' ]]; then
