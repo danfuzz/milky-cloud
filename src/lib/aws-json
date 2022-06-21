@@ -157,7 +157,9 @@ awsResult="$("${awsCommand[@]}")" \
     exit 1
 }
 
-if (( ${#resultConstructor[@]} != 0 )); then
+if (( ${#resultConstructor[@]} == 0 )); then
+    echo "${awsResult}"
+else
     jval -- \
         result:json="${awsResult}" \
         "${resultConstructor[@]}" \
