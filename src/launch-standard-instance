@@ -154,65 +154,60 @@ fi
 
 # Form the main command, and do it!
 
-imageId="$(jval --raw "${amiInfo}.ImageId")"
+# Label for the command arguments, which get spit out immediately below.
+echo 1>&2 ''
+echo 1>&2 'Launch arguments:'
 
 # Note: If a subnet ID is provided, then it implies the availability zone, in
 # which case one doesn't also need to specify the availability zone explicitly.
 # However, it's easier just to include it because this script is also meant to
 # work when a security group and subnet aren't specified.
-awsArgs="$(
-jq -n \
-    --arg imageId "${imageId}" \
-    --arg inLocation "${inLocation}" \
-    --arg instanceType "${instanceType}" \
-    --arg keyName "${keyName}" \
-    --arg name "${name}" \
-    --arg securityGroup "${securityGroup}" \
-    --arg subnetId "${subnetId}" \
-'
-    {
-        ImageId:      $imageId,
-        InstanceType: $instanceType,
-        MaxCount:     1,
-        Placement:    { AvailabilityZone: $inLocation }
-    }
-    + if $keyName == "" then {} else { KeyName: $keyName } end
-    + if $name == "" then {}
-      else {
-          TagSpecifications: [
-              {
-                  ResourceType: "instance",
-                  Tags: [
-                      {
-                          Key: "Name",
-                          Value: $name
-                      }
-                  ]
-              }
-          ]
-      }
-      end
-    + if $securityGroup == "" then {} else { SecurityGroupIds: [$securityGroup] } end
-    + if $subnetId == "" then {} else { SubnetId: $subnetId } end
-')"
-
-# Label for the command arguments, which get spit out immediately below.
-echo 1>&2 ''
-echo 1>&2 'Launch arguments:'
-
+#
 # Note: Public IP and DNS are de facto (usually?) not set in the output from
 # `ec2 run-instances`.
 ec2-json run-instances \
     --in="${inRegion}" \
     --print-arguments-to=/dev/stderr \
-    "${awsArgs}" \
+    amiInfo:json="${amiInfo}" \
+    inLocation="${inLocation}" \
+    instanceType="${instanceType}" \
+    keyName="${keyName}" \
+    name="${name}" \
+    securityGroup="${securityGroup}" \
+    subnetId="${subnetId}" \
+    '
+        {
+            ImageId:      $amiInfo.ImageId,
+            InstanceType: $instanceType,
+            MaxCount:     1,
+            Placement:    { AvailabilityZone: $inLocation }
+        }
+        + if $keyName == "" then {} else { KeyName: $keyName } end
+        + if $securityGroup == "" then {} else { SecurityGroupIds: [$securityGroup] } end
+        + if $subnetId == "" then {} else { SubnetId: $subnetId } end
+        + if $name == "" then {}
+          else {
+              TagSpecifications: [
+                  {
+                      ResourceType: "instance",
+                      Tags: [
+                          {
+                              Key: "Name",
+                              Value: $name
+                          }
+                      ]
+                  }
+              ]
+          }
+          end
+    ' \
     :: \
-'
-    $result | .Instances[0]
-    |
-    {
-        InstanceId: .InstanceId,
-        PrivateDnsName: .PrivateDnsName,
-        PrivateIpAddress: .PrivateIpAddress
-    }
-'
+    '
+        $result | .Instances[0]
+        |
+        {
+            InstanceId: .InstanceId,
+            PrivateDnsName: .PrivateDnsName,
+            PrivateIpAddress: .PrivateIpAddress
+        }
+    '
