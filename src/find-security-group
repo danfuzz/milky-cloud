@@ -126,7 +126,7 @@ ec2-json describe-security-groups \
     }' \
     :: \
     '
-        $result | .SecurityGroups | map({ id: .GroupId, name: .GroupName })
+        .SecurityGroups | map({ id: .GroupId, name: .GroupName })
         |
         {
             count: (. | length),

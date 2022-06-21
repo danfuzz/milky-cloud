@@ -137,7 +137,7 @@ ec2-json describe-instance-type-offerings \
             }
         ]
     }' \
-    :: '$result.InstanceTypeOfferings | length'
+    :: '.InstanceTypeOfferings | length'
 )" \
 || exit "$?"
 
@@ -155,7 +155,7 @@ ec2-json describe-instance-types \
     instanceType="${instanceType}" \
     '{ InstanceTypes: [$instanceType] }' \
     :: '
-        $result.InstanceTypes[0].ProcessorInfo.SupportedArchitectures
+        .InstanceTypes[0].ProcessorInfo.SupportedArchitectures
         | map(select(. != "i386"))
         | .[0] // "error"
     '
@@ -207,7 +207,7 @@ ec2-json describe-images \
         ]
     }' \
     :: '
-    $result.Images | max_by(.CreationDate)
+    .Images | max_by(.CreationDate)
     |
     {
         Description: .Description,

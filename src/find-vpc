@@ -122,7 +122,7 @@ function do-describe-call {
         }' \
         :: \
         topKey="${topKey}" \
-        '$result[$topKey] | map(.VpcId) | unique'
+        '.[$topKey] | map(.VpcId) | unique'
     )" \
     || return "$?"
 

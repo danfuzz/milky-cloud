@@ -125,7 +125,7 @@ if (( ${showHelp} || ${argError} )); then
     echo '  with successful result optionally post-processed through `json-val`.'
     echo '  If no argument expression is supplied, the value `{}` (an empty object)'
     echo '  is passed to the command. When post-processing, the original result is'
-    echo '  available as `$result`.'
+    echo '  available as an value on stdin.'
     echo ''
     echo '  <cmd> <subcommand>'
     echo '    The AWS command and subcommand to call, e.g. `ec2 run-instances`.'
@@ -182,15 +182,15 @@ result="$("${fullCommand[@]}")" \
     exit 1
 }
 
+# Even if there's no result filter, use `jval` to automatically get color output
+# when appropriate.
 if (( ${#resultConstructor[@]} == 0 )); then
-    # Use `jval` to get color output when appropriate.
-    jval -- "${result}"
-else
-    jval \
-        result:json="${result}" \
-        "${resultConstructor[@]}" \
-    || {
-        echo 1>&2 'Trouble parsing result filter.'
-        exit 1
-    }
+    resultConstructor=('.')
 fi
+
+jval --read-stdin -- \
+    "${resultConstructor[@]}" <<< "${result}" \
+|| {
+    echo 1>&2 'Trouble filtering result.'
+    exit 1
+}

@@ -203,7 +203,7 @@ ec2-json run-instances \
     ' \
     :: \
     '
-        $result | .Instances[0]
+        .Instances[0]
         |
         {
             InstanceId: .InstanceId,

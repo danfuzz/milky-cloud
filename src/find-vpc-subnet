@@ -125,7 +125,7 @@ result="$(ec2-json describe-subnets \
             }
         ]
     }' \
-    :: '$result.Subnets | map(.SubnetId)' \
+    :: '.Subnets | map(.SubnetId)' \
 )" \
 || exit "$?"
 
