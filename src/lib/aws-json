@@ -60,7 +60,7 @@ argConstructor=()
 # postprocessing.
 resultConstructor=()
 
-while (( $# > 0 )); do
+while (( $# > 0 && !${argError} )); do
     case "$1" in
         -h|--help)
             showHelp=1
