@@ -38,8 +38,8 @@ if ! ( (( $# >= 2 )) && [[ $1 =~ ^[a-z] ]] && [[ $2 =~ ^[a-z] ]] ); then
     echo 1>&2 'Missing AWS command and/or subcommand.'
     argError=1
 else
-    awsCommand="$1"
-    awsSubcommand="$2"
+    command="$1"
+    subcommand="$2"
     shift 2
 fi
 
@@ -160,8 +160,8 @@ if (( ${#argConstructor[@]} > 0 )); then
     }
 fi
 
-awsCommand=(
-    aws "${awsCommand}" "${awsSubcommand}"
+fullCommand=(
+    aws "${command}" "${subcommand}"
     --region="${inRegion}"
     --output=json
     --cli-input-json="${jsonArg}"
@@ -173,10 +173,10 @@ if [[ ${printArgumentsTo} != '' ]]; then
 fi
 
 if [[ ${printCommandTo} != '' ]]; then
-    echo "${awsCommand[@]}" >"${printCommandTo}"
+    echo "${fullCommand[@]}" >"${printCommandTo}"
 fi
 
-result="$("${awsCommand[@]}")" \
+result="$("${fullCommand[@]}")" \
 || {
     echo 1>&2 'Trouble running AWS command.'
     exit 1
