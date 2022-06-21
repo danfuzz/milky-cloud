@@ -132,16 +132,13 @@ if (( $? != 0 )); then
     exit "$?"
 fi
 
-jq -n --raw-output \
-    --argjson amiInfo "${amiInfo}" \
-'
-    $amiInfo | (
+jval --raw "${amiInfo}" \
+    '| (
         "Using AMI:",
         "  desc: " + .Description,
         "  name: " + .Name,
         "  id:   " + .ImageId
-    )
-'
+    )'
 
 # Resolve the security group and subnet IDs, if necessary.
 
@@ -159,9 +156,7 @@ fi
 
 # Form the main command, and do it!
 
-imageId="$(
-    jq -n --raw-output --argjson amiInfo "${amiInfo}" '$amiInfo | .ImageId'
-)"
+imageId="$(jval --raw "${amiInfo}.ImageId")"
 
 # Note: If a subnet ID is provided, then it implies the availability zone, in
 # which case one doesn't also need to specify the availability zone explicitly.
@@ -203,7 +198,6 @@ jq -n \
     + if $securityGroup == "" then {} else { SecurityGroupIds: [$securityGroup] } end
     + if $subnetId == "" then {} else { SubnetId: $subnetId } end
 ')"
-
 
 echo ''
 echo 'Launch arguments:'
