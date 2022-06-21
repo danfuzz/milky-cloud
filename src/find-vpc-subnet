@@ -103,14 +103,14 @@ fi
 # Main script
 #
 
-awsRegion="$(lib region-from-zone "${inLocation}")" \
+inRegion="$(lib region-from-zone "${inLocation}")" \
 || exit "$?"
 
-vpcId="$(lib find-vpc --in="${awsRegion}" "${nameOrId}")" \
+vpcId="$(lib find-vpc --in="${inRegion}" "${nameOrId}")" \
 || exit "$?"
 
 result="$(ec2-json describe-subnets \
-    --in="${awsRegion}" \
+    --in="${inRegion}" \
     zone="${inLocation}" \
     vpcId="${vpcId}" \
     '{

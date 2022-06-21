@@ -109,7 +109,7 @@ function do-describe-call {
 
     local result
     result="$(ec2-json "${commandName}" \
-        --in="${awsRegion}" \
+        --in="${inRegion}" \
         filterName="${filterName}" \
         nameOrId="${nameOrId}" \
         '{
@@ -170,7 +170,7 @@ function find-via-describe-security-groups {
 # Main script
 #
 
-awsRegion="$(lib region-from-location "${inLocation}")" \
+inRegion="$(lib region-from-location "${inLocation}")" \
 || exit "$?"
 
 if [[ ${nameOrId} =~ ^vpc- ]]; then

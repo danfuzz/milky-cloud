@@ -113,7 +113,7 @@ fi
 # Main script
 #
 
-awsRegion="$(lib region-from-zone "${inLocation}")" \
+inRegion="$(lib region-from-zone "${inLocation}")" \
 || exit "$?"
 
 # Check to see if the indicated instance type is available in the availability
@@ -121,7 +121,7 @@ awsRegion="$(lib region-from-zone "${inLocation}")" \
 
 foundInstanceType="$(
 ec2-json describe-instance-type-offerings \
-    --in="${awsRegion}" \
+    --in="${inRegion}" \
     inLocation="${inLocation}" \
     instanceType="${instanceType}" \
     '{
@@ -151,7 +151,7 @@ fi
 
 architecture="$(
 ec2-json describe-instance-types \
-    --in="${awsRegion}" \
+    --in="${inRegion}" \
     instanceType="${instanceType}" \
     '{ InstanceTypes: [$instanceType] }' \
     :: '
@@ -173,7 +173,7 @@ fi
 thisYear="$(date "+%Y")"
 
 ec2-json describe-images \
-    --in="${awsRegion}" \
+    --in="${inRegion}" \
     amiNamePattern="${amiNamePattern}" \
     architecture:json="${architecture}" \
     thisYear:json="${thisYear}" \

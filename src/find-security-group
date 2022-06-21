@@ -100,7 +100,7 @@ fi
 # Main script
 #
 
-awsRegion="$(lib region-from-location "${inLocation}")" \
+inRegion="$(lib region-from-location "${inLocation}")" \
 || exit "$?"
 
 if [[ ${nameOrId} =~ ^sg- ]]; then
@@ -113,7 +113,7 @@ fi
 
 result="$(
 ec2-json describe-security-groups \
-    --in="${awsRegion}" \
+    --in="${inRegion}" \
     filterName="${filterName}" \
     nameOrId="${nameOrId}" \
     '{
