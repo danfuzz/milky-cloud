@@ -146,8 +146,8 @@ if (( !${foundInstanceType} )); then
     exit 1
 fi
 
-# `aws ec2 describe-instance-types` to extract the supported architecture,
-# ignoring `i386` which we don't care about (`x86_64` is the modern choice).
+# `describe-instance-types` to extract the supported architecture, ignoring
+# `i386` which we don't care about (`x86_64` is the modern choice).
 
 architecture="$(
 ec2-json describe-instance-types \
@@ -168,7 +168,7 @@ if [[ ${architecture} == '"error"' ]]; then
     exit 1
 fi
 
-# `aws ec2 describe-images` to find the most recent salient AMI.
+# `describe-images` to find the most recent salient AMI.
 
 thisYear="$(date "+%Y")"
 
