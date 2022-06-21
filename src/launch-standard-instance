@@ -118,8 +118,8 @@ fi
 inRegion="$(lib region-from-zone "${inLocation}")" \
 || exit "$?"
 
-echo "type:      ${instanceType}"
-echo "in:        ${inRegion} / ${inLocation}"
+echo 1>&2 "type: ${instanceType}"
+echo 1>&2 "in:   ${inRegion} / ${inLocation}"
 
 # Figure out the correct AMI.
 
@@ -132,7 +132,7 @@ if (( $? != 0 )); then
     exit "$?"
 fi
 
-jval --raw "${amiInfo}" \
+jval 1>&2 --raw "${amiInfo}" \
     '| (
         "Using AMI:",
         "  desc: " + .Description,
@@ -148,10 +148,8 @@ if [[ ${securityGroup} != '' ]]; then
     || exit 1
     vpcId="$(lib find-vpc --in="${inLocation}" "${securityGroup}")" \
     || exit 1
-    echo "VPC:       ${vpcId}"
     subnetId="$(lib find-vpc-subnet --in="${inLocation}" --vpc="${vpcId}")" \
     || exit 1
-    echo "subnet:    ${subnetId}"
 fi
 
 # Form the main command, and do it!
@@ -198,26 +196,20 @@ jq -n \
     + if $subnetId == "" then {} else { SubnetId: $subnetId } end
 ')"
 
-echo ''
-echo 'Launch arguments:'
-echo "${awsArgs}"
-
-awsResult="$(
-aws ec2 run-instances \
-    --region="${inRegion}" \
-    --cli-input-json "${awsArgs}"
-)"
-
-if (( $? != 0 )); then
-    exit "$?"
-fi
+# Label for the command arguments, which get spit out immediately below.
+echo 1>&2 ''
+echo 1>&2 'Launch arguments:'
 
 # Note: Public IP and DNS are de facto (usually?) not set in the output from
 # `ec2 run-instances`.
-jq -n --raw-output \
-    --argjson info "${awsResult}" \
+ec2-json run-instances \
+    --in="${inRegion}" \
+    --print-arguments-to=/dev/stderr \
+    "${awsArgs}" \
+    :: \
 '
-    $info | .Instances[0] |
+    $result | .Instances[0]
+    |
     {
         InstanceId: .InstanceId,
         PrivateDnsName: .PrivateDnsName,
