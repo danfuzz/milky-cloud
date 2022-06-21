@@ -176,7 +176,7 @@ if [[ ${printCommandTo} != '' ]]; then
     echo "${awsCommand[@]}" >"${printCommandTo}"
 fi
 
-awsResult="$("${awsCommand[@]}")" \
+result="$("${awsCommand[@]}")" \
 || {
     echo 1>&2 'Trouble running AWS command.'
     exit 1
@@ -184,10 +184,10 @@ awsResult="$("${awsCommand[@]}")" \
 
 if (( ${#resultConstructor[@]} == 0 )); then
     # Use `jval` to get color output when appropriate.
-    jval -- "${awsResult}"
+    jval -- "${result}"
 else
     jval \
-        result:json="${awsResult}" \
+        result:json="${result}" \
         "${resultConstructor[@]}" \
     || {
         echo 1>&2 'Trouble parsing result filter.'
