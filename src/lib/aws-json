@@ -169,7 +169,7 @@ awsCommand=(
 
 if [[ ${printArgumentsTo} != '' ]]; then
     # Use `jval` to get color output when appropriate.
-    jval "${jsonArg}" > "${printArgumentsTo}"
+    jval -- "${jsonArg}" > "${printArgumentsTo}"
 fi
 
 if [[ ${printCommandTo} != '' ]]; then
@@ -183,9 +183,10 @@ awsResult="$("${awsCommand[@]}")" \
 }
 
 if (( ${#resultConstructor[@]} == 0 )); then
-    echo "${awsResult}"
+    # Use `jval` to get color output when appropriate.
+    jval -- "${awsResult}"
 else
-    jval -- \
+    jval \
         result:json="${awsResult}" \
         "${resultConstructor[@]}" \
     || {
