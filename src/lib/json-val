@@ -27,6 +27,9 @@ init-prog
 # Argument parsing
 #
 
+# Read stdin?
+readStdin=0
+
 # Output style.
 outputStyle=normal
 
@@ -56,6 +59,9 @@ while (( $# > 0 )); do
             ;;
         --raw)
             outputStyle=raw
+            ;;
+        --read-stdin)
+            readStdin=1
             ;;
         --)
             # Explicit end of options
@@ -118,7 +124,9 @@ if (( ${showHelp} || ${argError} )); then
     echo ''
     echo "${progName} [<opt> ...] [--] [<assignment> ...] [--] <jq-expression> ..."
     echo '  Constructs and prints one or more JSON values from variable'
-    echo '  assignments passed into an expression evaluated by `jq --null-input`.'
+    echo '  assignments passed into an expression evaluated by `jq` either with'
+    echo ' `--null-input` (by default) or as a usual pipeline over input values.'
+    echo ''
     echo '  The <jq-expression> arguments are concatenated together (separated by'
     echo '  spaces) to form the final expression to be evaluated.'
     echo ''
@@ -130,6 +138,8 @@ if (( ${showHelp} || ${argError} )); then
     echo '    Output in compact form (not multiline JSON).'
     echo '  --raw'
     echo '    Output raw strings (and other values compactly).'
+    echo '  --read-stdin'
+    echo '    Read value(s) from stdin to form pipeline input.'
     echo ''
     echo "${progName} [--help | -h]"
     echo '  Displays this message.'
@@ -141,7 +151,11 @@ fi
 # Main script
 #
 
-jqArgs=('--null-input')
+jqArgs=()
+
+if (( !${readStdin} )); then
+    jqArgs+=('--null-input')
+fi
 
 case "${outputStyle}" in
     compact)
