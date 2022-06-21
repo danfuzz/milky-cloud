@@ -109,14 +109,11 @@ awsRegion="$(lib region-from-zone "${inLocation}")" \
 vpcId="$(lib find-vpc --in="${awsRegion}" "${nameOrId}")" \
 || exit "$?"
 
-# aws ec2 describe-subnets
-
-awsArgs="$(
-jq -n \
-    --arg zone "${inLocation}" \
-    --arg vpcId "${vpcId}" \
-'
-    {
+result="$(ec2-json describe-subnets \
+    --in="${awsRegion}" \
+    zone="${inLocation}" \
+    vpcId="${vpcId}" \
+    '{
         Filters: [
             {
                 Name: "availability-zone",
@@ -127,45 +124,30 @@ jq -n \
                 Values: [$vpcId]
             }
         ]
-    }
-')"
+    }' \
+    :: '$result.Subnets | map(.SubnetId)' \
+)" \
+|| exit "$?"
 
-awsResult="$(
-aws ec2 describe-subnets \
-    --region="${awsRegion}" \
-    --cli-input-json="${awsArgs}" \
-|| echo 'error'
-)"
-
-if [[ ${awsResult} == 'error' ]]; then
-    # In this case, `aws` will have spewed an error message of some sort, we
-    # hope!
-    exit 1
-fi
-
-subnetId="$(jq -n --raw-output \
-    --argjson info "${awsResult}" \
-'
-    $info
-    | .Subnets
+subnetId="$(jval --raw \
+    "${result}" '
     |
-    if length == 0 then "subnet-none"
-    elif length == 1 then .[0].SubnetId
-    else "subnet-ambiguous"
+    if length == 0 then "none"
+    elif length == 1 then .[0]
+    else "ambiguous"
     end
 ')"
 
-if [[ ${subnetId} == 'subnet-none' ]]; then
-    echo 1>&2 'No such subnet.'
-    exit 1
-elif [[ ${subnetId} == 'subnet-ambiguous' ]]; then
-    echo 1>&2 'Ambiguous specification matches all of:'
-    jq 1>&2 -n --raw-output \
-        --argjson info "${awsResult}" \
-    '
-        $info | .Subnets | .[] | "  " + .SubnetId
-    '
-    exit 1
-fi
+case "${subnetId}" in
+    ambiguous)
+        echo 1>&2 'Ambiguous specification matches all of:'
+        jval 1>&2 --raw "${result}" '[] | "  " + .'
+        exit 1
+        ;;
+    none)
+        echo 1>&2 'No such subnet.'
+        exit 1
+        ;;
+esac
 
 echo "${subnetId}"
