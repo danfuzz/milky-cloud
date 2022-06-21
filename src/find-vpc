@@ -107,38 +107,21 @@ function do-describe-call {
     local filterName="$3"
     local nameOrId="$4"
 
-    local awsArgs="$(
-    jq -n \
-        --arg filterName "${filterName}" \
-        --arg nameOrId "${nameOrId}" \
-    '
-        {
+    ec2-json "${commandName}" \
+        --in="${awsRegion}" \
+        filterName="${filterName}" \
+        nameOrId="${nameOrId}" \
+        '{
             Filters: [
                 {
                     Name: $filterName,
                     Values: [$nameOrId]
                 }
             ]
-        }
-    ')"
-
-    local awsResult="$(
-    aws ec2 "${commandName}" \
-        --region="${awsRegion}" \
-        --cli-input-json="${awsArgs}" \
-    || echo 'error'
-    )"
-
-    if [[ ${awsResult} == 'error' ]]; then
-        # In this case, `aws` will have spewed an error message of some sort, we
-        # hope!
-        exit 1
-    fi
-
-    jq -n --raw-output \
-        --argjson info "${awsResult}" \
-        --arg topKey "${topKey}" \
-        '$info | .[$topKey]'
+        }' \
+        :: \
+        topKey="${topKey}" \
+        '$result[$topKey]'
 }
 
 # Find a VPC by looking through all the VPCs.
