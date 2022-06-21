@@ -107,7 +107,8 @@ function do-describe-call {
     local filterName="$3"
     local nameOrId="$4"
 
-    ec2-json "${commandName}" \
+    local result
+    result="$(ec2-json "${commandName}" \
         --in="${awsRegion}" \
         filterName="${filterName}" \
         nameOrId="${nameOrId}" \
@@ -121,7 +122,34 @@ function do-describe-call {
         }' \
         :: \
         topKey="${topKey}" \
-        '$result[$topKey]'
+        '$result[$topKey] | map(.VpcId) | unique'
+    )" \
+    || return "$?"
+
+    local vpcId
+    vpcId="$(jval --raw \
+        "${result}" '
+        |
+        if length == 0 then "none"
+        elif length == 1 then .[0]
+        else "ambiguous"
+        end
+    ')"
+
+    case "${vpcId}" in
+        ambiguous)
+            echo 1>&2 'Ambiguous name or ID matches all of:'
+            jval 1>&2 --raw "${result}" '[] | "  " + .'
+            return 1
+            ;;
+        none)
+            echo 1>&2 'No such VPC.'
+            return 1
+            ;;
+        *)
+            echo "${vpcId}"
+            ;;
+    esac
 }
 
 # Find a VPC by looking through all the VPCs.
@@ -129,70 +157,14 @@ function find-via-describe-vpcs {
     local filterName="$1"
     local nameOrId="$2"
 
-    local awsResult
-    awsResult="$(do-describe-call describe-vpcs Vpcs "${filterName}" "${nameOrId}")" \
-    || exit "$?"
-
-    local vpcId="$(jq -n --raw-output \
-        --argjson info "${awsResult}" \
-    '
-        $info
-        |
-        if length == 0 then "vpc-none"
-        elif length == 1 then .[0].VpcId
-        else "vpc-ambiguous"
-        end
-    ')"
-
-    if [[ ${vpcId} == 'vpc-none' ]]; then
-        echo 1>&2 'No such VPC.'
-        exit 1
-    elif [[ ${vpcId} == 'vpc-ambiguous' ]]; then
-        echo 1>&2 'Ambiguous name or ID matches all of:'
-        jq 1>&2 -n --raw-output \
-            --argjson info "${awsResult}" \
-        '
-            $info | .[] | "  " + .VpcId
-        '
-        exit 1
-    fi
-
-    echo "${vpcId}"
+    do-describe-call describe-vpcs Vpcs "${filterName}" "${nameOrId}"
 }
 
 # Find a VPC from an associated security group.
 function find-via-describe-security-groups {
     local nameOrId="$1"
 
-    local awsResult
-    awsResult="$(do-describe-call describe-security-groups SecurityGroups group-id "${nameOrId}")" \
-    || exit "$?"
-
-    vpcId="$(jq -n --raw-output \
-        --argjson info "${awsResult}" \
-    '
-        $info
-        |
-        if length == 0 then "vpc-none"
-        elif length == 1 then .[0].VpcId
-        else "vpc-ambiguous"
-        end
-    ')"
-
-    if [[ ${vpcId} == 'vpc-none' ]]; then
-        echo 1>&2 'No such VPC.'
-        exit 1
-    elif [[ ${vpcId} == 'vpc-ambiguous' ]]; then
-        echo 1>&2 'Unexpected, Ambiguous security group ID matches all of:'
-        jq 1>&2 -n --raw-output \
-            --argjson info "${awsResult}" \
-        '
-            $info | .[] | "  " + .VpcId
-        '
-        exit 1
-    fi
-
-    echo "${vpcId}"
+    do-describe-call describe-security-groups SecurityGroups group-id "${nameOrId}"
 }
 
 #
