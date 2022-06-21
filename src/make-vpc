@@ -106,31 +106,24 @@ fi
 inRegion="$(lib region-from-location "${inLocation}")" \
 || exit "$?"
 
-# aws vpc create-vpc
-
-awsArgs="$(
-jq -n \
-    --arg inLocation "${inLocation}" \
-    --arg name "${name}" \
-'
-    {
-        CidrBlock: "10.1.0.0/16",
-        AmazonProvidedIpv6CidrBlock: true,
-        InstanceTenancy: "default",
-        TagSpecifications: [
-            {
-                ResourceType: "vpc",
-                Tags: [
-                    {
-                        Key: "Name",
-                        Value: $name
-                    }
-                ]
-            }
-        ]
-    }
-')"
-
-aws ec2 create-vpc \
-    --region="${inRegion}" \
-    --cli-input-json="${awsArgs}"
+ec2-json create-vpc \
+    --in="${inRegion}" \
+    name="${name}" \
+    '
+        {
+            CidrBlock: "10.1.0.0/16",
+            AmazonProvidedIpv6CidrBlock: true,
+            InstanceTenancy: "default",
+            TagSpecifications: [
+                {
+                    ResourceType: "vpc",
+                    Tags: [
+                        {
+                            Key: "Name",
+                            Value: $name
+                        }
+                    ]
+                }
+            ]
+        }
+    '
