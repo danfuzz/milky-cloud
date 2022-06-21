@@ -46,6 +46,12 @@ fi
 # Location (region or availability zone).
 inLocation=''
 
+# File to print the constructed arguments to.
+printArgumentsTo=''
+
+# File to print the constructed command to.
+printCommandTo=''
+
 # Assignments and expression arguments to use to construct the value to pass to
 # the AWS command.
 argConstructor=()
@@ -62,6 +68,12 @@ while (( $# > 0 )); do
             ;;
         --in=?*)
             inLocation="${1#*=}"
+            ;;
+        --print-arguments-to=?*)
+            printArgumentsTo="${1#*=}"
+            ;;
+        --print-command-to=?*)
+            printCommandTo="${1#*=}"
             ;;
         --)
             # Explicit end of options
@@ -121,6 +133,10 @@ if (( ${showHelp} || ${argError} )); then
     echo '  --in=<region-or-zone>'
     echo '    What region to make the call in. Must be specified. If specified as'
     echo '    an availability zone, only the region portion matters.'
+    echo '  --print-arguments-to=<file>'
+    echo '    Name of a file to print the constructed arguments to.'
+    echo '  --print-command-to=<file>'
+    echo '    Name of a file to print the fully-constructed command to.'
     echo ''
     echo "${progName} [--help | -h]"
     echo '  Displays this message.'
@@ -150,6 +166,15 @@ awsCommand=(
     --output=json
     --cli-input-json="${jsonArg}"
 )
+
+if [[ ${printArgumentsTo} != '' ]]; then
+    # Use `jval` to get color output when appropriate.
+    jval "${jsonArg}" > "${printArgumentsTo}"
+fi
+
+if [[ ${printCommandTo} != '' ]]; then
+    echo "${awsCommand[@]}" >"${printCommandTo}"
+fi
 
 awsResult="$("${awsCommand[@]}")" \
 || {
