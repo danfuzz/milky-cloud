@@ -1,0 +1,202 @@
+#!/bin/bash
+#
+# Copyright 2022 Dan Bornstein.
+# Licensed AS IS and WITHOUT WARRANTY under the Apache License,
+# Version 2.0. Details: <http://www.apache.org/licenses/LICENSE-2.0>
+
+# Set `progName` to the program name, `progDir` to its directory, and `baseDir`
+# to `progDir`'s directory. Follows symlinks.
+function init-prog {
+    local newp p="$0"
+
+    while newp="$(readlink "$p")"; do
+        [[ ${newp} =~ ^/ ]] && p="${newp}" || p="$(dirname "$p")/${newp}"
+    done
+
+    progName="${p##*/}"
+    progDir="$(cd "$(dirname "$p")"; /bin/pwd -P)"
+    baseDir="$(cd "${progDir}/.."; /bin/pwd -P)"
+}
+init-prog
+
+# Load the helper library.
+. "${progDir}/lib/init"
+
+
+#
+# Argument parsing
+#
+
+# Error during argument processing?
+argError=0
+
+# Need help?
+showHelp=0
+
+# Description of the security group.
+description=''
+
+# Location (region or availability zone).
+inLocation=''
+
+# Name of the security group.
+name=''
+
+# Name or ID of the VPC.
+vpcNameOrId=''
+
+while (( $# > 0 )); do
+    case "$1" in
+        -h|--help)
+            showHelp=1
+            break
+            ;;
+        --description=?*)
+            description="${1#*=}"
+            ;;
+        --in=?*)
+            inLocation="${1#*=}"
+            ;;
+        --name=?*)
+            name="${1#*=}"
+            ;;
+        --vpc=?*)
+            vpcNameOrId="${1#*=}"
+            ;;
+        --)
+            # Explicit end of options
+            shift
+            break
+            ;;
+        -?*)
+            echo 1>&2 "Unknown option: $1"
+            argError=1
+            break
+            ;;
+        *)
+            # Non-option argument
+            break
+            ;;
+    esac
+
+    shift
+done
+
+if (( !${argError} )); then
+    if [[ ${inLocation} == '' ]]; then
+        echo 1>&2 'Missing option: --in'
+        argError=1
+    fi
+    if [[ ${vpcNameOrId} == '' ]]; then
+        echo 1>&2 'Missing option: --vpc'
+        argError=1
+    fi
+fi
+
+if (( ${showHelp} || ${argError} )); then
+    echo 'Usage:'
+    echo ''
+    echo "${progName} [<opt> ...]"
+    echo '  Makes a new security group, configured in a standard way.'
+    echo ''
+    echo '  --description=<description>'
+    echo '    Brief description of the security group. If not specified, fairly'
+    echo '    generic and content-free text is used (because it does need to be'
+    echo '    defined on the result).'
+    echo '  --in=<region-or-zone>'
+    echo '    What region to make the security group in. Must be specified. If'
+    echo '    specified as an availability zone, only the region portion matters.'
+    echo '  --name=<name>'
+    echo '    Name to assign to the constructed VPC. If not specified, a name is'
+    echo '    derived from the associated VPC.'
+    echo '  --vpc=<name-or-id>'
+    echo '    Name or ID of the VPC to be associated with. Must be specified.'
+    echo ''
+    echo "${progName} [--help | -h]"
+    echo '  Displays this message.'
+    exit "${argError}"
+fi
+
+
+#
+# Helper functions
+#
+
+# Figures out a name for the security group: If the VPC has a name, use that.
+# Or, if the VPC doesn't have a name, then just use the VPC ID (with a
+# suggestive prefix).
+function figure-out-name {
+    local name
+
+    name=$(ec2-json describe-vpcs \
+        --raw \
+        --in="${inRegion}" \
+        vpcId="${vpcId}" \
+        '{
+            Filters: [
+                {
+                    Name:"vpc-id",
+                    Values: [$vpcId]
+                }
+            ]
+        }' \
+        :: \
+        '.Vpcs[0].Tags[] | select(.Key == "Name") | .Value'
+    ) \
+    || return "$?"
+
+    if [[ ${name} == '' ]]; then
+        name="for-${vpcId}"
+    fi
+
+    echo "${name}"
+}
+
+
+#
+# Main script
+#
+
+inRegion="$(lib region-from-location "${inLocation}")" \
+|| exit "$?"
+
+# Validate or find the ID of the VPC.
+vpcId="$(lib find-vpc --in="${inRegion}" "${vpcNameOrId}")" \
+|| exit "$?"
+
+# Figure out the name if not passed as an option.
+if [[ ${name} == '' ]]; then
+    name="$(figure-out-name)" \
+    || exit "$?"
+fi
+
+# Make up a description if not passed as an option.
+if [[ ${description} == '' ]]; then
+    now="$(date -u '+%Y-%m-%d %H:%M:%S %Z')"
+    description="created by script at ${now}"
+fi
+
+ec2-json create-security-group \
+    --print-arguments-to=/dev/stderr \
+    --in="${inRegion}" \
+    description="${description}" \
+    name="${name}" \
+    vpcId="${vpcId}" \
+    '
+        {
+            Description: $description,
+            GroupName: $name,
+            VpcId: $vpcId,
+            TagSpecifications: [
+                {
+                    ResourceType: "security-group",
+                    Tags: [
+                        {
+                            Key: "Name",
+                            Value: $name
+                        }
+                    ]
+                }
+            ]
+        }
+    '
