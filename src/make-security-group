@@ -176,6 +176,7 @@ if [[ ${description} == '' ]]; then
     description="created by script at ${now}"
 fi
 
+# TODO: This seems to incorrectly fail with an error about missing arguments.
 ec2-json create-security-group \
     --print-arguments-to=/dev/stderr \
     --in="${inRegion}" \
