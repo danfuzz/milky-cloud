@@ -127,3 +127,13 @@ ec2-json create-vpc \
             ]
         }
     '
+
+# TODO: Finish this!
+
+# Create a security group.
+
+# Create a subnet per availability zone.
+
+# Create an internet gateway.
+
+# Attach the internet gateway to the VPC.
