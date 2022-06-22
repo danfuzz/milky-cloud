@@ -52,6 +52,9 @@ printArgumentsTo=''
 # File to print the constructed command to.
 printCommandTo=''
 
+# Raw output?
+rawOutput=0
+
 # Assignments and expression arguments to use to construct the value to pass to
 # the AWS command.
 argConstructor=()
@@ -74,6 +77,9 @@ while (( $# > 0 && !${argError} )); do
             ;;
         --print-command-to=?*)
             printCommandTo="${1#*=}"
+            ;;
+        --raw)
+            rawOutput=1
             ;;
         --)
             # Explicit end of options
@@ -137,6 +143,9 @@ if (( ${showHelp} || ${argError} )); then
     echo '    Name of a file to print the constructed arguments to.'
     echo '  --print-command-to=<file>'
     echo '    Name of a file to print the fully-constructed command to.'
+    echo '  --raw'
+    echo '    In the final (possibly filtered) result, output raw strings (and'
+    echo '    other values compactly).'
     echo ''
     echo "${progName} [--help | -h]"
     echo '  Displays this message.'
@@ -182,13 +191,19 @@ result="$("${fullCommand[@]}")" \
     exit 1
 }
 
-# Even if there's no result filter, use `jval` to automatically get color output
-# when appropriate.
+# Note: Even if there's no result filter, we use `jval` to automatically get
+# color output when appropriate and to do "raw" output when requested.
+
 if (( ${#resultConstructor[@]} == 0 )); then
     resultConstructor=('.')
 fi
 
-jval --read-stdin -- \
+jvalOpts=()
+if (( ${rawOutput} )); then
+    jvalOpts+=(--raw)
+fi
+
+jval --read-stdin "${jvalOpts[@]}" -- \
     "${resultConstructor[@]}" <<< "${result}" \
 || {
     echo 1>&2 'Trouble filtering result.'
