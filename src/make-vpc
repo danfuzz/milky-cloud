@@ -85,7 +85,8 @@ if (( ${showHelp} || ${argError} )); then
     echo 'Usage:'
     echo ''
     echo "${progName} [<opt> ...]"
-    echo '  Makes a new VPC, plus associated accouterments.'
+    echo '  Makes a new VPC, plus associated accouterments. On success, prints'
+    echo '  the ID of the created VPC.'
     echo ''
     echo '  --in=<region-or-zone>'
     echo '    What region to make the VPC in. Must be specified. If specified as'
