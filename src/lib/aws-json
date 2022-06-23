@@ -236,7 +236,7 @@ if (( ${rawOutput} )); then
 fi
 
 jval --read-stdin "${jvalOpts[@]}" -- \
-    "${resultConstructor[@]}" <<< "${result}" \
+    "${resultConstructor[@]}" <<<"${result}" \
 || {
     echo 1>&2 'Trouble filtering result.'
     exit 1
