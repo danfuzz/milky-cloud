@@ -24,6 +24,42 @@ init-prog
 
 
 #
+# Helper functions
+#
+
+# Figures out a name for the security group: If the VPC has a name, use that.
+# Or, if the VPC doesn't have a name, then just use the VPC ID (with a
+# suggestive prefix).
+function figure-out-name {
+    local name
+
+    name=$(ec2-json describe-vpcs \
+        --raw \
+        --in="${inRegion}" \
+        vpcId="${vpcId}" \
+        '{
+            Filters: [
+                {
+                    Name:"vpc-id",
+                    Values: [$vpcId]
+                }
+            ]
+        }' \
+        :: \
+        '.Vpcs[0].Tags[] | select(.Key == "Name") | .Value'
+    ) \
+    || return "$?"
+
+    if [[ ${name} == '' ]]; then
+        name="for-${vpcId}"
+    fi
+
+    echo "${name}"
+}
+
+
+
+#
 # Argument parsing
 #
 
@@ -117,41 +153,6 @@ if (( ${showHelp} || ${argError} )); then
     echo '  Displays this message.'
     exit "${argError}"
 fi
-
-
-#
-# Helper functions
-#
-
-# Figures out a name for the security group: If the VPC has a name, use that.
-# Or, if the VPC doesn't have a name, then just use the VPC ID (with a
-# suggestive prefix).
-function figure-out-name {
-    local name
-
-    name=$(ec2-json describe-vpcs \
-        --raw \
-        --in="${inRegion}" \
-        vpcId="${vpcId}" \
-        '{
-            Filters: [
-                {
-                    Name:"vpc-id",
-                    Values: [$vpcId]
-                }
-            ]
-        }' \
-        :: \
-        '.Vpcs[0].Tags[] | select(.Key == "Name") | .Value'
-    ) \
-    || return "$?"
-
-    if [[ ${name} == '' ]]; then
-        name="for-${vpcId}"
-    fi
-
-    echo "${name}"
-}
 
 
 #

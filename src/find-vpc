@@ -24,6 +24,78 @@ init-prog
 
 
 #
+# Helper functions
+#
+
+# Performs a `describe-*` call and passes through the JSON output under the
+# indicated top-level object key.
+function do-describe-call {
+    local commandName="$1"
+    local topKey="$2"
+    local filterName="$3"
+    local nameOrId="$4"
+
+    local result
+    result="$(ec2-json "${commandName}" \
+        --in="${inRegion}" \
+        filterName="${filterName}" \
+        nameOrId="${nameOrId}" \
+        '{
+            Filters: [
+                {
+                    Name: $filterName,
+                    Values: [$nameOrId]
+                }
+            ]
+        }' \
+        :: \
+        topKey="${topKey}" \
+        '.[$topKey] | map(.VpcId) | unique'
+    )" \
+    || return "$?"
+
+    local vpcId
+    vpcId="$(jval --raw \
+        "${result}" '
+        |
+        if length == 0 then "none"
+        elif length == 1 then .[0]
+        else "ambiguous"
+        end
+    ')"
+
+    case "${vpcId}" in
+        ambiguous)
+            echo 1>&2 'Ambiguous name or ID matches all of:'
+            jval 1>&2 --raw "${result}" '[] | "  " + .'
+            return 1
+            ;;
+        none)
+            echo 1>&2 'No such VPC.'
+            return 1
+            ;;
+    esac
+
+    echo "${vpcId}"
+}
+
+# Find a VPC by looking through all the VPCs.
+function find-via-describe-vpcs {
+    local filterName="$1"
+    local nameOrId="$2"
+
+    do-describe-call describe-vpcs Vpcs "${filterName}" "${nameOrId}"
+}
+
+# Find a VPC from an associated security group.
+function find-via-describe-security-groups {
+    local nameOrId="$1"
+
+    do-describe-call describe-security-groups SecurityGroups group-id "${nameOrId}"
+}
+
+
+#
 # Argument parsing
 #
 
@@ -95,76 +167,6 @@ if (( ${showHelp} || ${argError} )); then
     exit "${argError}"
 fi
 
-#
-# Helper functions
-#
-
-# Performs a `describe-*` call and passes through the JSON output under the
-# indicated top-level object key.
-function do-describe-call {
-    local commandName="$1"
-    local topKey="$2"
-    local filterName="$3"
-    local nameOrId="$4"
-
-    local result
-    result="$(ec2-json "${commandName}" \
-        --in="${inRegion}" \
-        filterName="${filterName}" \
-        nameOrId="${nameOrId}" \
-        '{
-            Filters: [
-                {
-                    Name: $filterName,
-                    Values: [$nameOrId]
-                }
-            ]
-        }' \
-        :: \
-        topKey="${topKey}" \
-        '.[$topKey] | map(.VpcId) | unique'
-    )" \
-    || return "$?"
-
-    local vpcId
-    vpcId="$(jval --raw \
-        "${result}" '
-        |
-        if length == 0 then "none"
-        elif length == 1 then .[0]
-        else "ambiguous"
-        end
-    ')"
-
-    case "${vpcId}" in
-        ambiguous)
-            echo 1>&2 'Ambiguous name or ID matches all of:'
-            jval 1>&2 --raw "${result}" '[] | "  " + .'
-            return 1
-            ;;
-        none)
-            echo 1>&2 'No such VPC.'
-            return 1
-            ;;
-    esac
-
-    echo "${vpcId}"
-}
-
-# Find a VPC by looking through all the VPCs.
-function find-via-describe-vpcs {
-    local filterName="$1"
-    local nameOrId="$2"
-
-    do-describe-call describe-vpcs Vpcs "${filterName}" "${nameOrId}"
-}
-
-# Find a VPC from an associated security group.
-function find-via-describe-security-groups {
-    local nameOrId="$1"
-
-    do-describe-call describe-security-groups SecurityGroups group-id "${nameOrId}"
-}
 
 #
 # Main script
