@@ -7,4 +7,41 @@
 # Special case handler to rewrite the arguments to `ec2 create-security-group`,
 # so as to work around this issue: <https://github.com/aws/aws-cli/issues/7058>
 
-echo "$@"
+# Set `progName` to the program name, `progDir` to its directory, and `baseDir`
+# to `progDir`'s directory. Follows symlinks.
+function init-prog {
+    local newp p="$0"
+
+    while newp="$(readlink "$p")"; do
+        [[ ${newp} =~ ^/ ]] && p="${newp}" || p="$(dirname "$p")/${newp}"
+    done
+
+    progName="${p##*/}"
+    progDir="$(cd "$(dirname "$p")"; /bin/pwd -P)"
+    baseDir="$(cd "${progDir}/.."; /bin/pwd -P)"
+}
+init-prog
+
+# Set up for library-internal usage.
+. "${progDir}/init" --lib
+
+
+#
+# Main script
+#
+
+parts="$1"
+
+jval parts:json="${parts}" '
+    $parts
+    | .jsonArg.Description as $description
+    | del(.jsonArg.Description)
+    | .jsonArg.GroupName as $groupName
+    | del(.jsonArg.GroupName)
+    | if $description then
+        .dashArgs += ["--description=" + $description]
+    else . end
+    | if $groupName then
+        .dashArgs += ["--group-name=" + $groupName]
+    else . end
+'
