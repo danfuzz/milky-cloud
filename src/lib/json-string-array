@@ -39,12 +39,12 @@ showHelp=0
 # Parse options.
 while (( $# > 0 )); do
     case "$1" in
+        --compact)
+            compactOutput=1
+            ;;
         -h|--help)
             showHelp=1
             break
-            ;;
-        --compact)
-            compactOutput=1
             ;;
         --)
             # Explicit end of options

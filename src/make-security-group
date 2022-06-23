@@ -83,10 +83,6 @@ vpcNameOrId=''
 
 while (( $# > 0 )); do
     case "$1" in
-        -h|--help)
-            showHelp=1
-            break
-            ;;
         --description=?*)
             description="${1#*=}"
             ;;
@@ -98,6 +94,10 @@ while (( $# > 0 )); do
             ;;
         --vpc=?*)
             vpcNameOrId="${1#*=}"
+            ;;
+        -h|--help)
+            showHelp=1
+            break
             ;;
         --)
             # Explicit end of options

@@ -50,10 +50,6 @@ showHelp=0
 # Parse options.
 while (( $# > 0 )); do
     case "$1" in
-        -h|--help)
-            showHelp=1
-            break
-            ;;
         --compact)
             outputStyle=compact
             ;;
@@ -62,6 +58,10 @@ while (( $# > 0 )); do
             ;;
         --read-stdin)
             readStdin=1
+            ;;
+        -h|--help)
+            showHelp=1
+            break
             ;;
         --)
             # Explicit end of options

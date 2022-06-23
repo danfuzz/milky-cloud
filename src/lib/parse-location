@@ -43,10 +43,6 @@ printItem='none'
 
 while (( $# > 0 )); do
     case "$1" in
-        -h|--help)
-            showHelp=1
-            break
-            ;;
         --input-region)
             inputType='region'
             ;;
@@ -61,6 +57,10 @@ while (( $# > 0 )); do
             ;;
         --print-zone-suffix)
             printItem='zone-suffix'
+            ;;
+        -h|--help)
+            showHelp=1
+            break
             ;;
         --)
             # Explicit end of options

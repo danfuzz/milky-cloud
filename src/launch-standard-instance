@@ -50,10 +50,6 @@ securityGroup=''
 
 while (( $# > 0 )); do
     case "$1" in
-        -h|--help)
-            showHelp=1
-            break
-            ;;
         --in=?*)
             inLocation="${1#*=}"
             ;;
@@ -68,6 +64,10 @@ while (( $# > 0 )); do
             ;;
         --security-group=?*)
             securityGroup="${1#*=}"
+            ;;
+        -h|--help)
+            showHelp=1
+            break
             ;;
         --)
             # Explicit end of options
