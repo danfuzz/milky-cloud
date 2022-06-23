@@ -92,7 +92,9 @@ if (( ${showHelp} || ${argError} )); then
     echo 'Usage:'
     echo ''
     echo "${progName} [<opt> ...]"
-    echo '  Launches a standard-configured instance.'
+    echo '  Launches a standard-configured instance. On success, prints a JSON'
+    echo '  object with the most-salient values (including notably the'
+    echo '  instance ID).'
     echo ''
     echo '  --in=<availability-zone>'
     echo '    Where to launch.'
