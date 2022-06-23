@@ -107,7 +107,8 @@ fi
 inRegion="$(lib region-from-location "${inLocation}")" \
 || exit "$?"
 
-ec2-json create-vpc \
+# Create the main VPC result.
+result="$(ec2-json create-vpc \
     --in="${inRegion}" \
     name="${name}" \
     '
@@ -127,8 +128,10 @@ ec2-json create-vpc \
                 }
             ]
         }
-    '
+    ')" \
+|| exit "$?"
 
+jval -- "${result}"
 # TODO: Finish this!
 
 # Create a security group.
