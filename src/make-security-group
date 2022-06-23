@@ -97,7 +97,8 @@ if (( ${showHelp} || ${argError} )); then
     echo 'Usage:'
     echo ''
     echo "${progName} [<opt> ...]"
-    echo '  Makes a new security group, configured in a standard way.'
+    echo '  Makes a new security group, configured in a standard way. On success,'
+    echo '  prints the ID of the created security group.'
     echo ''
     echo '  --description=<description>'
     echo '    Brief description of the security group. If not specified, fairly'
@@ -176,9 +177,8 @@ if [[ ${description} == '' ]]; then
     description="created by script at ${now}"
 fi
 
-# TODO: This seems to incorrectly fail with an error about missing arguments.
 ec2-json create-security-group \
-    --print-arguments-to=/dev/stderr \
+    --raw \
     --in="${inRegion}" \
     description="${description}" \
     name="${name}" \
@@ -200,4 +200,5 @@ ec2-json create-security-group \
                 }
             ]
         }
-    '
+    ' \
+    :: '.GroupId'
