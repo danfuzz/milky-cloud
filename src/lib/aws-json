@@ -24,6 +24,29 @@ init-prog
 
 
 #
+# Helper functions
+#
+
+# Constructs a JSON value to represent all the pieces of a command, based on the
+# globals set up by the main script.
+function make-command-parts-json {
+    local dashArgsJson="$(lib json-string-array -- "${dashArgs[@]}")"
+
+    jval \
+        command="${command}" \
+        subcommand="${subcommand}" \
+        jsonArg:json="${jsonArg}" \
+        dashArgs:json="${dashArgsJson}" \
+        '{
+            command:    $command,
+            subcommand: $subcommand,
+            jsonArg:    $jsonArg,
+            dashArgs:   $dashArgs
+        }'
+}
+
+
+#
 # Argument parsing
 #
 
@@ -164,7 +187,7 @@ dashArgs=(--output=json --region="${inRegion}")
 
 jsonArg='{}'
 if (( ${#argConstructor[@]} > 0 )); then
-    jsonArg="$(jval -- "${argConstructor[@]}")" \
+    jsonArg="$(jval --compact -- "${argConstructor[@]}")" \
     || {
         echo 1>&2 'Trouble parsing argument constructor.'
         exit 1
@@ -175,26 +198,12 @@ fi
 # a handler is defined (in a sibling file to this script).
 specialCaseHandler="${progDir}/${progName}_${command}_${subcommand}"
 if [[ -x ${specialCaseHandler} ]]; then
-    dashArgsJson="$(lib json-string-array -- "${dashArgs[@]}")"
-    commandParts="$(jval \
-        command="${command}" \
-        subcommand="${subcommand}" \
-        jsonArg:json="${jsonArg}" \
-        dashArgs:json="${dashArgsJson}" \
-        '{
-            command:    $command,
-            subcommand: $subcommand,
-            jsonArg:    $jsonArg,
-            dashArgs:   $dashArgs
-        }'
-    )"
-
-    commandParts="$("${specialCaseHandler}" "${commandParts}")" \
+    commandParts="$("${specialCaseHandler}" "$(make-command-parts-json)")" \
     || exit 1
 
     command="$(jval --raw p:json="${commandParts}" '$p.command')"
     subcommand="$(jval --raw p:json="${commandParts}" '$p.subcommand')"
-    jsonArg="$(jval p:json="${commandParts}" '$p.jsonArg')"
+    jsonArg="$(jval --compact p:json="${commandParts}" '$p.jsonArg')"
 
     dashArgsLength="$(jval p:json="${commandParts}" '$p.dashArgs | length')"
     dashArgs=()
@@ -214,7 +223,12 @@ if [[ ${printArgumentsTo} != '' ]]; then
 fi
 
 if [[ ${printCommandTo} != '' ]]; then
-    echo "${fullCommand[@]}" >"${printCommandTo}"
+    # Print a JSON value representing the command, hopefully covering pretty
+    # much every bit someone might care about.
+    jval >"${printCommandTo}" \
+        parts:json="$(make-command-parts-json)" \
+        full:json="$(lib json-string-array "${fullCommand[@]}")" \
+        '$parts + {fullCommand: $full}'
 fi
 
 result="$("${fullCommand[@]}")" \
