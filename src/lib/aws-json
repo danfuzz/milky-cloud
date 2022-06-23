@@ -160,6 +160,8 @@ fi
 inRegion="$(lib region-from-location "${inLocation}")" \
 || exit "$?"
 
+dashArgs=(--output=json --region="${inRegion}")
+
 jsonArg='{}'
 if (( ${#argConstructor[@]} > 0 )); then
     jsonArg="$(jval -- "${argConstructor[@]}")" \
@@ -169,11 +171,41 @@ if (( ${#argConstructor[@]} > 0 )); then
     }
 fi
 
+# Run the special case handler which manipulates the arguments to `aws`, if such
+# a handler is defined (in a sibling file to this script).
+specialCaseHandler="${progDir}/${progName}_${command}_${subcommand}"
+if [[ -x ${specialCaseHandler} ]]; then
+    dashArgsJson="$(lib json-string-array -- "${dashArgs[@]}")"
+    commandParts="$(jval \
+        command="${command}" \
+        subcommand="${subcommand}" \
+        jsonArg:json="${jsonArg}" \
+        dashArgs:json="${dashArgsJson}" \
+        '{
+            command:    $command,
+            subcommand: $subcommand,
+            jsonArg:    $jsonArg,
+            dashArgs:   $dashArgs
+        }'
+    )"
+
+    commandParts="$("${specialCaseHandler}" "${commandParts}")" \
+    || exit 1
+
+    command="$(jval --raw p:json="${commandParts}" '$p.command')"
+    subcommand="$(jval --raw p:json="${commandParts}" '$p.subcommand')"
+    jsonArg="$(jval p:json="${commandParts}" '$p.jsonArg')"
+
+    dashArgsLength="$(jval p:json="${commandParts}" '$p.dashArgs | length')"
+    dashArgs=()
+    for (( i=0; ${i} < ${dashArgsLength}; i++ )); do
+        dashArgs+=("$(jval --raw p:json="${commandParts}" i:json="${i}" '$p.dashArgs[$i]')")
+    done
+fi
+
 fullCommand=(
-    aws "${command}" "${subcommand}"
-    --region="${inRegion}"
-    --output=json
-    --cli-input-json="${jsonArg}"
+    aws "${command}" "${subcommand}" "${dashArgs[@]}"
+        --cli-input-json="${jsonArg}"
 )
 
 if [[ ${printArgumentsTo} != '' ]]; then
