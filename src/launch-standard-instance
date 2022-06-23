@@ -167,7 +167,7 @@ echo 1>&2 'Launch arguments:'
 # `ec2 run-instances`.
 ec2-json run-instances \
     --in="${inRegion}" \
-    --print-arguments-to=/dev/stderr \
+    --print-command-to=/dev/stderr \
     amiInfo:json="${amiInfo}" \
     inLocation="${inLocation}" \
     instanceType="${instanceType}" \

@@ -69,9 +69,6 @@ fi
 # Location (region or availability zone).
 inLocation=''
 
-# File to print the constructed arguments to.
-printArgumentsTo=''
-
 # File to print the constructed command to.
 printCommandTo=''
 
@@ -94,9 +91,6 @@ while (( $# > 0 && !${argError} )); do
             ;;
         --in=?*)
             inLocation="${1#*=}"
-            ;;
-        --print-arguments-to=?*)
-            printArgumentsTo="${1#*=}"
             ;;
         --print-command-to=?*)
             printCommandTo="${1#*=}"
@@ -162,8 +156,6 @@ if (( ${showHelp} || ${argError} )); then
     echo '  --in=<region-or-zone>'
     echo '    What region to make the call in. Must be specified. If specified as'
     echo '    an availability zone, only the region portion matters.'
-    echo '  --print-arguments-to=<file>'
-    echo '    Name of a file to print the constructed arguments to.'
     echo '  --print-command-to=<file>'
     echo '    Name of a file to print the fully-constructed command to.'
     echo '  --raw'
