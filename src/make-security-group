@@ -178,7 +178,7 @@ if [[ ${description} == '' ]]; then
     description="created by script at ${now}"
 fi
 
-ec2-json create-security-group \
+groupId="$(ec2-json create-security-group \
     --raw \
     --in="${inRegion}" \
     description="${description}" \
@@ -203,5 +203,9 @@ ec2-json create-security-group \
         }
     ' \
     :: '.GroupId'
+)" \
+|| exit "$?"
+
+echo "${groupId}"
 
 # TODO: Finish this! Need to add rules.
