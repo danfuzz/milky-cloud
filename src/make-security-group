@@ -225,7 +225,10 @@ ec2-json authorize-security-group-ingress \
     '
     $tagSpec +
     {
+        GroupId: $groupId,
+        IpPermissions: [
 
+        ]
     }' \
 || error="$?"
 
