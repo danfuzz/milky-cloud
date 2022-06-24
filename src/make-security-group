@@ -50,6 +50,23 @@ function figure-out-name {
 }
 
 
+#
+# Helper functions.
+#
+
+# Prints an ingress permission entry.
+function ingress-entry {
+    local port="$1"
+
+    jval \
+        port:json="${port}" \
+        '{
+            FromPort:   $port,
+            ToPort:     $port,
+            IpProtocol: "tcp"
+        }'
+}
+
 
 #
 # Argument parsing
@@ -190,13 +207,15 @@ groupId="$(ec2-json create-security-group \
 )" \
 || exit "$?"
 
-echo "${groupId}"
+echo 1>&2 "Made group: ${groupId}"
 
 # Note: Past this point, if there are errors, we attempt to clean up the
 # partial mess by deleting the security group.
 
 tagSpec="$(lib name-tag-spec 'security-group-rule' "${name}")"
 error=0
+
+# Egress rules.
 
 ec2-json authorize-security-group-egress \
     --in="${inRegion}" \
@@ -214,22 +233,28 @@ ec2-json authorize-security-group-egress \
             }
         ]
     }' \
+&& echo 1>&2 "Added egress rules." \
 || error="$?"
 
-# TODO: Add ingress rules.
-echo \
+# Ingress rules.
+
+httpsEntry="$(ingress-entry 443)"
+sshEntry="$(ingress-entry 22)"
+
+# TODO: This isn't working for some reason. The call succeeds, but no rules
+# seem to be added as a result.
 ec2-json authorize-security-group-ingress \
     --in="${inRegion}" \
     groupId="${groupId}" \
+    ipPermissions:json="[${httpsEntry}, ${sshEntry}]" \
     tagSpec:json="${tagSpec}" \
     '
     $tagSpec +
     {
         GroupId: $groupId,
-        IpPermissions: [
-
-        ]
+        IpPermissions: $ipPermissions
     }' \
+&& echo 1>&2 "Added ingress rules." \
 || error="$?"
 
 if (( ${error} )); then
@@ -242,7 +267,8 @@ if (( ${error} )); then
     exit "${error}"
 fi
 
-# TODO: Finish this! Need to add rules.
+echo "${groupId}"
+exit
 
 #
 # FOR REFERENCE
