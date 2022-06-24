@@ -72,8 +72,8 @@ inLocation=''
 # File to print the constructed command to.
 printCommandTo=''
 
-# Raw output?
-rawOutput=0
+# Output style.
+outputStyle=normal
 
 # Assignments and expression arguments to use to construct the value to pass to
 # the AWS command.
@@ -137,8 +137,11 @@ done
 
 while (( $# > 0 && !${argError} )); do
     case "$1" in
+        --compact)
+            outputStyle=compact
+            ;;
         --raw)
-            rawOutput=1
+            outputStyle=raw
             ;;
         --)
             # Explicit end of options
@@ -187,9 +190,10 @@ if (( ${showHelp} || ${argError} )); then
     echo ''
     echo 'Output options:'
     echo ''
+    echo '--compact'
+    echo '  Output in compact form (not multiline JSON).'
     echo '--raw'
-    echo '  In the final (possibly filtered) result, output raw strings (and'
-    echo '  other values compactly).'
+    echo '  Output raw strings (and other values compactly).'
     echo ''
     echo "${progName} [--help | -h]"
     echo '  Displays this message.'
@@ -269,9 +273,14 @@ if (( ${#resultConstructor[@]} == 0 )); then
 fi
 
 jvalOpts=()
-if (( ${rawOutput} )); then
-    jvalOpts+=(--raw)
-fi
+case "${outputStyle}" in
+    compact)
+        jvalOpts+=('--compact')
+        ;;
+    raw)
+        jvalOpts+=('--raw')
+        ;;
+esac
 
 jval --read-stdin "${jvalOpts[@]}" -- \
     "${resultConstructor[@]}" <<<"${result}" \
