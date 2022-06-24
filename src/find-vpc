@@ -35,19 +35,13 @@ function do-describe-call {
     local filterName="$3"
     local nameOrId="$4"
 
+    local filterSpec="$(lib aws-filter-spec "${filterName}=${nameOrId}")"
+
     local result
     result="$(ec2-json "${commandName}" \
         --in="${inRegion}" \
-        filterName="${filterName}" \
-        nameOrId="${nameOrId}" \
-        '{
-            Filters: [
-                {
-                    Name: $filterName,
-                    Values: [$nameOrId]
-                }
-            ]
-        }' \
+        filterSpec:json="${filterSpec}" \
+        '{ Filters: $filterSpec }' \
         :: \
         topKey="${topKey}" \
         '.[$topKey] | map(.VpcId) | unique'
