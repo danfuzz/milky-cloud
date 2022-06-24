@@ -109,22 +109,15 @@ inRegion="$(lib region-from-zone "${inLocation}")" \
 vpcId="$(lib find-vpc --in="${inRegion}" "${nameOrId}")" \
 || exit "$?"
 
+filterSpec="$(lib aws-filter-spec \
+    availability-zone="${inLocation}" \
+    vpc-id="${vpcId}"
+)"
+
 result="$(ec2-json describe-subnets \
     --in="${inRegion}" \
-    zone="${inLocation}" \
-    vpcId="${vpcId}" \
-    '{
-        Filters: [
-            {
-                Name: "availability-zone",
-                Values: [$zone]
-            },
-            {
-                Name: "vpc-id",
-                Values: [$vpcId]
-            }
-        ]
-    }' \
+    filterSpec:json="${filterSpec}" \
+    '{ Filters: $filterSpec }' \
     :: '.Subnets | map(.SubnetId)' \
 )" \
 || exit "$?"
