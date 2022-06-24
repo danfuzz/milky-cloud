@@ -49,21 +49,18 @@ function figure-out-name {
     echo "${name}"
 }
 
-
-#
-# Helper functions.
-#
-
-# Prints an ingress permission entry.
-function ingress-entry {
+# Prints a permission entry.
+function permission-entry {
     local port="$1"
+    local protocol="$2"
 
     jval \
         port:json="${port}" \
+        protocol="${protocol}" \
         '{
             FromPort:   $port,
             ToPort:     $port,
-            IpProtocol: "tcp"
+            IpProtocol: $protocol
         }'
 }
 
@@ -220,18 +217,13 @@ error=0
 ec2-json authorize-security-group-egress \
     --in="${inRegion}" \
     groupId="${groupId}" \
+    permissionsEntry:json="$(permission-entry -1 -1)" \
     tagSpec:json="${tagSpec}" \
     '
     $tagSpec +
     {
         GroupId: $groupId,
-        IpPermissions: [
-            {
-                FromPort: -1,
-                ToPort: -1,
-                IpProtocol: "-1"
-            }
-        ]
+        IpPermissions: [ $permissionsEntry ]
     }' \
     :: --none \
 && echo 1>&2 "Added egress rules." \
@@ -239,8 +231,8 @@ ec2-json authorize-security-group-egress \
 
 # Ingress rules.
 
-httpsEntry="$(ingress-entry 443)"
-sshEntry="$(ingress-entry 22)"
+httpsEntry="$(permission-entry 443 tcp)"
+sshEntry="$(permission-entry 22 tcp)"
 
 # TODO: This isn't working for some reason. The call succeeds, but no rules
 # seem to be added as a result.
