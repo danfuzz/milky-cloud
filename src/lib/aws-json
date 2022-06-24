@@ -91,9 +91,6 @@ while (( $# > 0 && !${argError} )); do
         --print-command-to=?*)
             printCommandTo="${1#*=}"
             ;;
-        --raw)
-            rawOutput=1
-            ;;
         -h|--help)
             showHelp=1
             break
