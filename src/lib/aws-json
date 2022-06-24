@@ -136,33 +136,63 @@ while (( $# > 0 && !${argError} )); do
     shift
 done
 
-# Collect postprocessor arguments, if any.
+# Process postprocessor arguments, if any.
+
+while (( $# > 0 && !${argError} )); do
+    case "$1" in
+        --raw)
+            rawOutput=1
+            ;;
+        --)
+            # Explicit end of options
+            shift
+            break
+            ;;
+        -?*)
+            echo 1>&2 "Unknown option: $1"
+            argError=1
+            break
+            ;;
+        *)
+            # Non-option argument
+            break
+            ;;
+    esac
+
+    shift
+done
+
 resultConstructor=("$@")
 
 if (( ${showHelp} || ${argError} )); then
     echo 'Usage:'
     echo ''
     echo "${progName} <cmd> <subcommand> [<opt> ...] [--] [<assignment> ...]"
-    echo '[<jq-expression> ...] [:: [<assignment> ...] <jq-expression> ...]'
-    echo '  Makes an AWS call with a JSON value constructed with `json-val`, and'
-    echo '  with successful result optionally post-processed through `json-val`.'
-    echo '  If no argument expression is supplied, the value `{}` (an empty object)'
-    echo '  is passed to the command. When post-processing, the original result is'
-    echo '  available as an value on stdin.'
+    echo '  [<jq-expression> ...]'
+    echo '  [:: [<out-opt> ...] [<assignment> ...] <jq-expression> ...]'
     echo ''
-    echo '  <cmd> <subcommand>'
-    echo '    The AWS command and subcommand to call, e.g. `ec2 run-instances`.'
+    echo 'Makes an AWS call with a JSON value constructed with `json-val`, and'
+    echo 'with successful result optionally post-processed through `json-val`.'
+    echo 'If no argument expression is supplied, the value `{}` (an empty object)'
+    echo 'is passed to the command. When post-processing, the original result is'
+    echo 'available as an value on stdin.'
     echo ''
-    echo '  --in=<region-or-zone>'
-    echo '    What region to make the call in. Must be specified. If specified as'
-    echo '    an availability zone, only the region portion matters.'
-    echo '  --print-command-to=<file>'
-    echo '    Name of a file to print the fully-constructed command to. It is'
-    echo '    emitted as a JSON value including both split-out components and'
-    echp '    the actual commandline.'
-    echo '  --raw'
-    echo '    In the final (possibly filtered) result, output raw strings (and'
-    echo '    other values compactly).'
+    echo '<cmd> <subcommand>'
+    echo '  The AWS command and subcommand to call, e.g. `ec2 run-instances`.'
+    echo ''
+    echo '--in=<region-or-zone>'
+    echo '  What region to make the call in. Must be specified. If specified as'
+    echo '  an availability zone, only the region portion matters.'
+    echo '--print-command-to=<file>'
+    echo '  Name of a file to print the fully-constructed command to. It is'
+    echo '  emitted as a JSON value including both split-out components and'
+    echp '  the actual commandline.'
+    echo ''
+    echo 'Output options:'
+    echo ''
+    echo '--raw'
+    echo '  In the final (possibly filtered) result, output raw strings (and'
+    echo '  other values compactly).'
     echo ''
     echo "${progName} [--help | -h]"
     echo '  Displays this message.'
