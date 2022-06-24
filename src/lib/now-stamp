@@ -84,7 +84,7 @@ fi
 # Main script
 #
 
-now="$(date -u '+%Y-%m-%d-%H:%M:%S')"
+now="$(date -u '+%Y-%m-%d-%H%M%S')"
 
 if [[ ${suffix} == '' ]]; then
     echo "${now}"
