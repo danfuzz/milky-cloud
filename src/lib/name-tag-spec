@@ -1,0 +1,129 @@
+#!/bin/bash
+#
+# Copyright 2022 Dan Bornstein.
+# Licensed AS IS and WITHOUT WARRANTY under the Apache License,
+# Version 2.0. Details: <http://www.apache.org/licenses/LICENSE-2.0>
+
+# Set `progName` to the program name, `progDir` to its directory, and `baseDir`
+# to `progDir`'s directory. Follows symlinks.
+function init-prog {
+    local newp p="$0"
+
+    while newp="$(readlink "$p")"; do
+        [[ ${newp} =~ ^/ ]] && p="${newp}" || p="$(dirname "$p")/${newp}"
+    done
+
+    progName="${p##*/}"
+    progDir="$(cd "$(dirname "$p")"; /bin/pwd -P)"
+    baseDir="$(cd "${progDir}/.."; /bin/pwd -P)"
+}
+init-prog
+
+# Set up for library-internal usage.
+. "${progDir}/init" --lib
+
+
+#
+# Argument parsing
+#
+
+# Error during argument processing?
+argError=0
+
+# Need help?
+showHelp=0
+
+# Compact output?
+compactOutput=0
+
+# Resource type.
+resourceType=''
+
+# Name for the resource.
+name=''
+
+while (( $# > 0 )); do
+    case "$1" in
+        --compact)
+            compactOutput=1
+            ;;
+        -h|--help)
+            showHelp=1
+            break
+            ;;
+        --)
+            # Explicit end of options
+            shift
+            break
+            ;;
+        -?*)
+            echo 1>&2 "Unknown option: $1"
+            argError=1
+            break
+            ;;
+        *)
+            # Non-option argument
+            break
+            ;;
+    esac
+
+    shift
+done
+
+if [[ $# < 2 ]]; then
+    echo 1>&2 'Missing argument: resource type and/or name'
+    argError=1
+fi
+
+resourceType="$1"
+name="$2"
+
+if (( ${showHelp} || ${argError} )); then
+    echo 'Usage:'
+    echo ''
+    echo "${progName} [<opt> ...] <resource-type> <name>"
+    echo ''
+    echo 'Constructs and prints a JSON object suitable for use as a'
+    echo '`TagSpecifications` argument to an AWS command, to _just_ define a'
+    echo '`Name` tag. The result is an object that binds `TagSpecifications`, so'
+    echo 'it can be used as-is (if that is the only argument) or merged with'
+    echo 'other arguments.'
+    echo ''
+    echo '--compact'
+    echo '  Output in compact form (not multiline JSON).'
+    echo ''
+    echo "${progName} [--help | -h]"
+    echo '  Displays this message.'
+    exit "${argError}"
+fi
+
+
+#
+# Main script
+#
+
+jqArgs=(-n)
+
+if (( ${compactOutput} )); then
+    jqArgs+=('--compact-output')
+fi
+
+jqArgs+=(
+    --arg name "${name}"
+    --arg resourceType "${resourceType}"
+)
+
+exec jq "${jqArgs[@]}" \
+'{
+    TagSpecifications: [
+        {
+            ResourceType: $resourceType,
+            Tags: [
+                {
+                    Key: "Name",
+                    Value: $name
+                }
+            ]
+        }
+    ]
+}'
