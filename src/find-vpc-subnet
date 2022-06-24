@@ -116,8 +116,7 @@ filterSpec="$(lib aws-filter-spec \
 
 result="$(ec2-json describe-subnets \
     --in="${inRegion}" \
-    filterSpec:json="${filterSpec}" \
-    '{ Filters: $filterSpec }' \
+    "${filterSpec}" \
     :: '.Subnets | map(.SubnetId)' \
 )" \
 || exit "$?"

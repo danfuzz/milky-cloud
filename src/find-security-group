@@ -111,13 +111,10 @@ else
     filterName='group-name'
 fi
 
-filterSpec="$(lib aws-filter-spec "${filterName}=${nameOrId}")"
-
 result="$(
 ec2-json describe-security-groups \
     --in="${inRegion}" \
-    filterSpec:json="${filterSpec}" \
-    '{ Filters: $filterSpec }' \
+    "$(lib aws-filter-spec "${filterName}=${nameOrId}")" \
     :: \
     '
         .SecurityGroups | map({ id: .GroupId, name: .GroupName })

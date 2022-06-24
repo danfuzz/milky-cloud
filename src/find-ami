@@ -128,10 +128,7 @@ foundInstanceType="$(
 ec2-json describe-instance-type-offerings \
     --in="${inRegion}" \
     filterSpec:json="${filterSpec}" \
-    '{
-        LocationType: "availability-zone",
-        Filters: $filterSpec
-    }' \
+    '$filterSpec + { LocationType: "availability-zone" }' \
     :: '.InstanceTypeOfferings | length'
 )" \
 || exit "$?"
@@ -177,10 +174,10 @@ filterSpec="$(lib aws-filter-spec \
 ec2-json describe-images \
     --in="${inRegion}" \
     filterSpec:json="${filterSpec}" \
-    '{
+    '$filterSpec +
+    {
         ExecutableUsers: ["all"],
-        Owners: ["amazon"],
-        Filters: $filterSpec
+        Owners: ["amazon"]
     }' \
     :: '
     .Images | max_by(.CreationDate)

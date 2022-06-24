@@ -31,13 +31,12 @@ init-prog
 # Or, if the VPC doesn't have a name, then just use the VPC ID (with a
 # suggestive prefix).
 function figure-out-name {
-    local filterSpec="$(lib aws-filter-spec vpc-id="${vpcId}")"
+    local filterSpec=
 
     local name
     name=$(ec2-json describe-vpcs \
         --in="${inRegion}" \
-        filterSpec:json="${filterSpec}" \
-        '{ Filters: $filterSpec }' \
+        "$(lib aws-filter-spec vpc-id="${vpcId}")" \
         :: --raw \
         '.Vpcs[0].Tags[] | select(.Key == "Name") | .Value'
     ) \

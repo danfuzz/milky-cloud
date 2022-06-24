@@ -95,8 +95,10 @@ if (( ${showHelp} || ${argError} )); then
     echo 'Usage:'
     echo ''
     echo "${progName} [<opt> ...] [--] [<filter-spec> ...]"
-    echo '  Constructs and prints a JSON object suitable for passing as a'
-    echo '  `Filters` specification to an AWS command.'
+    echo '  Constructs and prints a JSON object suitable for use as a'
+    echo '  `Filters` specification argument to an AWS command. The result is'
+    echo '  an object that binds `Filters`, so it can be used as-is (if that is'
+    echo '  the only argument) or merged with other arguments.'
     echo ''
     echo '  <filter-spec>'
     echo '    <name>=<value> Use `value` as a filter for `name`. If the same'
@@ -142,5 +144,5 @@ exec jq "${jqArgs[@]}" \
     |
     to_entries
     |
-    map({ Name: .key, Values: .value})
+    { Filters: map({ Name: .key, Values: .value}) }
 '
