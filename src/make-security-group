@@ -173,7 +173,7 @@ groupId="$(ec2-json create-security-group \
     --in="${inRegion}" \
     description="${description}" \
     name="${name}" \
-    tagSpec="$(lib name-tag-spec 'security-group' "${name}")" \
+    tagSpec:json="$(lib name-tag-spec 'security-group' "${name}")" \
     vpcId="${vpcId}" \
     '
         $tagSpec +

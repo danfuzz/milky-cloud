@@ -110,23 +110,13 @@ inRegion="$(lib region-from-location "${inLocation}")" \
 # Create the main VPC result.
 result="$(ec2-json create-vpc \
     --in="${inRegion}" \
-    name="${name}" \
+    tagSpec:json="$(lib name-tag-spec vpc "${name}")"
     '
+        $tagSpec +
         {
             CidrBlock: "10.1.0.0/16",
             AmazonProvidedIpv6CidrBlock: true,
-            InstanceTenancy: "default",
-            TagSpecifications: [
-                {
-                    ResourceType: "vpc",
-                    Tags: [
-                        {
-                            Key: "Name",
-                            Value: $name
-                        }
-                    ]
-                }
-            ]
+            InstanceTenancy: "default"
         }
     ')" \
 || exit "$?"
