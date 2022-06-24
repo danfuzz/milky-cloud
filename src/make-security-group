@@ -233,6 +233,7 @@ ec2-json authorize-security-group-egress \
             }
         ]
     }' \
+    :: --none \
 && echo 1>&2 "Added egress rules." \
 || error="$?"
 
@@ -254,6 +255,7 @@ ec2-json authorize-security-group-ingress \
         GroupId: $groupId,
         IpPermissions: $ipPermissions
     }' \
+    :: --none \
 && echo 1>&2 "Added ingress rules." \
 || error="$?"
 
