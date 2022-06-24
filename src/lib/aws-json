@@ -177,7 +177,7 @@ fi
 inRegion="$(lib region-from-location "${inLocation}")" \
 || exit "$?"
 
-dashArgs=(--output=json --region="${inRegion}")
+dashArgs=(--no-cli-pager --output=json --region="${inRegion}")
 
 jsonArg='{}'
 if (( ${#argConstructor[@]} > 0 )); then
