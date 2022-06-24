@@ -140,6 +140,9 @@ while (( $# > 0 && !${argError} )); do
         --compact)
             outputStyle=compact
             ;;
+        --none)
+            outputStyle=none
+            ;;
         --raw)
             outputStyle=raw
             ;;
@@ -192,6 +195,8 @@ if (( ${showHelp} || ${argError} )); then
     echo ''
     echo '--compact'
     echo '  Output in compact form (not multiline JSON).'
+    echo '--none'
+    echo '  Do not produce (non-error) output.'
     echo '--raw'
     echo '  Output raw strings (and other values compactly).'
     echo ''
@@ -272,19 +277,21 @@ if (( ${#resultConstructor[@]} == 0 )); then
     resultConstructor=('.')
 fi
 
-jvalOpts=()
-case "${outputStyle}" in
-    compact)
-        jvalOpts+=('--compact')
-        ;;
-    raw)
-        jvalOpts+=('--raw')
-        ;;
-esac
+if [[ ${outputStyle} != 'none' ]]; then
+    jvalOpts=()
+    case "${outputStyle}" in
+        compact)
+            jvalOpts+=('--compact')
+            ;;
+        raw)
+            jvalOpts+=('--raw')
+            ;;
+    esac
 
-jval --read-stdin "${jvalOpts[@]}" -- \
-    "${resultConstructor[@]}" <<<"${result}" \
-|| {
-    echo 1>&2 'Trouble filtering result.'
-    exit 1
-}
+    jval --read-stdin "${jvalOpts[@]}" -- \
+        "${resultConstructor[@]}" <<<"${result}" \
+    || {
+        echo 1>&2 'Trouble filtering result.'
+        exit 1
+    }
+fi
