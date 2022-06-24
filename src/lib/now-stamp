@@ -1,0 +1,93 @@
+#!/bin/bash
+#
+# Copyright 2022 Dan Bornstein.
+# Licensed AS IS and WITHOUT WARRANTY under the Apache License,
+# Version 2.0. Details: <http://www.apache.org/licenses/LICENSE-2.0>
+
+# Set `progName` to the program name, `progDir` to its directory, and `baseDir`
+# to `progDir`'s directory. Follows symlinks.
+function init-prog {
+    local newp p="$0"
+
+    while newp="$(readlink "$p")"; do
+        [[ ${newp} =~ ^/ ]] && p="${newp}" || p="$(dirname "$p")/${newp}"
+    done
+
+    progName="${p##*/}"
+    progDir="$(cd "$(dirname "$p")"; /bin/pwd -P)"
+    baseDir="$(cd "${progDir}/.."; /bin/pwd -P)"
+}
+init-prog
+
+# Set up for library-internal usage.
+. "${progDir}/init" --lib
+
+
+#
+# Argument parsing
+#
+
+# Error during argument processing?
+argError=0
+
+# Need help?
+showHelp=0
+
+# Suffix text.
+suffix=''
+
+while (( $# > 0 )); do
+    case "$1" in
+        -h|--help)
+            showHelp=1
+            break
+            ;;
+        --)
+            # Explicit end of options
+            shift
+            break
+            ;;
+        -?*)
+            echo 1>&2 "Unknown option: $1"
+            argError=1
+            break
+            ;;
+        *)
+            # Non-option argument
+            break
+            ;;
+    esac
+
+    shift
+done
+
+if [[ $# > 0 ]]; then
+    suffix="$1"
+fi
+
+if (( ${showHelp} || ${argError} )); then
+    echo 'Usage:'
+    echo ''
+    echo "${progName} [<suffix>]"
+    echo ''
+    echo 'Prints a standardized timestamp representing "now" with an optional'
+    echo 'suffix. This can be used to label things that have nothing more'
+    echo 'suitable.'
+    echo ''
+    echo "${progName} [--help | -h]"
+    echo '  Displays this message.'
+    exit "${argError}"
+fi
+
+
+#
+# Main script
+#
+
+now="$(date -u '+%Y-%m-%d-%H:%M:%S')"
+
+if [[ ${suffix} == '' ]]; then
+    echo "${now}"
+else
+    echo "${now}-${suffix}"
+fi
