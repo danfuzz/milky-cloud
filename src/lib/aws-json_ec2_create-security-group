@@ -6,6 +6,9 @@
 
 # Special case handler to rewrite the arguments to `ec2 create-security-group`,
 # so as to work around this issue: <https://github.com/aws/aws-cli/issues/7058>
+# This issue is also worked around in the main `aws-json`, but this file remains
+# as an example of how the special handler mechanism works, just in case it's
+# needed for some other reason.
 
 # Set `progName` to the program name, `progDir` to its directory, and `baseDir`
 # to `progDir`'s directory. Follows symlinks.

@@ -206,9 +206,12 @@ if [[ -x ${specialCaseHandler} ]]; then
     done
 fi
 
+# Note: `--cli-input-json` and its argument are passed as separate values -- not
+# combined in the usual way with `=` -- to work around this bug in the AWS CLI:
+# <https://github.com/aws/aws-cli/issues/7058>
 fullCommand=(
     aws "${command}" "${subcommand}" "${dashArgs[@]}"
-        --cli-input-json="${jsonArg}"
+        --cli-input-json "${jsonArg}"
 )
 
 if [[ ${printArgumentsTo} != '' ]]; then
