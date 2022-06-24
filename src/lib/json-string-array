@@ -108,8 +108,10 @@ result="$(
 
 # Pass the result through `jq` for final formatting.
 
+jqArgs=()
+
 if (( ${compactOutput} )); then
     jqArgs+=('--compact-output')
 fi
 
-exec jq "${jqArgs}" <<<"${result}"
+exec jq "${jqArgs[@]}" <<<"${result}"
