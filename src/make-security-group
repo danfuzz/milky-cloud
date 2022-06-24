@@ -35,11 +35,10 @@ function figure-out-name {
 
     local name
     name=$(ec2-json describe-vpcs \
-        --raw \
         --in="${inRegion}" \
         filterSpec:json="${filterSpec}" \
         '{ Filters: $filterSpec }' \
-        :: \
+        :: --raw \
         '.Vpcs[0].Tags[] | select(.Key == "Name") | .Value'
     ) \
     || return "$?"
@@ -173,7 +172,6 @@ if [[ ${description} == '' ]]; then
 fi
 
 groupId="$(ec2-json create-security-group \
-    --raw \
     --in="${inRegion}" \
     description="${description}" \
     name="${name}" \
@@ -196,7 +194,7 @@ groupId="$(ec2-json create-security-group \
             ]
         }
     ' \
-    :: '.GroupId'
+    :: --raw '.GroupId'
 )" \
 || exit "$?"
 

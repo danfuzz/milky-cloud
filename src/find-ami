@@ -146,11 +146,10 @@ fi
 
 architecture="$(
 ec2-json describe-instance-types \
-    --raw \
     --in="${inRegion}" \
     instanceType="${instanceType}" \
     '{ InstanceTypes: [$instanceType] }' \
-    :: '
+    :: --raw '
         .InstanceTypes[0].ProcessorInfo.SupportedArchitectures
         | map(select(. != "i386"))
         | .[0] // "error"
