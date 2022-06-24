@@ -119,23 +119,18 @@ inRegion="$(lib region-from-zone "${inLocation}")" \
 # Check to see if the indicated instance type is available in the availability
 # zone.
 
+filterSpec="$(lib aws-filter-spec \
+    location="${inLocation}" \
+    instance-type="${instanceType}"
+)"
+
 foundInstanceType="$(
 ec2-json describe-instance-type-offerings \
     --in="${inRegion}" \
-    inLocation="${inLocation}" \
-    instanceType="${instanceType}" \
+    filterSpec:json="${filterSpec}" \
     '{
         LocationType: "availability-zone",
-        Filters: [
-            {
-                Name: "location",
-                Values: [$inLocation]
-            },
-            {
-                Name: "instance-type",
-                Values: [$instanceType]
-            }
-        ]
+        Filters: $filterSpec
     }' \
     :: '.InstanceTypeOfferings | length'
 )" \
@@ -151,6 +146,7 @@ fi
 
 architecture="$(
 ec2-json describe-instance-types \
+    --raw \
     --in="${inRegion}" \
     instanceType="${instanceType}" \
     '{ InstanceTypes: [$instanceType] }' \
@@ -162,8 +158,7 @@ ec2-json describe-instance-types \
 )" \
 || exit "$?"
 
-# Note: Quoted `"error"` because the value is JSON (not a raw string).
-if [[ ${architecture} == '"error"' ]]; then
+if [[ ${architecture} == 'error' ]]; then
     echo 1>&2 "Unsupported instance type: ${instanceType} in ${inLocation}"
     exit 1
 fi
@@ -171,40 +166,22 @@ fi
 # `describe-images` to find the most recent salient AMI.
 
 thisYear="$(date "+%Y")"
+filterSpec="$(lib aws-filter-spec \
+    architecture="${architecture}" \
+    name="${amiNamePattern}" \
+    creation-date="${thisYear}*" \
+    creation-date="$(( ${thisYear} - 1))*" \
+    image-type=machine \
+    root-device-type=ebs \
+)"
 
 ec2-json describe-images \
     --in="${inRegion}" \
-    amiNamePattern="${amiNamePattern}" \
-    architecture:json="${architecture}" \
-    thisYear:json="${thisYear}" \
+    filterSpec:json="${filterSpec}" \
     '{
         ExecutableUsers: ["all"],
         Owners: ["amazon"],
-        Filters: [
-            {
-                Name: "architecture",
-                Values: [$architecture]
-            },
-            {
-                Name: "image-type",
-                Values: ["machine"]
-            },
-            {
-                Name: "root-device-type",
-                Values: ["ebs"]
-            },
-            {
-                Name: "name",
-                Values: [$amiNamePattern]
-            },
-            {
-                Name: "creation-date",
-                Values: [
-                    ($thisYear | tostring) + "*",
-                    ($thisYear - 1 | tostring) + "*"
-                ]
-            }
-        ]
+        Filters: $filterSpec
     }' \
     :: '
     .Images | max_by(.CreationDate)
