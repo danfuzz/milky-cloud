@@ -128,6 +128,9 @@ if (( ${showHelp} || ${argError} )); then
     echo '  Makes a new security group, configured in a standard way. On success,'
     echo '  prints the ID of the created security group.'
     echo ''
+    echo '  The resulting security group allows incoming TCP traffic to the SSH'
+    echo '  and HTTPS ports, and allows outgoing traffic to anywhere.'
+    echo ''
     echo '  --description=<description>'
     echo '    Brief description of the security group. If not specified, fairly'
     echo '    generic and content-free text is used (because it does need to be'
@@ -189,4 +192,83 @@ groupId="$(ec2-json create-security-group \
 
 echo "${groupId}"
 
+# Note: Past this point, if there are errors, we attempt to clean up the
+# partial mess by deleting the security group.
+
+tagSpec="$(lib name-tag-spec 'security-group-rule' "${name}")"
+error=0
+
+ec2-json authorize-security-group-egress \
+    --in="${inRegion}" \
+    groupId="${groupId}" \
+    tagSpec:json="${tagSpec}" \
+    '
+    $tagSpec +
+    {
+        GroupId: $groupId,
+        IpPermissions: [
+            {
+                FromPort: -1,
+                ToPort: -1,
+                IpProtocol: "-1"
+            }
+        ]
+    }' \
+|| error="$?"
+
+# TODO: Add ingress rules.
+echo \
+ec2-json authorize-security-group-ingress \
+    --in="${inRegion}" \
+    groupId="${groupId}" \
+    tagSpec:json="${tagSpec}" \
+    '
+    $tagSpec +
+    {
+
+    }' \
+|| error="$?"
+
+if (( ${error} )); then
+    echo 1>&2 'Error(s) after group creation. Attempting cleanup!'
+    ec2-json delete-security-group \
+        --in="${inRegion}" \
+        groupId="${groupId}" \
+        '{ GroupId: $groupId }' \
+    || echo 1>&2 'Error while deleting group, alas!'
+    exit "${error}"
+fi
+
 # TODO: Finish this! Need to add rules.
+
+#
+# FOR REFERENCE
+#
+cat >/dev/null <<<'
+{
+  "SecurityGroupRules": [
+    {
+      "SecurityGroupRuleId": "sgr-0fd66cfcd16ba3cf0",
+      "GroupId": "sg-011e725f418a4e666",
+      "GroupOwnerId": "396104045551",
+      "IsEgress": false,
+      "IpProtocol": "tcp",
+      "FromPort": 443,
+      "ToPort": 443,
+      "CidrIpv4": "0.0.0.0/0",
+      "Tags": []
+    },
+    {
+      "SecurityGroupRuleId": "sgr-027eb3de951a26056",
+      "GroupId": "sg-011e725f418a4e666",
+      "GroupOwnerId": "396104045551",
+      "IsEgress": false,
+      "IpProtocol": "tcp",
+      "FromPort": 22,
+      "ToPort": 22,
+      "CidrIpv4": "0.0.0.0/0",
+      "Tags": []
+    }
+  ]
+}
+'
