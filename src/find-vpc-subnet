@@ -109,7 +109,7 @@ inRegion="$(lib region-from-zone "${inLocation}")" \
 vpcId="$(lib find-vpc --in="${inRegion}" "${nameOrId}")" \
 || exit "$?"
 
-filterSpec="$(lib aws-filter-spec \
+filterSpec="$(lib filter-spec \
     availability-zone="${inLocation}" \
     vpc-id="${vpcId}"
 )"

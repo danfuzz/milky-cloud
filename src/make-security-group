@@ -36,7 +36,7 @@ function figure-out-name {
     local name
     name=$(ec2-json describe-vpcs \
         --in="${inRegion}" \
-        "$(lib aws-filter-spec vpc-id="${vpcId}")" \
+        "$(lib filter-spec vpc-id="${vpcId}")" \
         :: --raw \
         '.Vpcs[0].Tags[] | select(.Key == "Name") | .Value'
     ) \

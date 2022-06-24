@@ -114,7 +114,7 @@ fi
 result="$(
 ec2-json describe-security-groups \
     --in="${inRegion}" \
-    "$(lib aws-filter-spec "${filterName}=${nameOrId}")" \
+    "$(lib filter-spec "${filterName}=${nameOrId}")" \
     :: \
     '
         .SecurityGroups | map({ id: .GroupId, name: .GroupName })

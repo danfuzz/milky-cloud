@@ -119,7 +119,7 @@ inRegion="$(lib region-from-zone "${inLocation}")" \
 # Check to see if the indicated instance type is available in the availability
 # zone.
 
-filterSpec="$(lib aws-filter-spec \
+filterSpec="$(lib filter-spec \
     location="${inLocation}" \
     instance-type="${instanceType}"
 )"
@@ -162,7 +162,7 @@ fi
 # `describe-images` to find the most recent salient AMI.
 
 thisYear="$(date "+%Y")"
-filterSpec="$(lib aws-filter-spec \
+filterSpec="$(lib filter-spec \
     architecture="${architecture}" \
     name="${amiNamePattern}" \
     creation-date="${thisYear}*" \
