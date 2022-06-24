@@ -116,16 +116,21 @@ fi
 # Main script
 #
 
-jqArgs=()
+jqArgs=(-n)
 
 if (( ${compactOutput} )); then
     jqArgs+=('--compact-output')
 fi
 
-namesJson="$(lib json-string-array "${filterNames[@]}")"
-valuesJson="$(lib json-string-array "${filterValues[@]}")"
+jqArgs+=(
+    --argjson names "$(lib json-string-array "${filterNames[@]}")"
+    --argjson values "$(lib json-string-array "${filterValues[@]}")"
+)
 
-jq '
+exec jq "${jqArgs[@]}" \
+'
+    [$names, $values]
+    |
     transpose
     |
     reduce .[] as $binding ({};
@@ -138,5 +143,4 @@ jq '
     to_entries
     |
     map({ Name: .key, Values: .value})
-' \
-    <<<"[${namesJson}, ${valuesJson}]"
+'
