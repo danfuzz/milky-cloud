@@ -154,11 +154,17 @@ if [[ ${securityGroup} != '' ]]; then
     || exit 1
 fi
 
+# Make up a name if one wasn't provided.
+if [[ ${name} == '' ]]; then
+    now="$(date -u '+%Y-%m-%d-%H:%M:%S')"
+    name="${now}-via-script"
+fi
+
 # Form the main command, and do it!
 
-# Label for the command arguments, which get spit out immediately below.
+# Label for the command, which get spit out immediately below.
 echo 1>&2 ''
-echo 1>&2 'Launch arguments:'
+echo 1>&2 'Launch command:'
 
 # Note: If a subnet ID is provided, then it implies the availability zone, in
 # which case one doesn't also need to specify the availability zone explicitly.
@@ -174,9 +180,9 @@ ec2-json run-instances \
     inLocation="${inLocation}" \
     instanceType="${instanceType}" \
     keyName="${keyName}" \
-    name="${name}" \
     securityGroup="${securityGroup}" \
     subnetId="${subnetId}" \
+    tagSpec:json="$(lib name-tag-spec instance "${name}")" \
     '
         {
             ImageId:      $amiInfo.ImageId,
@@ -184,24 +190,10 @@ ec2-json run-instances \
             MaxCount:     1,
             Placement:    { AvailabilityZone: $inLocation }
         }
+        + $tagSpec
         + if $keyName == "" then {} else { KeyName: $keyName } end
         + if $securityGroup == "" then {} else { SecurityGroupIds: [$securityGroup] } end
         + if $subnetId == "" then {} else { SubnetId: $subnetId } end
-        + if $name == "" then {}
-          else {
-              TagSpecifications: [
-                  {
-                      ResourceType: "instance",
-                      Tags: [
-                          {
-                              Key: "Name",
-                              Value: $name
-                          }
-                      ]
-                  }
-              ]
-          }
-          end
     ' \
     :: \
     '
