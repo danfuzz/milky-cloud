@@ -166,31 +166,21 @@ fi
 
 # Make up a description if not passed as an option.
 if [[ ${description} == '' ]]; then
-    now="$(date -u '+%Y-%m-%d %H:%M:%S %Z')"
-    description="created by script at ${now}"
+    description="$(lib now-stamp via-script)"
 fi
 
 groupId="$(ec2-json create-security-group \
     --in="${inRegion}" \
     description="${description}" \
     name="${name}" \
+    tagSpec="$(lib name-tag-spec 'security-group' "${name}")" \
     vpcId="${vpcId}" \
     '
+        $tagSpec +
         {
             Description: $description,
             GroupName: $name,
-            VpcId: $vpcId,
-            TagSpecifications: [
-                {
-                    ResourceType: "security-group",
-                    Tags: [
-                        {
-                            Key: "Name",
-                            Value: $name
-                        }
-                    ]
-                }
-            ]
+            VpcId: $vpcId
         }
     ' \
     :: --raw '.GroupId'
