@@ -272,7 +272,19 @@ if [[ ${printCommandTo} != '' ]]; then
     jval >"${printCommandTo}" \
         parts:json="$(make-command-parts-json)" \
         full:json="$(lib json-string-array "${fullCommand[@]}")" \
-        '$parts + {fullCommand: $full}'
+        '
+        def quoteMaybe:
+            if test("^[-_/=a-zA-Z0-9]+$")
+            then .
+            else (. | @sh)
+            end
+        ;
+
+        $parts + {
+            commandWords: $full,
+            commandLine: ($full | map(quoteMaybe) | join(" "))
+        }
+        '
 fi
 
 result="$("${fullCommand[@]}")" \
