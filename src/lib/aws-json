@@ -242,9 +242,25 @@ if [[ -x ${specialCaseHandler} ]]; then
     done
 fi
 
-# Note: `--cli-input-json` and its argument are passed as separate values -- not
-# combined in the usual way with `=` -- to work around this bug in the AWS CLI:
-# <https://github.com/aws/aws-cli/issues/7058>
+# Split dash args that use `=` to bind values to instead be separate arguments.
+# This is done because, while the AWS CLI nominally recognizes `=` forms, it
+# seems to not actually be a well-tested code path. But, because we want the
+# special case handlers to have a more standardized setup, we use `=` all the
+# way up to this moment. See bug <https://github.com/aws/aws-cli/issues/7058>
+# for one way that `=` mis-handling affects things.
+origDashArgs=("${dashArgs[@]}")
+dashArgs=()
+for arg in "${origDashArgs[@]}"; do
+    if [[ ${arg} =~ ^--([_a-zA-Z0-9][-_a-zA-Z0-9]+)=([^-].*)?$ ]]; then
+        dashArgs+=("--${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}")
+    else
+        dashArgs+=("${arg}")
+    fi
+done
+
+# Note: Similarly to above, `--cli-input-json` and its argument are passed as
+# separate values, not combined in the usual way with `=`. See the section above
+# in re the bug which motivated this arrangement.
 fullCommand=(
     aws "${command}" "${subcommand}" "${dashArgs[@]}"
         --cli-input-json "${jsonArg}"
