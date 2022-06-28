@@ -110,7 +110,7 @@ inRegion="$(lib region-from-location "${inLocation}")" \
 # Create the main VPC result.
 result="$(ec2-json create-vpc \
     --in="${inRegion}" \
-    tagSpec:json="$(lib name-tag-spec vpc "${name}")"
+    tagSpec:json="$(lib name-tag-spec vpc "${name}")" \
     '
         $tagSpec +
         {
