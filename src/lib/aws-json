@@ -266,11 +266,6 @@ fullCommand=(
         --cli-input-json "${jsonArg}"
 )
 
-if [[ ${printArgumentsTo} != '' ]]; then
-    # Use `jval` to get color output when appropriate.
-    jval -- "${jsonArg}" >"${printArgumentsTo}"
-fi
-
 if [[ ${printCommandTo} != '' ]]; then
     # Print a JSON value representing the command, hopefully covering pretty
     # much every bit someone might care about.
