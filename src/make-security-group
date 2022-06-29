@@ -210,7 +210,7 @@ echo 1>&2 "Made group: ${groupId}"
 # partial mess by deleting the security group.
 
 tagSpec="$(lib name-tag-spec 'security-group-rule' "${name}")"
-# There seems to be a bug in the AWS CLI (or maybe in AWS itselt) where it
+# There seems to be a bug in the AWS CLI (or maybe in AWS itself) where it
 # errors out if asked to tag a security group rule on creation. For now, blank
 # out the tag. TODO: Remove this when the bug is addressed.
 tagSpec='{}'
