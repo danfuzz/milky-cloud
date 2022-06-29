@@ -49,21 +49,6 @@ function figure-out-name {
     echo "${name}"
 }
 
-# Prints a permission entry.
-function permission-entry {
-    local port="$1"
-    local protocol="$2"
-
-    jval \
-        port:json="${port}" \
-        protocol="${protocol}" \
-        '{
-            FromPort:   $port,
-            ToPort:     $port,
-            IpProtocol: $protocol
-        }'
-}
-
 
 #
 # Argument parsing
@@ -210,48 +195,24 @@ echo 1>&2 "Made group: ${groupId}"
 # partial mess by deleting the security group.
 
 tagSpec="$(lib name-tag-spec 'security-group-rule' "${name}")"
-# There seems to be a bug in the AWS CLI (or maybe in AWS itself) where it
-# errors out if asked to tag a security group rule on creation. For now, blank
-# out the tag. TODO: Remove this when the bug is addressed.
-tagSpec='{}'
-
 error=0
+
+commonArgs=(--in="${inRegion}" --security-group="${groupId}")
 
 # Egress rules.
 
-ec2-json authorize-security-group-egress \
-    --in="${inRegion}" \
-    groupId="${groupId}" \
-    ipPermissions:json="[$(permission-entry -1 -1)]" \
-    tagSpec:json="${tagSpec}" \
-    '
-    $tagSpec +
-    {
-        GroupId: $groupId,
-        IpPermissions: $ipPermissions
-    }' \
-    :: --none \
-&& echo 1>&2 "Added egress rules." \
+lib add-security-group-rule "${commonArgs[@]}" --egress all all \
+&& echo 1>&2 "Added all-access egress rule." \
 || error="$?"
 
 # Ingress rules.
 
-httpsEntry="$(permission-entry 443 tcp)"
-sshEntry="$(permission-entry 22 tcp)"
+lib add-security-group-rule "${commonArgs[@]}" --ingress tcp 22 \
+&& echo 1>&2 "Added SSH ingress rule." \
+|| error="$?"
 
-ec2-json authorize-security-group-ingress \
-    --in="${inRegion}" \
-    groupId="${groupId}" \
-    ipPermissions:json="[${httpsEntry}, ${sshEntry}]" \
-    tagSpec:json="${tagSpec}" \
-    '
-    $tagSpec +
-    {
-        GroupId: $groupId,
-        IpPermissions: $ipPermissions
-    }' \
-    :: --none \
-&& echo 1>&2 "Added ingress rules." \
+lib add-security-group-rule "${commonArgs[@]}" --ingress tcp 443 \
+&& echo 1>&2 "Added HTTPS ingress rule." \
 || error="$?"
 
 if (( ${error} )); then
@@ -266,35 +227,3 @@ fi
 
 echo "${groupId}"
 exit
-
-#
-# FOR REFERENCE
-#
-cat >/dev/null <<<'
-{
-  "SecurityGroupRules": [
-    {
-      "SecurityGroupRuleId": "sgr-0fd66cfcd16ba3cf0",
-      "GroupId": "sg-011e725f418a4e666",
-      "GroupOwnerId": "396104045551",
-      "IsEgress": false,
-      "IpProtocol": "tcp",
-      "FromPort": 443,
-      "ToPort": 443,
-      "CidrIpv4": "0.0.0.0/0",
-      "Tags": []
-    },
-    {
-      "SecurityGroupRuleId": "sgr-027eb3de951a26056",
-      "GroupId": "sg-011e725f418a4e666",
-      "GroupOwnerId": "396104045551",
-      "IsEgress": false,
-      "IpProtocol": "tcp",
-      "FromPort": 22,
-      "ToPort": 22,
-      "CidrIpv4": "0.0.0.0/0",
-      "Tags": []
-    }
-  ]
-}
-'
