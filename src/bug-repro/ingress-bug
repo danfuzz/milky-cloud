@@ -1,0 +1,53 @@
+#!/bin/bash
+
+# Replace with a valid VPC ID.
+vpcId='vpc-xxxxxxxx'
+vpcId='vpc-aa6acfcf'
+
+groupId="$(
+aws ec2 create-security-group --output json --region us-west-2 \
+    --description test --group-name test --vpc-id "${vpcId}" \
+| jq --raw-output '.GroupId'
+)"
+
+echo "Group ID: ${groupId}"
+
+aws ec2 describe-security-group-rules --output json --region us-west-2 \
+    --filters Name=group-id,Values="${groupId}" \
+| jq '.SecurityGroupRules[] | { IsEgress, IpProtocol, FromPort, ToPort }'
+
+echo '##########'
+
+jsonArg="$(jq -n --arg groupId "${groupId}" '
+{
+  GroupId: $groupId,
+  IpPermissions: [
+    {
+      FromPort: 10,
+      ToPort: 10,
+      IpProtocol: "tcp"
+    }
+  ],
+  TagSpecifications: [
+    {
+      ResourceType: "security-group-rule",
+      Tags: [
+        {
+          Key: "Name",
+          Value: "hello-there"
+        }
+      ]
+    }
+  ]}
+')"
+
+#aws ec2 authorize-security-group-egress --output json --region us-west-2 \
+#    --cli-input-json "${jsonArg}"
+
+aws ec2 authorize-security-group-ingress --output json --region us-west-2 \
+    --group-id "${groupId}" \
+    --ip-permissions 'FromPort=22,ToPort=22,IpProtocol=tcp' 'FromPort=443,ToPort=443,IpProtocol=tcp'
+
+aws ec2 describe-security-group-rules --output json --region us-west-2 \
+    --filters Name=group-id,Values="${groupId}" \
+| jq '.SecurityGroupRules[] | { IsEgress, IpProtocol, FromPort, ToPort }'
