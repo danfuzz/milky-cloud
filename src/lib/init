@@ -11,7 +11,9 @@ fi
 
 if [[ "$1" == '--lib' ]]; then
     libDir="${progDir}"
+    mainDir="$(cd "${progDir}/.."; /bin/pwd)"
 else
+    mainDir="${progDir}"
     libDir="${progDir}/lib"
 fi
 
@@ -43,9 +45,9 @@ function lib {
     elif [[ -x "${libDir}/${name}" ]]; then
         # It's in the internal helper library.
         "${libDir}/${name}" "$@"
-    elif [[ -x "${progDir}/${name}" ]]; then
-        # It's a "sibling" exposed script.
-        "${progDir}/${name}" "$@"
+    elif [[ -x "${mainDir}/${name}" ]]; then
+        # It's an exposed script.
+        "${mainDir}/${name}" "$@"
     else
         echo 1>&2 'No such library script:' "${name}"
         return 1
