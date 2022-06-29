@@ -210,6 +210,11 @@ echo 1>&2 "Made group: ${groupId}"
 # partial mess by deleting the security group.
 
 tagSpec="$(lib name-tag-spec 'security-group-rule' "${name}")"
+# There seems to be a bug in the AWS CLI (or maybe in AWS itselt) where it
+# errors out if asked to tag a security group rule on creation. For now, blank
+# out the tag. TODO: Remove this when the bug is addressed.
+tagSpec='{}'
+
 error=0
 
 # Egress rules.
@@ -217,13 +222,13 @@ error=0
 ec2-json authorize-security-group-egress \
     --in="${inRegion}" \
     groupId="${groupId}" \
-    permissionsEntry:json="$(permission-entry -1 -1)" \
+    ipPermissions:json="[$(permission-entry -1 -1)]" \
     tagSpec:json="${tagSpec}" \
     '
     $tagSpec +
     {
         GroupId: $groupId,
-        IpPermissions: [ $permissionsEntry ]
+        IpPermissions: $ipPermissions
     }' \
     :: --none \
 && echo 1>&2 "Added egress rules." \
@@ -234,8 +239,6 @@ ec2-json authorize-security-group-egress \
 httpsEntry="$(permission-entry 443 tcp)"
 sshEntry="$(permission-entry 22 tcp)"
 
-# TODO: This isn't working for some reason. The call succeeds, but no rules
-# seem to be added as a result.
 ec2-json authorize-security-group-ingress \
     --in="${inRegion}" \
     groupId="${groupId}" \
