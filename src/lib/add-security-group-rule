@@ -43,16 +43,22 @@ inLocation=''
 name=''
 
 # Port of the rule.
-port='all'
+port=''
 
 # Protocol of the rule.
-protocol='all'
+protocol=''
 
 # Name or ID of the security group.
 groupNameOrId=''
 
 while (( $# > 0 )); do
     case "$1" in
+        --all-ports)
+            port='all'
+            ;;
+        --all-protocols)
+            protocol='all'
+            ;;
         --egress)
             direction='egress'
             ;;
@@ -112,16 +118,25 @@ if (( !${argError} )); then
     if [[ ${direction} == '' ]]; then
         echo 1>&2 'Missing option: --egress or --ingress'
     fi
+    if [[ ${port} == '' ]]; then
+        echo 1>&2 'Missing option: --all-ports or --port'
+    fi
+    if [[ ${port} == '' ]]; then
+        echo 1>&2 'Missing option: --all-protocols, --tcp, or --udp'
+    fi
 fi
 
 if (( ${showHelp} || ${argError} )); then
     echo 'Usage:'
     echo ''
     echo "${progName} [<opt> ...]"
-    echo '  Adds a rule to a given security group. If no port is specified, the'
-    echo '  resulting rule applies to all ports. If no protocol is specified, the'
-    echo '  resulting rule applies to all protocols.'
+    echo '  Adds a rule to a given security group. Either `--port` or `--all-ports`'
+    echo '  must be passed. Similarly, one protocol option must be passed.'
     echo ''
+    echo '  --all-ports'
+    echo '    The rule is to apply to all ports.'
+    echo '  --all-protocols'
+    echo '    The rule is to apply to all protocols.'
     echo '  --egress'
     echo '    The rule is to be an egress rule.'
     echo '  --in=<region-or-zone>'
@@ -132,7 +147,7 @@ if (( ${showHelp} || ${argError} )); then
     echo '  --name=<name>'
     echo '    Name to attach to the rule, if any.'
     echo '  --port=<number>'
-    echo '    Port for the rule. If omitted, the rule will apply to all ports.'
+    echo '    Port for the rule.'
     echo '  --security-group=<name-or-id>'
     echo '    Name or ID of the security group to add to.'
     echo '  --tcp'
