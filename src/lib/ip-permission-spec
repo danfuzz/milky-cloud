@@ -1,0 +1,143 @@
+#!/bin/bash
+#
+# Copyright 2022 Dan Bornstein.
+# Licensed AS IS and WITHOUT WARRANTY under the Apache License,
+# Version 2.0. Details: <http://www.apache.org/licenses/LICENSE-2.0>
+
+# Set `progName` to the program name, `progDir` to its directory, and `baseDir`
+# to `progDir`'s directory. Follows symlinks.
+function init-prog {
+    local newp p="$0"
+
+    while newp="$(readlink "$p")"; do
+        [[ ${newp} =~ ^/ ]] && p="${newp}" || p="$(dirname "$p")/${newp}"
+    done
+
+    progName="${p##*/}"
+    progDir="$(cd "$(dirname "$p")"; /bin/pwd -P)"
+    baseDir="$(cd "${progDir}/.."; /bin/pwd -P)"
+}
+init-prog
+
+# Set up for library-internal usage.
+. "${progDir}/init" --lib
+
+
+#
+# Argument parsing
+#
+
+# Error during argument processing?
+argError=0
+
+# Need help?
+showHelp=0
+
+# Compact output?
+compactOutput=0
+
+# Protocol.
+protocol=''
+
+# Port.
+port=''
+
+while (( $# > 0 )); do
+    case "$1" in
+        --compact)
+            compactOutput=1
+            ;;
+        -h|--help)
+            showHelp=1
+            break
+            ;;
+        --)
+            # Explicit end of options
+            shift
+            break
+            ;;
+        -?*)
+            echo 1>&2 "Unknown option: $1"
+            argError=1
+            break
+            ;;
+        *)
+            # Non-option argument
+            break
+            ;;
+    esac
+
+    shift
+done
+
+protocol="$1"
+port="$2"
+
+if [[ $# < 2 ]]; then
+    echo 1>&2 'Missing argument: protocol and/or port'
+    argError=1
+else
+    case "${protocol}" in
+        all|tcp|udp)
+            : # It's valid.
+            ;;
+        *)
+            echo 1>&2 "Invalid value for protocol: ${protocol}"
+            argError=1
+            ;;
+    esac
+    if [[ ${port} != 'all' && ! ${port} =~ ^[0-9]+$ ]]; then
+        echo 1>&2 "Invalid value for port: ${port}"
+        argError=1
+    fi
+fi
+
+if (( ${showHelp} || ${argError} )); then
+    echo 'Usage:'
+    echo ''
+    echo "${progName} [<opt> ...] <protocol> <port>"
+    echo ''
+    echo 'Constructs and prints a JSON object suitable for use as an'
+    echo '`IpPermissions` entry to one of the security group rule addition'
+    echo 'commands. <protocol> must be one of `all`, `tcp`, or `udp`.'
+    echo ''
+    echo '--compact'
+    echo '  Output in compact form (not multiline JSON).'
+    echo ''
+    echo "${progName} [--help | -h]"
+    echo '  Displays this message.'
+    exit "${argError}"
+fi
+
+
+#
+# Main script
+#
+
+jqArgs=(-n)
+
+if (( ${compactOutput} )); then
+    jqArgs+=('--compact-output')
+fi
+
+if [[ ${port} == 'all' ]]; then
+    port='-1'
+fi
+
+if [[ ${protocol} == 'all' ]]; then
+    # Note: Even though this is a "number," the AWS API wants this to be passed
+    # as a string.
+    protocol='-1'
+fi
+
+jqArgs+=(
+    --argjson port "${port}"
+    --arg protocol "${protocol}"
+)
+
+exec jq "${jqArgs[@]}" \
+'{
+    FromPort:   $port,
+    ToPort:     $port,
+    IpProtocol: $protocol
+}'
