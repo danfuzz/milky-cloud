@@ -251,4 +251,3 @@ if (( ${error} )); then
 fi
 
 echo "${groupId}"
-exit
