@@ -108,7 +108,7 @@ inRegion="$(lib region-from-location "${inLocation}")" \
 || exit "$?"
 
 # Create the main VPC result.
-result="$(ec2-json create-vpc \
+vpcId="$(ec2-json create-vpc \
     --in="${inRegion}" \
     tagSpec:json="$(lib name-tag-spec vpc "${name}")" \
     '
@@ -118,16 +118,54 @@ result="$(ec2-json create-vpc \
             AmazonProvidedIpv6CidrBlock: true,
             InstanceTenancy: "default"
         }
-    ')" \
+    ' \
+    :: --raw '.Vpc.VpcId'
+)" \
 || exit "$?"
 
-jval -- "${result}"
-# TODO: Finish this!
+echo 1>&2 "Made VPC: ${vpcId}"
+
+# After this point, in case of error, we try to clean things up by removing the
+# VPC.
+error=0
 
 # Create a security group.
+groupId=''
+if (( !${error} )); then
+    groupId="$(
+    lib make-security-group \
+        --in="${inRegion}" --name="standard-for-${name}" --vpc="${vpcId}" \
+    )" \
+    || error=1
+fi
+
+# TODO: Finish this!
+error=1
 
 # Create a subnet per availability zone.
 
 # Create an internet gateway.
 
 # Attach the internet gateway to the VPC.
+
+# Do cleanup if necessary.
+
+if (( ${error} )); then
+    echo 1>&2 'Error(s) after VPC creation. Attempting cleanup!'
+
+    if [[ ${groupId} != '' ]]; then
+        ec2-json delete-security-group \
+            --in="${inRegion}" \
+            groupId="${groupId}" \
+            '{ GroupId: $groupId }'
+    fi
+
+    ec2-json delete-vpc \
+        --in="${inRegion}" \
+        vpcId="${vpcId}" \
+        '{ VpcId: $vpcId }'
+
+    exit "${error}"
+fi
+
+echo "${vpcId}"
