@@ -1,0 +1,202 @@
+#!/bin/bash
+#
+# Copyright 2022 Dan Bornstein.
+# Licensed AS IS and WITHOUT WARRANTY under the Apache License,
+# Version 2.0. Details: <http://www.apache.org/licenses/LICENSE-2.0>
+
+# Set `progName` to the program name, `progDir` to its directory, and `baseDir`
+# to `progDir`'s directory. Follows symlinks.
+function init-prog {
+    local newp p="$0"
+
+    while newp="$(readlink "$p")"; do
+        [[ ${newp} =~ ^/ ]] && p="${newp}" || p="$(dirname "$p")/${newp}"
+    done
+
+    progName="${p##*/}"
+    progDir="$(cd "$(dirname "$p")"; /bin/pwd -P)"
+    baseDir="$(cd "${progDir}/.."; /bin/pwd -P)"
+}
+init-prog
+
+# Load the helper library.
+. "${progDir}/lib/init"
+
+
+#
+# Argument parsing
+#
+
+# Error during argument processing?
+argError=0
+
+# Need help?
+showHelp=0
+
+# Rule direction (`ingress` or `egress`).
+direction=''
+
+# Name or ID of the security group.
+groupNameOrId=''
+
+# Location (region or availability zone).
+inLocation=''
+
+# Name of the rule.
+name=''
+
+# Port of the rule.
+port=''
+
+# Protocol of the rule.
+protocol=''
+
+while (( $# > 0 )); do
+    case "$1" in
+        --all-ports)
+            port='all'
+            ;;
+        --all-protocols)
+            protocol='all'
+            ;;
+        --egress)
+            direction='egress'
+            ;;
+        --in=?*)
+            inLocation="${1#*=}"
+            ;;
+        --ingress)
+            direction='ingress'
+            ;;
+        --name=?*)
+            name="${1#*=}"
+            ;;
+        --port=?*)
+            port="${1#*=}"
+            ;;
+        --security-group=?*)
+            groupNameOrId="${1#*=}"
+            ;;
+        --tcp)
+            protocol='tcp'
+            ;;
+        --udp)
+            protocol='udp'
+            ;;
+        -h|--help)
+            showHelp=1
+            break
+            ;;
+        --)
+            # Explicit end of options
+            shift
+            break
+            ;;
+        -?*)
+            echo 1>&2 "Unknown option: $1"
+            argError=1
+            break
+            ;;
+        *)
+            # Non-option argument
+            break
+            ;;
+    esac
+
+    shift
+done
+
+if (( !${argError} )); then
+    if [[ ${inLocation} == '' ]]; then
+        echo 1>&2 'Missing option: --in'
+        argError=1
+    fi
+    if [[ ${groupNameOrId} == '' ]]; then
+        echo 1>&2 'Missing option: --security-group'
+        argError=1
+    fi
+    if [[ ${direction} == '' ]]; then
+        echo 1>&2 'Missing option: --egress or --ingress'
+    fi
+    if [[ ${port} == '' ]]; then
+        echo 1>&2 'Missing option: --all-ports or --port'
+    fi
+    if [[ ${protocol} == '' ]]; then
+        echo 1>&2 'Missing option: --all-protocols, --tcp, or --udp'
+    fi
+fi
+
+if (( ${showHelp} || ${argError} )); then
+    echo 'Usage:'
+    echo ''
+    echo "${progName} [<opt> ...]"
+    echo '  Adds one or more rules to a given security group. Either `--port` or'
+    echo '  `--all-ports` must be passed. Similarly, one protocol option must be'
+    echo '  passed. Upon success, prints out a JSON array of all added rules.'
+    echo ''
+    echo '  Note: Even though this command only nominally lets you specify one'
+    echo '  rule, AWS splits out multiple rules when the specified rule applies'
+    echo '  to multiple IP address ranges (including notably treating "any IPv4"'
+    echo '  and "any IPv6" as different ranges).'
+    echo ''
+    echo '  --all-ports'
+    echo '    The rule is to apply to all ports.'
+    echo '  --all-protocols'
+    echo '    The rule is to apply to all protocols.'
+    echo '  --egress'
+    echo '    The rule is to be an egress rule.'
+    echo '  --in=<region-or-zone>'
+    echo '    What region to make the security group in. Must be specified. If'
+    echo '    specified as an availability zone, only the region portion matters.'
+    echo '  --ingress'
+    echo '    The rule is to be an ingress rule.'
+    echo '  --name=<name>'
+    echo '    Name to attach to the rule, if any.'
+    echo '  --port=<number>'
+    echo '    Port for the rule.'
+    echo '  --security-group=<name-or-id>'
+    echo '    Name or ID of the security group to add to.'
+    echo '  --tcp'
+    echo '    The rule is for TCP traffic.'
+    echo '  --udp'
+    echo '    The rule is for UDP traffic.'
+    echo ''
+    echo "${progName} [--help | -h]"
+    echo '  Displays this message.'
+    exit "${argError}"
+fi
+
+
+#
+# Main script
+#
+
+inRegion="$(lib region-from-location "${inLocation}")" \
+|| exit "$?"
+
+# Validate or find the ID of the security group.
+groupId="$(lib find-security-group --in="${inRegion}" "${groupNameOrId}")" \
+|| exit "$?"
+
+tagSpec='{}'
+if [[ ${name} != '' ]]; then
+    tagSpec="$(lib name-tag-spec 'security-group-rule' "${name}")"
+fi
+
+command="authorize-security-group-${direction}"
+
+ipSpec="$(lib ip-permission-spec "${protocol}" "${port}")" \
+|| exit "$?"
+
+ec2-json "${command}" \
+    --in="${inRegion}" \
+    groupId="${groupId}" \
+    ipPermissions:json="[${ipSpec}]" \
+    tagSpec:json="${tagSpec}" \
+    '
+    $tagSpec +
+    {
+        GroupId: $groupId,
+        IpPermissions: $ipPermissions
+    }' \
+    :: '.SecurityGroupRules | map(.SecurityGroupRuleId)'
