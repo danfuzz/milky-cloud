@@ -194,10 +194,9 @@ echo 1>&2 "Made group: ${groupId}"
 # Note: Past this point, if there are errors, we attempt to clean up the
 # partial mess by deleting the security group.
 
-tagSpec="$(lib name-tag-spec 'security-group-rule' "${name}")"
 error=0
 
-commonArgs=(--in="${inRegion}" --security-group="${groupId}")
+commonArgs=(--in="${inRegion}" --security-group="${groupId}" --name="${name}")
 
 # Add egress rules.
 
