@@ -126,7 +126,7 @@ vpcId="$(ec2-json create-vpc \
 echo 1>&2 "Made VPC: ${vpcId}"
 
 # After this point, in case of error, we try to clean things up by removing the
-# VPC.
+# VPC and all its interconnected dependencies.
 error=0
 
 # Create a security group.
