@@ -27,9 +27,9 @@ init-prog
 # Helper functions
 #
 
-# Figures out a name for the security group: If the VPC has a name, use that.
-# Or, if the VPC doesn't have a name, then just use the VPC ID (with a
-# suggestive prefix).
+# Figures out a name for the security group: If the VPC has a name, use that as
+# a basis. Or, if the VPC doesn't have a name, then just use the VPC ID as the
+# basis.
 function figure-out-name {
     local filterSpec=
 
@@ -46,7 +46,7 @@ function figure-out-name {
         name="for-${vpcId}"
     fi
 
-    echo "${name}"
+    echo "$(lib now-stamp)-${name}"
 }
 
 
