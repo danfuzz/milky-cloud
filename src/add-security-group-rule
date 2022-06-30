@@ -36,6 +36,9 @@ showHelp=0
 # Rule direction (`ingress` or `egress`).
 direction=''
 
+# Name or ID of the security group.
+groupNameOrId=''
+
 # Location (region or availability zone).
 inLocation=''
 
@@ -47,9 +50,6 @@ port=''
 
 # Protocol of the rule.
 protocol=''
-
-# Name or ID of the security group.
-groupNameOrId=''
 
 while (( $# > 0 )); do
     case "$1" in
