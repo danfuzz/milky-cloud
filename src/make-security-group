@@ -196,6 +196,42 @@ echo 1>&2 "Made group: ${groupId}"
 
 error=0
 
+# Start with a blank slate of rules by deleting any that are already associated
+# with the new security group.
+#
+# Context: As of this writing, a newly-created security group seems to come with
+# one rule (egress allowed to anywhere in IPv4 space), but that fact isn't
+# documented (or at least not blatantly documented) and arguably shouldn't be
+# relied upon.
+
+predefinedRuleIds="$(ec2-json describe-security-group-rules \
+    --in="${inRegion}" \
+    "$(lib filter-spec "group-id=${groupId}")" \
+    :: '.SecurityGroupRules | map({ id: .SecurityGroupRuleId, egress: .IsEgress })'
+)" \
+|| error=1
+
+echo '############'
+echo "${predefinedRuleIds}"
+
+egressRuleIds="$(
+    jval --raw "${predefinedRuleIds} | map(select(.egress == true)) | map(.id)[]"
+)"
+
+ingressRuleIds="$(
+    jval --raw "${predefinedRuleIds} | map(select(.egress == false)) | map(.id)[]"
+)"
+
+echo '######### egress'
+echo ">>${egressRuleIds}<<"
+echo '######### ingress'
+echo ">>${ingressRuleIds}<<"
+echo '#########'
+
+# TODO: Actually delete the rules!
+error=1
+
+# Common args for all calls to `add-security-group-rule`.
 commonArgs=(--in="${inRegion}" --security-group="${groupId}" --name="${name}")
 
 # Add egress rules.
