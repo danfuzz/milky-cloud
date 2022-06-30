@@ -189,7 +189,7 @@ groupId="$(ec2-json create-security-group \
 )" \
 || exit "$?"
 
-echo 1>&2 "Made group: ${groupId}"
+echo 1>&2 "Made security group: ${groupId}"
 
 # Note: Past this point, if there are errors, we attempt to clean up the
 # partial mess by deleting the security group.
