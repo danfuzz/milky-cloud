@@ -27,8 +27,8 @@ init-prog
 # Argument parsing
 #
 
-# Read stdin?
-readStdin=0
+# Input style.
+inputStyle=none
 
 # Output style.
 outputStyle=normal
@@ -57,7 +57,10 @@ while (( $# > 0 )); do
             outputStyle=raw
             ;;
         --read-stdin)
-            readStdin=1
+            inputStyle=read
+            ;;
+        --slurp-stdin)
+            inputStyle=slurp
             ;;
         -h|--help)
             showHelp=1
@@ -140,6 +143,8 @@ if (( ${showHelp} || ${argError} )); then
     echo '    Output raw strings (and other values compactly).'
     echo '  --read-stdin'
     echo '    Read value(s) from stdin to form pipeline input.'
+    echo '  --slurp-stdin'
+    echo '    Read all values from stdin into a single array pipeline input.'
     echo ''
     echo "${progName} [--help | -h]"
     echo '  Displays this message.'
@@ -153,9 +158,17 @@ fi
 
 jqArgs=()
 
-if (( !${readStdin} )); then
-    jqArgs+=('--null-input')
-fi
+case "${inputStyle}" in
+    none)
+        jqArgs+=('--null-input')
+        ;;
+    read)
+        : # No additional arguments needed.
+        ;;
+    slurp)
+        jqArgs+=('--slurp')
+        ;;
+esac
 
 case "${outputStyle}" in
     compact)
