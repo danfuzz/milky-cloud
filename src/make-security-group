@@ -203,12 +203,13 @@ error=0
 # one rule (egress allowed to anywhere in IPv4 space), but that fact isn't
 # documented (or at least not blatantly documented) and arguably shouldn't be
 # relied upon.
-lib remove-security-group-rules --in="${inRegion}" \
-    --security-group="${groupId}" --all --quiet \
+lib remove-security-group-rules --quiet --in="${inRegion}" \
+    --security-group="${groupId}" --all \
 || exit "$?"
 
 # Common args for all calls to `add-security-group-rule`.
-commonArgs=(--in="${inRegion}" --security-group="${groupId}" --name="${name}")
+commonArgs=(--quiet --in="${inRegion}" --security-group="${groupId}"
+    --name="${name}")
 
 # Add egress rules.
 

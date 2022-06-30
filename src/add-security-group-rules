@@ -51,6 +51,9 @@ port=''
 # Protocol of the rule.
 protocol=''
 
+# Quiet?
+quiet=0
+
 while (( $# > 0 )); do
     case "$1" in
         --all-ports)
@@ -73,6 +76,9 @@ while (( $# > 0 )); do
             ;;
         --port=?*)
             port="${1#*=}"
+            ;;
+        --quiet)
+            quiet=1
             ;;
         --security-group=?*)
             groupNameOrId="${1#*=}"
@@ -154,6 +160,8 @@ if (( ${showHelp} || ${argError} )); then
     echo '    Name to attach to the rule, if any.'
     echo '  --port=<number>'
     echo '    Port for the rule.'
+    echo '  --quiet'
+    echo '    Suppress non-error output.'
     echo '  --security-group=<name-or-id>'
     echo '    Name or ID of the security group to add to.'
     echo '  --tcp'
@@ -188,6 +196,11 @@ command="authorize-security-group-${direction}"
 ipSpec="$(lib ip-permission-spec "${protocol}" "${port}")" \
 || exit "$?"
 
+filterArg='.SecurityGroupRules | map(.SecurityGroupRuleId)'
+if (( ${quiet} )); then
+    filterArg='--none'
+fi
+
 ec2-json "${command}" \
     --in="${inRegion}" \
     groupId="${groupId}" \
@@ -199,4 +212,4 @@ ec2-json "${command}" \
         GroupId: $groupId,
         IpPermissions: $ipPermissions
     }' \
-    :: '.SecurityGroupRules | map(.SecurityGroupRuleId)'
+    :: "${filterArg}"
