@@ -199,24 +199,26 @@ error=0
 
 commonArgs=(--in="${inRegion}" --security-group="${groupId}")
 
-# Egress rules.
+# Add egress rules.
 
 lib add-security-group-rule "${commonArgs[@]}" \
     --egress --all-protocols --all-ports \
-&& echo 1>&2 "Added all-access egress rule." \
+&& echo 1>&2 "Added all-access egress rules." \
 || error="$?"
 
-# Ingress rules.
+# Add ingress rules.
 
 lib add-security-group-rule "${commonArgs[@]}" \
     --ingress --tcp --port=22 \
-&& echo 1>&2 "Added SSH ingress rule." \
+&& echo 1>&2 "Added SSH ingress rules." \
 || error="$?"
 
 lib add-security-group-rule "${commonArgs[@]}" \
     --ingress --tcp --port=443 \
-&& echo 1>&2 "Added HTTPS ingress rule." \
+&& echo 1>&2 "Added HTTPS ingress rules." \
 || error="$?"
+
+# Do cleanup if necessary.
 
 if (( ${error} )); then
     echo 1>&2 'Error(s) after group creation. Attempting cleanup!'
