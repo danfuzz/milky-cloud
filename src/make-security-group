@@ -212,19 +212,19 @@ commonArgs=(--in="${inRegion}" --security-group="${groupId}" --name="${name}")
 
 # Add egress rules.
 
-lib add-security-group-rule "${commonArgs[@]}" \
+lib add-security-group-rules "${commonArgs[@]}" \
     --egress --all-protocols --all-ports \
 && echo 1>&2 "Added all-access egress rules." \
 || error="$?"
 
 # Add ingress rules.
 
-lib add-security-group-rule "${commonArgs[@]}" \
+lib add-security-group-rules "${commonArgs[@]}" \
     --ingress --tcp --port=22 \
 && echo 1>&2 "Added SSH ingress rules." \
 || error="$?"
 
-lib add-security-group-rule "${commonArgs[@]}" \
+lib add-security-group-rules "${commonArgs[@]}" \
     --ingress --tcp --port=443 \
 && echo 1>&2 "Added HTTPS ingress rules." \
 || error="$?"
