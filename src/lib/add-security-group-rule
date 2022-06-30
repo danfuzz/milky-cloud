@@ -175,11 +175,6 @@ groupId="$(lib find-security-group --in="${inRegion}" "${groupNameOrId}")" \
 tagSpec='{}'
 if [[ ${name} != '' ]]; then
     tagSpec="$(lib name-tag-spec 'security-group-rule' "${name}")"
-
-    # There seems to be a bug in the AWS CLI (or maybe in AWS itself) where it
-    # errors out if asked to tag a security group rule on creation. For now, blank
-    # out the tag. TODO: Remove this when the bug is addressed.
-    tagSpec='{}'
 fi
 
 command="authorize-security-group-${direction}"
