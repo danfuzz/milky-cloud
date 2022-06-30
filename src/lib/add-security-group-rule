@@ -121,7 +121,7 @@ if (( !${argError} )); then
     if [[ ${port} == '' ]]; then
         echo 1>&2 'Missing option: --all-ports or --port'
     fi
-    if [[ ${port} == '' ]]; then
+    if [[ ${protocol} == '' ]]; then
         echo 1>&2 'Missing option: --all-protocols, --tcp, or --udp'
     fi
 fi
