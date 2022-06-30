@@ -36,11 +36,14 @@ showHelp=0
 # Filter to apply, to determine which rule(s) to remove.
 filterArgs=()
 
+# Name or ID of the security group.
+groupNameOrId=''
+
 # Location (region or availability zone).
 inLocation=''
 
-# Name or ID of the security group.
-groupNameOrId=''
+# Quiet?
+quiet=0
 
 while (( $# > 0 )); do
     case "$1" in
@@ -55,6 +58,9 @@ while (( $# > 0 )); do
             ;;
         --in=?*)
             inLocation="${1#*=}"
+            ;;
+        --quiet)
+            quiet=1
             ;;
         --security-group=?*)
             groupNameOrId="${1#*=}"
@@ -126,6 +132,8 @@ if (( ${showHelp} || ${argError} )); then
     echo '  --in=<region-or-zone>'
     echo '    What region to make the security group in. Must be specified. If'
     echo '    specified as an availability zone, only the region portion matters.'
+    echo '  --quiet'
+    echo '    Suppress non-error output.'
     echo '  --security-group=<name-or-id>'
     echo '    Name or ID of the security group to add to.'
     echo ''
@@ -198,6 +206,8 @@ if [[ ${ingressRuleIds} != '[]' ]]; then
     || exit "$?"
 fi
 
-jval \
-    ids:json="[${egressRuleIds}, ${ingressRuleIds}]" \
-    '$ids | flatten | sort'
+if (( !${quiet} )); then
+    jval \
+        ids:json="[${egressRuleIds}, ${ingressRuleIds}]" \
+        '$ids | flatten | sort'
+fi
