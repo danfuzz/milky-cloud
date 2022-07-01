@@ -1,0 +1,211 @@
+#!/bin/bash
+#
+# Copyright 2022 Dan Bornstein.
+# Licensed AS IS and WITHOUT WARRANTY under the Apache License,
+# Version 2.0. Details: <http://www.apache.org/licenses/LICENSE-2.0>
+
+# Set `progName` to the program name, `progDir` to its directory, and `baseDir`
+# to `progDir`'s directory. Follows symlinks.
+function init-prog {
+    local newp p="$0"
+
+    while newp="$(readlink "$p")"; do
+        [[ ${newp} =~ ^/ ]] && p="${newp}" || p="$(dirname "$p")/${newp}"
+    done
+
+    progName="${p##*/}"
+    progDir="$(cd "$(dirname "$p")"; /bin/pwd -P)"
+    baseDir="$(cd "${progDir}/.."; /bin/pwd -P)"
+}
+init-prog
+
+# Load the helper library.
+. "${progDir}/lib/init"
+
+
+#
+# Helper functions
+#
+
+# Gets the number of bits needed to represent N values (e.g. the numbers
+# 0..(N-1)).
+function bits-needed {
+    local n="$1"
+    local count=0
+
+    while (( ${n} > 0 )); do
+        (( count++ ))
+        (( n >>= 1 ))
+    done
+
+    echo "${count}"
+}
+
+
+#
+# Argument parsing
+#
+
+# Error during argument processing?
+argError=0
+
+# Need help?
+showHelp=0
+
+# Location (region or availability zone).
+inLocation=''
+
+# Name for the subnets.
+name=''
+
+# Name or ID of the VPC.
+vpcNameOrId=''
+
+while (( $# > 0 )); do
+    case "$1" in
+        --in=?*)
+            inLocation="${1#*=}"
+            ;;
+        --name=?*)
+            name="${1#*=}"
+            ;;
+        --vpc=?*)
+            vpcNameOrId="${1#*=}"
+            ;;
+        -h|--help)
+            showHelp=1
+            break
+            ;;
+        --)
+            # Explicit end of options
+            shift
+            break
+            ;;
+        -?*)
+            echo 1>&2 "Unknown option: $1"
+            argError=1
+            break
+            ;;
+        *)
+            # Non-option argument
+            break
+            ;;
+    esac
+
+    shift
+done
+
+if (( !${argError} )); then
+    if [[ ${inLocation} == '' ]]; then
+        echo 1>&2 'Missing option: --in'
+        argError=1
+    fi
+    if [[ ${vpcNameOrId} == '' ]]; then
+        echo 1>&2 'Missing option: --vpc'
+        argError=1
+    fi
+fi
+
+if (( ${showHelp} || ${argError} )); then
+    echo 'Usage:'
+    echo ''
+    echo "${progName} [<opt> ...]"
+    echo '  Adds a set of subnets to a VPC -- one per availability zone -- along'
+    echo '  with an associated routing table.'
+    echo ''
+    echo '  --in=<region-or-zone>'
+    echo '    What region to make the security group in. Must be specified. If'
+    echo '    specified as an availability zone, only the region portion matters.'
+    echo '  --name=<name>'
+    echo '    Name to use for the created subnets. If not specified, a name is'
+    echo '    generated programatically.'
+    echo '  --vpc=<name-or-id>'
+    echo '    Name or ID of the VPC.'
+    echo ''
+    echo "${progName} [--help | -h]"
+    echo '  Displays this message.'
+    exit "${argError}"
+fi
+
+
+#
+# Main script
+#
+
+inRegion="$(lib region-from-location "${inLocation}")" \
+|| exit "$?"
+
+azList="$(lib list-availability-zones --in="${inRegion}")" \
+|| exit "$?"
+
+# Get all the VPC info.
+vpcInfo="$(lib find-vpc --in="${inRegion}" --print-all "${vpcNameOrId}")" \
+|| exit "$?"
+
+cidr4="$(jval --raw vpcInfo:json="${vpcInfo}" '
+    $vpcInfo.CidrBlockAssociationSet
+    |
+    if length == 0 then "none"
+    elif length == 1 then .[0].CidrBlock
+    else "many"
+    end
+')"
+
+if [[ ${cidr4} == 'many' ]]; then
+    echo 1>&2 'Sorry, not set up to deal with multiple CIDR sets (IPv4).'
+    exit 1
+fi
+
+cidr6="$(jval --raw vpcInfo:json="${vpcInfo}" '
+    $vpcInfo.Ipv6CidrBlockAssociationSet
+    |
+    if length == 0 then "none"
+    elif length == 1 then .[0].Ipv6CidrBlock
+    else "many"
+    end
+')"
+
+if [[ ${cidr6} == 'many' ]]; then
+    echo 1>&2 'Sorry, not set up to deal with multiple CIDR sets (IPv4).'
+    exit 1
+fi
+
+echo '#### IPV4:' "${cidr4}"
+echo '#### IPV6:' "${cidr6}"
+
+azCount="$(lib json-length "${azList}")"
+azBits="$(bits-needed "${azCount}")"
+
+split-cidr4 "${cidr4}" "${azCount}"
+
+if [[ ${name} == '' ]]; then
+    name="$(lib now-stamp via-script)"
+fi
+
+tagSpec="$(lib name-tag-spec 'subnet' "${name}")"
+
+# TODO: Finish this!
+
+exit 1
+ec2-json "${command}" \
+    --in="${inRegion}" \
+    groupId="${groupId}" \
+    ipPermissions:json="[${ipSpec}]" \
+    tagSpec:json="${tagSpec}" \
+    '
+    $tagSpec +
+    {
+        GroupId: $groupId,
+        IpPermissions: $ipPermissions
+    }' \
+    :: "${filterArg}"
+
+# For reference
+'
+
+#### IPV4: 10.1.0.0/16
+   10.1.
+
+#### IPV6: 2600:1f14:462:3100::/56
+
+'
