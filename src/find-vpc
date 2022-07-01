@@ -28,8 +28,10 @@ init-prog
 #
 
 # Performs a `describe-*` call and passes through the JSON output under the
-# indicated top-level object key.
-function do-describe-call {
+# indicated top-level object key. Print out the final requested result (either
+# just the ID or the full info), including possibly doing a second call to
+# get the requested info.
+function do-find {
     local commandName="$1"
     local topKey="$2"
     local filterName="$3"
@@ -38,16 +40,22 @@ function do-describe-call {
     local result
     result="$(ec2-json "${commandName}" \
         --in="${inRegion}" \
-        "$(lib filter-spec "${filterName}=${nameOrId}")" \
-        :: \
-        topKey="${topKey}" \
-        '.[$topKey] | map(.VpcId) | unique'
+        "$(lib filter-spec "${filterName}=${nameOrId}")"
     )" \
     || return "$?"
 
+    local idResult
+    idResult="$(jval \
+        result:json="${result}" \
+        topKey="${topKey}" \
+        '$result[$topKey] | map(.VpcId) | unique'
+    )"
+
     local vpcId
     vpcId="$(jval --raw \
-        "${result}" '
+        idResult:json="${idResult}" \
+        '
+        $idResult
         |
         if length == 0 then "none"
         elif length == 1 then .[0]
@@ -67,7 +75,22 @@ function do-describe-call {
             ;;
     esac
 
-    echo "${vpcId}"
+    if (( ${printAll} )); then
+        if [[ ${topKey} != 'Vpcs' ]]; then
+            # We got the ID out of some other object (e.g. a security group),
+            # and we've been asked for full info. So we need to actually get
+            # that info!
+            result="$(ec2-json describe-vpcs \
+                --in="${inRegion}" \
+                vpcId="${vpcId}" \
+                '{ VpcIds: [$vpcId] }'
+            )" \
+            || return "$?"
+        fi
+        jval result:json="${result}" '$result.Vpcs[0]'
+    else
+        echo "${vpcId}"
+    fi
 }
 
 # Find a VPC by looking through all the VPCs.
@@ -75,14 +98,14 @@ function find-via-describe-vpcs {
     local filterName="$1"
     local nameOrId="$2"
 
-    do-describe-call describe-vpcs Vpcs "${filterName}" "${nameOrId}"
+    do-find describe-vpcs Vpcs "${filterName}" "${nameOrId}"
 }
 
 # Find a VPC from an associated security group.
 function find-via-describe-security-groups {
     local nameOrId="$1"
 
-    do-describe-call describe-security-groups SecurityGroups group-id "${nameOrId}"
+    do-find describe-security-groups SecurityGroups group-id "${nameOrId}"
 }
 
 
@@ -99,10 +122,16 @@ showHelp=0
 # Location (region or availability zone).
 inLocation=''
 
+# Print full object?
+printAll=0
+
 while (( $# > 0 )); do
     case "$1" in
         --in=?*)
             inLocation="${1#*=}"
+            ;;
+        --print-all)
+            printAll=1
             ;;
         -h|--help)
             showHelp=1
@@ -147,8 +176,11 @@ if (( ${showHelp} || ${argError} )); then
     echo ''
     echo "${progName} [<opt> ...] <name-or-id>"
     echo '  Finds a VPC by name or security group ID, or validates the existence'
-    echo '  of one by ID. On success, prints the VPC ID.'
+    echo '  of one by ID. On success, prints the VPC ID (by default) or the'
+    echo '  full VPC info object.'
     echo ''
+    echo '  --print-all'
+    echo '    Print the full info object, not just the ID.'
     echo '  --in=<region-or-zone>'
     echo '    Where to look. Must be specified. If specified as an availability'
     echo '    zone, only the region portion matters.'
