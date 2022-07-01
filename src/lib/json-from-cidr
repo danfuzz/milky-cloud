@@ -27,33 +27,119 @@ init-prog
 # Helper functions
 #
 
-# Prints out the bytes of an IPv4 address, suitable for subsequent inclusion in
-# a final result.
+# Validates and prints out the bytes of an IPv4 address, suitable for subsequent
+# inclusion in a final result.
 function v4-bytes {
     local address="$1"
+    local errorMsg="Unparseable IPv4 address: ${address}"
     local count=0
     local result=''
 
     address=".${address}" # Avoids a special case for the first iteration.
 
+    local num
     while [[ ${address} != '' ]]; do
-        if ! [[ ${address} =~ ^\.([0-9]+)(.*)$ ]]; then
-            echo 1>&2 "Unparseable IPv4 CIDR: ${cidr}"
+        # `0*` below strips leading zeros, so that the number doesn't get
+        # interpreted as octal.
+        if ! [[ ${address} =~ ^\.0*([0-9]+)(.*)$ ]]; then
+            echo 1>&2 "${errorMsg}"
             return 1
         fi
-        result="${result}, ${BASH_REMATCH[1]}"
+
+        num="${BASH_REMATCH[1]}"
         address="${BASH_REMATCH[2]}"
+
+        if (( ${num} > 255 )); then
+            echo 1>&2 "${errorMsg}"
+            return 1
+        fi
+
+        result="${result}, ${num}"
         (( count++ ))
     done
+
+    if (( ${count} > 4 )); then
+        echo 1>&2 "${errorMsg}"
+        return 1
+    fi
 
     while (( ${count} < 4 )); do
         result="${result}, 0"
         (( count++ ))
     done
 
-    # Drop the extra comma and space from the result.
-    [[ ${result} =~ ^[,' ']+(.*)$ ]]
+    # Drop the extra comma and space from the result, and put it in brackets.
+    [[ ${result} =~ ^[,\ ]+(.*)$ ]]
+    echo "[${BASH_REMATCH[1]}]"
+}
 
+# Validates and prints out the bytes of an IPv6 address, suitable for subsequent
+# inclusion in a final result.
+function v6-bytes {
+    local address="$1"
+    local errorMsg="Unparseable IPv6 address: ${address}"
+    local gotGap=0
+    local nums=()
+
+    if ! [[ ${address} =~ ^([:0-9a-f]*)(::([:0-9a-f]*))?$ ]]; then
+        echo 1>&2 "${errorMsg}"
+        return 1
+    fi
+
+    while [[ ${address} != '' ]]; do
+        if [[ ${address} =~ ^::(.*)$ ]]; then
+            if (( ${gotGap} )); then
+                # Double gap.
+                echo 1>&2 "${errorMsg}"
+                return 1
+            fi
+            gotGap=1
+            nums+=(gap)
+            address="${BASH_REMATCH[1]}"
+        elif [[ ${address} =~ ^([0-9a-f]{1,4})((:.*)|$) ]]; then
+            nums+=("0x${BASH_REMATCH[1]}")
+            address="${BASH_REMATCH[2]}"
+            if [[ ${address} =~ ^:([^:].*)$ ]]; then
+                # Strip `:` separator but not `::` gap.
+                address="${BASH_REMATCH[1]}"
+            fi
+        else
+            echo 1>&2 "${errorMsg}"
+            return 1
+        fi
+    done
+
+    local zeroCount=0
+    if (( ${gotGap} )); then
+        if (( ${#nums[@]} > 8 )); then
+            echo 1>&2 "${errorMsg}"
+            return 1
+        fi
+        zeroCount=$(( 9 - ${#nums[@]} ))
+    else
+        if (( ${#nums[@]} != 8 )); then
+            echo 1>&2 "${errorMsg}"
+            return 1
+        fi
+    fi
+
+    local result=''
+    local n
+
+    for n in "${nums[@]}"; do
+        if [[ ${n} == 'gap' ]]; then
+            while (( ${zeroCount} > 0 )); do
+                result="${result}, 0"
+                (( zeroCount-- ))
+            done
+        else
+            # The math expression converts from hex to decimal.
+            result="${result}, $(( ${n} ))"
+        fi
+    done
+
+    # Drop the extra comma and space from the result, and put it in brackets.
+    [[ ${result} =~ ^[,\ ]+(.*)$ ]]
     echo "[${BASH_REMATCH[1]}]"
 }
 
@@ -118,7 +204,7 @@ fi
 # Main script
 #
 
-if ! [[ ${value} =~ ^([.:0-9a-f]+)/([0-9]+) ]]; then
+if ! [[ ${value} =~ ^([.:0-9a-f]+)/([0-9]+)$ ]]; then
     echo 1>&2 "Unparseable CIDR: ${value}"
     exit 1
 fi
@@ -127,22 +213,20 @@ address="${BASH_REMATCH[1]}"
 bits="${BASH_REMATCH[2]}"
 type=
 
-if [[ ${cidr} =~ : ]]; then
-    # It's IPv6.
+if [[ ${address} =~ : ]]; then
+    # It's apparently IPv6.
     type=v6
-    echo 1>&2 'TODO!!!'
-    exit 1
-else
-    # It's IPv4.
+    addressBytes="$(v6-bytes "${address}")" \
+    || exit "$?"
+elif [[ ${address} =~ \. ]]; then
+    # It's apparently IPv4.
     type=v4
-
     addressBytes="$(v4-bytes "${address}")" \
     || exit "$?"
+else
+    echo 1>&2 "Unparseable CIDR: ${value}"
+    exit 1
 fi
-
-echo '########'
-echo "${addressBytes}"
-echo '########'
 
 jval \
     address:json="${addressBytes}" \
