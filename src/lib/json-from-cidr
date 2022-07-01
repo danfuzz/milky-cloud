@@ -1,0 +1,155 @@
+#!/bin/bash
+#
+# Copyright 2022 Dan Bornstein.
+# Licensed AS IS and WITHOUT WARRANTY under the Apache License,
+# Version 2.0. Details: <http://www.apache.org/licenses/LICENSE-2.0>
+
+# Set `progName` to the program name, `progDir` to its directory, and `baseDir`
+# to `progDir`'s directory. Follows symlinks.
+function init-prog {
+    local newp p="$0"
+
+    while newp="$(readlink "$p")"; do
+        [[ ${newp} =~ ^/ ]] && p="${newp}" || p="$(dirname "$p")/${newp}"
+    done
+
+    progName="${p##*/}"
+    progDir="$(cd "$(dirname "$p")"; /bin/pwd -P)"
+    baseDir="$(cd "${progDir}/.."; /bin/pwd -P)"
+}
+init-prog
+
+# Set up for library-internal usage.
+. "${progDir}/init" --lib
+
+
+#
+# Helper functions
+#
+
+# Prints out the bytes of an IPv4 address, suitable for subsequent inclusion in
+# a final result.
+function v4-bytes {
+    local address="$1"
+    local count=0
+    local result=''
+
+    address=".${address}" # Avoids a special case for the first iteration.
+
+    while [[ ${address} != '' ]]; do
+        if ! [[ ${address} =~ ^\.([0-9]+)(.*)$ ]]; then
+            echo 1>&2 "Unparseable IPv4 CIDR: ${cidr}"
+            return 1
+        fi
+        result="${result}, ${BASH_REMATCH[1]}"
+        address="${BASH_REMATCH[2]}"
+        (( count++ ))
+    done
+
+    while (( ${count} < 4 )); do
+        result="${result}, 0"
+        (( count++ ))
+    done
+
+    # Drop the extra comma and space from the result.
+    [[ ${result} =~ ^[,' ']+(.*)$ ]]
+
+    echo "[${BASH_REMATCH[1]}]"
+}
+
+
+#
+# Argument parsing
+#
+
+# Error during argument processing?
+argError=0
+
+# Need help?
+showHelp=0
+
+# CIDR value.
+value=''
+
+while (( $# > 0 )); do
+    case "$1" in
+        -h|--help)
+            showHelp=1
+            break
+            ;;
+        --)
+            # Explicit end of options
+            shift
+            break
+            ;;
+        -?*)
+            echo 1>&2 "Unknown option: $1"
+            argError=1
+            break
+            ;;
+        *)
+            # Non-option argument
+            break
+            ;;
+    esac
+
+    shift
+done
+
+if [[ $# > 0 ]]; then
+    value="$1"
+fi
+
+if (( ${showHelp} || ${argError} )); then
+    echo 'Usage:'
+    echo ''
+    echo "${progName} <cidr>"
+    echo ''
+    echo 'Converts a CIDR value (either for IPv4 or IPv6) into a JSON object'
+    echo 'which can then be used for further and more convenient calculation.'
+    echo ''
+    echo "${progName} [--help | -h]"
+    echo '  Displays this message.'
+    exit "${argError}"
+fi
+
+
+#
+# Main script
+#
+
+if ! [[ ${value} =~ ^([.:0-9a-f]+)/([0-9]+) ]]; then
+    echo 1>&2 "Unparseable CIDR: ${value}"
+    exit 1
+fi
+
+address="${BASH_REMATCH[1]}"
+bits="${BASH_REMATCH[2]}"
+type=
+
+if [[ ${cidr} =~ : ]]; then
+    # It's IPv6.
+    type=v6
+    echo 1>&2 'TODO!!!'
+    exit 1
+else
+    # It's IPv4.
+    type=v4
+
+    addressBytes="$(v4-bytes "${address}")" \
+    || exit "$?"
+fi
+
+echo '########'
+echo "${addressBytes}"
+echo '########'
+
+jval \
+    address:json="${addressBytes}" \
+    bits:json="${bits}" \
+    type="${type}" \
+    '{
+        address: $address,
+        prefixBits: $bits,
+        type: $type
+    }'
