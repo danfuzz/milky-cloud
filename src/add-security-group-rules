@@ -123,12 +123,15 @@ if (( !${argError} )); then
     fi
     if [[ ${direction} == '' ]]; then
         echo 1>&2 'Missing option: --egress or --ingress'
+        argError=1
     fi
     if [[ ${port} == '' ]]; then
         echo 1>&2 'Missing option: --all-ports or --port'
+        argError=1
     fi
     if [[ ${protocol} == '' ]]; then
         echo 1>&2 'Missing option: --all-protocols, --tcp, or --udp'
+        argError=1
     fi
 fi
 
