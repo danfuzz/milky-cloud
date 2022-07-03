@@ -234,6 +234,6 @@ jval \
     type="${type}" \
     '{
         address: $address,
-        prefixBits: $bits,
+        netmaskBits: $bits,
         type: $type
     }'
