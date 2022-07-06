@@ -307,7 +307,6 @@ jval \
     type="${type}" \
     '{
         address: $address,
-        netmask: $netmask,
         netmaskBits: $netmaskBits,
         type: $type
     }'
