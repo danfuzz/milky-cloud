@@ -30,7 +30,7 @@ init-prog
 # Constructs a JSON value to represent all the pieces of a command, based on the
 # globals set up by the main script.
 function make-command-parts-json {
-    local dashArgsJson="$(lib json-string-array -- "${dashArgs[@]}")"
+    local dashArgsJson="$(lib json-array --strings -- "${dashArgs[@]}")"
 
     jval \
         command="${command}" \
@@ -271,7 +271,7 @@ if [[ ${printCommandTo} != '' ]]; then
     # much every bit someone might care about.
     jval >"${printCommandTo}" \
         parts:json="$(make-command-parts-json)" \
-        full:json="$(lib json-string-array "${fullCommand[@]}")" \
+        full:json="$(lib json-array --strings "${fullCommand[@]}")" \
         '
         def quoteMaybe:
             if test("^[-_/=a-zA-Z0-9]+$")

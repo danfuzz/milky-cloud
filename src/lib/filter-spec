@@ -125,8 +125,8 @@ if (( ${compactOutput} )); then
 fi
 
 jqArgs+=(
-    --argjson names "$(lib json-string-array "${filterNames[@]}")"
-    --argjson values "$(lib json-string-array "${filterValues[@]}")"
+    --argjson names "$(lib json-array --strings "${filterNames[@]}")"
+    --argjson values "$(lib json-array --strings "${filterValues[@]}")"
 )
 
 exec jq "${jqArgs[@]}" \
