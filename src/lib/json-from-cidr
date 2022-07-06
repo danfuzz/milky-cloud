@@ -89,9 +89,9 @@ function netmask-array {
     lib json-array "${result[@]}"
 }
 
-# Validates and prints out the bytes of an IPv4 address, suitable for subsequent
-# inclusion in a final result.
-function v4-bytes {
+# Validates and prints out the hextets of an IPv4 address, suitable for
+# subsequent inclusion in a final result.
+function v4-hextets {
     local address="$1"
     local errorMsg="Unparseable IPv4 address: ${address}"
     local result=()
@@ -136,9 +136,9 @@ function v4-bytes {
     echo ']'
 }
 
-# Validates and prints out the bytes of an IPv6 address, suitable for subsequent
-# inclusion in a final result.
-function v6-bytes {
+# Validates and prints out the hextets of an IPv6 address, suitable for
+# subsequent inclusion in a final result.
+function v6-hextets {
     local address="$1"
     local errorMsg="Unparseable IPv6 address: ${address}"
     local gotGap=0
@@ -281,13 +281,13 @@ if [[ ${address} =~ : ]]; then
     # It's apparently IPv6.
     type=v6
     totalBits=128
-    addressBytes="$(v6-bytes "${address}")" \
+    addressHextets="$(v6-hextets "${address}")" \
     || exit "$?"
 elif [[ ${address} =~ \. ]]; then
     # It's apparently IPv4.
     type=v4
     totalBits=32
-    addressBytes="$(v4-bytes "${address}")" \
+    addressHextets="$(v4-hextets "${address}")" \
     || exit "$?"
 else
     echo 1>&2 "Unparseable CIDR: ${value}"
@@ -295,10 +295,10 @@ else
 fi
 
 netmask="$(netmask-array "${netmaskBits}" "${totalBits}" )"
-addressBytes="$(mask-address "${addressBytes}" "${netmask}")"
+addressHextets="$(mask-address "${addressHextets}" "${netmask}")"
 
 jval \
-    address:json="${addressBytes}" \
+    address:json="${addressHextets}" \
     netmask:json="${netmask}" \
     netmaskBits:json="${netmaskBits}" \
     type="${type}" \
