@@ -29,6 +29,23 @@ init-prog
 
 # Command: Add a subnet to the end of a CIDR's network.
 function command_add-subnet {
+    case "$#" in
+        0|1)
+            echo 1>&2 'Missing <cidr> and/or <address> argument.'
+            return 1
+            ;;
+        2)
+            : # It's good.
+            ;;
+        *)
+            echo 1>&2 'Too many arguments.'
+            return 1
+            ;;
+    esac
+
+    local cidr="$1"
+    local addressAndBits="$2"
+
     # TODO!
     echo 1>&2 TODO
     return 1
@@ -120,10 +137,10 @@ outputStyle=string
 
 while (( $# > 0 )); do
     case "$1" in
-        compact-json)
+        --compact-json)
             outputStyle=compact-json
             ;;
-        json)
+        --json)
             outputStyle=json
             ;;
         -h|--help)

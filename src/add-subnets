@@ -166,7 +166,7 @@ cidr6="$(jval --raw vpcInfo:json="${vpcInfo}" '
 ')"
 
 if [[ ${cidr6} == 'many' ]]; then
-    echo 1>&2 'Sorry, not set up to deal with multiple CIDR sets (IPv4).'
+    echo 1>&2 'Sorry, not set up to deal with multiple CIDR sets (IPv6).'
     exit 1
 fi
 
@@ -175,6 +175,7 @@ echo '#### IPV6:' "${cidr6}"
 
 azCount="$(lib json-length "${azList}")"
 azBits="$(bits-needed "${azCount}")"
+azIndexes=($(seq 0 "$(( ${azCount} - 1 ))"))
 
 split-cidr4 "${cidr4}" "${azCount}"
 
