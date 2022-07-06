@@ -27,6 +27,38 @@ init-prog
 # Helper functions
 #
 
+# Prints a netmask array.
+function netmask-array {
+    local netmaskBits="$1"
+    local totalBits="$2"
+
+    if (( ${netmaskBits} > ${totalBits} )); then
+        echo 1>&2 'Too few total bits!'
+        return 1
+    elif (( (${totalBits} % 16) != 0 )); then
+        echo 1>&2 'Total bits must be a multiple of 16!'
+        return 1
+    fi
+
+    local totalHextets=$(( ${totalBits} / 16 ))
+    local result=()
+
+    while (( ${netmaskBits} > 16 )); do
+        result+=(65535)
+        (( netmaskBits -= 16 ))
+    done
+
+    if (( ${netmaskBits} != 0 )); then
+        result+=($(( ((1 << ${netmaskBits}) - 1) << (16 - ${netmaskBits}) )))
+    fi
+
+    while (( ${#result[@]} < ${totalHextets} )); do
+        result+=(0)
+    done
+
+    lib json-array "${result[@]}"
+}
+
 # Validates and prints out the bytes of an IPv4 address, suitable for subsequent
 # inclusion in a final result.
 function v4-bytes {
@@ -142,38 +174,6 @@ function v6-bytes {
     # Drop the extra comma and space from the result, and put it in brackets.
     [[ ${result} =~ ^[,\ ]+(.*)$ ]]
     echo "[${BASH_REMATCH[1]}]"
-}
-
-# Prints a netmask array.
-function netmask-array {
-    local netmaskBits="$1"
-    local totalBits="$2"
-
-    if (( ${netmaskBits} > ${totalBits} )); then
-        echo 1>&2 'Too few total bits!'
-        return 1
-    elif (( (${totalBits} % 16) != 0 )); then
-        echo 1>&2 'Total bits must be a multiple of 16!'
-        return 1
-    fi
-
-    local totalHextets=$(( ${totalBits} / 16 ))
-    local result=()
-
-    while (( ${netmaskBits} > 16 )); do
-        result+=(65535)
-        (( netmaskBits -= 16 ))
-    done
-
-    if (( ${netmaskBits} != 0 )); then
-        result+=($(( ((1 << ${netmaskBits}) - 1) << (16 - ${netmaskBits}) )))
-    fi
-
-    while (( ${#result[@]} < ${totalHextets} )); do
-        result+=(0)
-    done
-
-    lib json-array "${result[@]}"
 }
 
 
