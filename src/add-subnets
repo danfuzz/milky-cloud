@@ -177,7 +177,18 @@ azCount="$(lib json-length "${azList}")"
 azBits="$(bits-needed "${azCount}")"
 azIndexes=($(seq 0 "$(( ${azCount} - 1 ))"))
 
-split-cidr4 "${cidr4}" "${azCount}"
+if [[ ${cidr4} != 'none' ]]; then
+    for (( n=0; n < "${azCount}"; n++ )); do
+        lib cidr-calc add-subnet "${cidr4}" "${n}/${azBits}"
+    done
+    # TODO
+fi
+
+if [[ ${cidr6} != 'none' ]]; then
+    for (( n=0; n < "${azCount}"; n++ )); do
+        lib cidr-calc add-subnet "${cidr6}" "${n}/${azBits}"
+    done
+fi
 
 if [[ ${name} == '' ]]; then
     name="$(lib now-stamp via-script)"
