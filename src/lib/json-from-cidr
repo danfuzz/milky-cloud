@@ -32,8 +32,7 @@ init-prog
 function v4-bytes {
     local address="$1"
     local errorMsg="Unparseable IPv4 address: ${address}"
-    local count=0
-    local result=''
+    local result=()
 
     address=".${address}" # Avoids a special case for the first iteration.
 
@@ -54,23 +53,25 @@ function v4-bytes {
             return 1
         fi
 
-        result="${result}, ${num}"
-        (( count++ ))
+        result+=("${num}")
     done
 
-    if (( ${count} > 4 )); then
+    if (( ${#result[@]} > 4 )); then
         echo 1>&2 "${errorMsg}"
         return 1
     fi
 
-    while (( ${count} < 4 )); do
-        result="${result}, 0"
-        (( count++ ))
+    while (( ${#result[@]} < 4 )); do
+        result+=(0)
     done
 
-    # Drop the extra comma and space from the result, and put it in brackets.
-    [[ ${result} =~ ^[,\ ]+(.*)$ ]]
-    echo "[${BASH_REMATCH[1]}]"
+    # The array form uses 16-bit elements, so combine the four 8-bit elements
+    # to produce the final result.
+    echo '['
+    echo $(( (${result[0]} << 8) + ${result[1]} ))
+    echo ','
+    echo $(( (${result[2]} << 8) + ${result[3]} ))
+    echo ']'
 }
 
 # Validates and prints out the bytes of an IPv6 address, suitable for subsequent
@@ -143,6 +144,38 @@ function v6-bytes {
     echo "[${BASH_REMATCH[1]}]"
 }
 
+# Prints a netmask array.
+function netmask-array {
+    local netmaskBits="$1"
+    local totalBits="$2"
+
+    if (( ${netmaskBits} > ${totalBits} )); then
+        echo 1>&2 'Too few total bits!'
+        return 1
+    elif (( (${totalBits} % 16) != 0 )); then
+        echo 1>&2 'Total bits must be a multiple of 16!'
+        return 1
+    fi
+
+    local totalHextets=$(( ${totalBits} / 16 ))
+    local result=()
+
+    while (( ${netmaskBits} > 16 )); do
+        result+=(65535)
+        (( netmaskBits -= 16 ))
+    done
+
+    if (( ${netmaskBits} != 0 )); then
+        result+=($(( ((1 << ${netmaskBits}) - 1) << (16 - ${netmaskBits}) )))
+    fi
+
+    while (( ${#result[@]} < ${totalHextets} )); do
+        result+=(0)
+    done
+
+    lib json-array "${result[@]}"
+}
+
 
 #
 # Argument parsing
@@ -210,17 +243,20 @@ if ! [[ ${value} =~ ^([.:0-9a-f]+)/([0-9]+)$ ]]; then
 fi
 
 address="${BASH_REMATCH[1]}"
-bits="${BASH_REMATCH[2]}"
+netmaskBits="${BASH_REMATCH[2]}"
+totalBits=
 type=
 
 if [[ ${address} =~ : ]]; then
     # It's apparently IPv6.
     type=v6
+    totalBits=128
     addressBytes="$(v6-bytes "${address}")" \
     || exit "$?"
 elif [[ ${address} =~ \. ]]; then
     # It's apparently IPv4.
     type=v4
+    totalBits=32
     addressBytes="$(v4-bytes "${address}")" \
     || exit "$?"
 else
@@ -228,12 +264,16 @@ else
     exit 1
 fi
 
+netmask="$(netmask-array "${netmaskBits}" "${totalBits}" )"
+
 jval \
     address:json="${addressBytes}" \
-    bits:json="${bits}" \
+    netmask:json="${netmask}" \
+    netmaskBits:json="${netmaskBits}" \
     type="${type}" \
     '{
         address: $address,
-        netmaskBits: $bits,
+        netmask: $netmask,
+        netmaskBits: $netmaskBits,
         type: $type
     }'
