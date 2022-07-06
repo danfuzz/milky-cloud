@@ -44,7 +44,7 @@ function mask-address {
     # just do something like `| map(.[0] & .[1])` in the invocation above.
     local before after v1 v2 combo
     while true; do
-        [[ ${pairs} =~ ^(.*)(\[([0-9]+),([0-9]+)\])(.*)$ ]] \
+        [[ ${pairs} =~ ^(\[.*)(\[([0-9]+),([0-9]+)\])(.*\])$ ]] \
         || break
         before="${BASH_REMATCH[1]}"
         v1="${BASH_REMATCH[3]}"
@@ -247,6 +247,9 @@ done
 
 if [[ $# > 0 ]]; then
     value="$1"
+else
+    echo 1>&2 'Missing CIDR argument.'
+    argError=1
 fi
 
 if (( ${showHelp} || ${argError} )); then
