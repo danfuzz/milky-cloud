@@ -27,6 +27,36 @@ init-prog
 # Helper functions
 #
 
+# Masks an address with a netmask (that is, logical-ANDs the address with the
+# netmask). This canonicalizes an address being used as a network specifier.
+function mask-address {
+    local address="$1"
+    local netmask="$2"
+
+    local pairs="$(jval --compact \
+        address:json="${address}" \
+        netmask:json="${netmask}" \
+        '[$address, $netmask] | transpose'
+    )"
+
+    # This is kinda awful. We do the logical-AND of pairs this way because `jq`
+    # -- surprisingly -- doesn't offer bitwise operations. If it did, we could
+    # just do something like `| map(.[0] & .[1])` in the invocation above.
+    local before after v1 v2 combo
+    while true; do
+        [[ ${pairs} =~ ^(.*)(\[([0-9]+),([0-9]+)\])(.*)$ ]] \
+        || break
+        before="${BASH_REMATCH[1]}"
+        v1="${BASH_REMATCH[3]}"
+        v2="${BASH_REMATCH[4]}"
+        after="${BASH_REMATCH[5]}"
+        combo=$(( ${v1} & ${v2} ))
+        pairs="${before}${combo}${after}"
+    done
+
+    echo "${pairs}"
+}
+
 # Prints a netmask array.
 function netmask-array {
     local netmaskBits="$1"
@@ -265,6 +295,7 @@ else
 fi
 
 netmask="$(netmask-array "${netmaskBits}" "${totalBits}" )"
+addressBytes="$(mask-address "${addressBytes}" "${netmask}")"
 
 jval \
     address:json="${addressBytes}" \
