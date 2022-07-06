@@ -1,0 +1,211 @@
+#!/bin/bash
+#
+# Copyright 2022 Dan Bornstein.
+# Licensed AS IS and WITHOUT WARRANTY under the Apache License,
+# Version 2.0. Details: <http://www.apache.org/licenses/LICENSE-2.0>
+
+# Set `progName` to the program name, `progDir` to its directory, and `baseDir`
+# to `progDir`'s directory. Follows symlinks.
+function init-prog {
+    local newp p="$0"
+
+    while newp="$(readlink "$p")"; do
+        [[ ${newp} =~ ^/ ]] && p="${newp}" || p="$(dirname "$p")/${newp}"
+    done
+
+    progName="${p##*/}"
+    progDir="$(cd "$(dirname "$p")"; /bin/pwd -P)"
+    baseDir="$(cd "${progDir}/.."; /bin/pwd -P)"
+}
+init-prog
+
+# Set up for library-internal usage.
+. "${progDir}/init" --lib
+
+
+#
+# Helper functions
+#
+
+# Command: Add a subnet to the end of a CIDR's network.
+function command_add-subnet {
+    # TODO!
+    echo 1>&2 TODO
+    return 1
+}
+
+# Command: Print a CIDR.
+function command_print {
+    case "$#" in
+        0)
+            echo 1>&2 'Missing <cidr> argument.'
+            return 1
+            ;;
+        1)
+            : # It's good.
+            ;;
+        *)
+            echo 1>&2 'Too many arguments.'
+            return 1
+            ;;
+    esac
+
+    local cidr="$1"
+
+    json-from-any "${cidr}"
+}
+
+# Get or validate a JSON-CIDR from the given value. If a standard-form string,
+# converts it. If JSON, validates it.
+function json-from-any {
+    local value="$1"
+
+    if [[ ${value} =~ ^'{' ]]; then
+        json-validate "${value}"
+    elif [[ ${value} =~ ^[:./0-9a-f]+$ ]]; then
+        lib json-from-cidr "${value}"
+    else
+        echo 1>&2 "Unparseable CIDR: ${value}"
+        return 1
+    fi
+}
+
+# Validates a JSON-CIDR value. On success, prints the value.
+function json-validate {
+    local value="$1"
+
+    # This doesn't check every possible problem, but it should be sufficient to
+    # catch _unintentional_ misuse.
+    local result
+    result="$(jval cidr:json="${value}" \
+        '
+            (($cidr | type) == "object")
+        and (($cidr | keys) == ["address", "netmask", "netmaskBits", "type"])
+        and (($cidr.address | type) == "array")
+        and (($cidr.netmask | type) == "array")
+        and (($cidr.address | length) == ($cidr.netmask | length))
+        and (($cidr.netmaskBits | type) == "number")
+        and (($cidr.netmaskBits >= 0) and ($cidr.netmaskBits <= 128))
+        and (($cidr.type == "v4") or ($cidr.type == "v6"))
+        |
+        if . then $cidr else null end
+        '
+    )" \
+    || return "$?"
+
+    if [[ ${result} == 'null' ]]; then
+        echo 1>&2 "Malformed JSON-CIDR: ${value}"
+        return 1
+    fi
+
+    echo "${result}"
+}
+
+
+#
+# Argument parsing
+#
+
+# Error during argument processing?
+argError=0
+
+# Need help?
+showHelp=0
+
+# Command.
+command=
+
+# Output style.
+outputStyle=string
+
+while (( $# > 0 )); do
+    case "$1" in
+        compact-json)
+            outputStyle=compact-json
+            ;;
+        json)
+            outputStyle=json
+            ;;
+        -h|--help)
+            showHelp=1
+            break
+            ;;
+        --)
+            # Explicit end of options
+            shift
+            break
+            ;;
+        -?*)
+            echo 1>&2 "Unknown option: $1"
+            argError=1
+            break
+            ;;
+        *)
+            # Non-option argument
+            break
+            ;;
+    esac
+
+    shift
+done
+
+if [[ $# > 0 ]]; then
+    command="$1"
+    shift
+else
+    echo 1>&2 'Missing command argument.'
+    argError=1
+fi
+
+if (( ${showHelp} || ${argError} )); then
+    echo 'Usage:'
+    echo ''
+    echo "${progName} [<opt> ...] <command> <arg> ..."
+    echo ''
+    echo 'Performs a calculation of some sort on a CIDR address/mask. Input CIDR'
+    echo 'values can be either standard-form strings or parsed JSON values (such'
+    echo 'as are produced by the `--json` option of this tool).'
+    echo
+    echo '--compact-json'
+    echo '  Produces compact JSON output.'
+    echo '--json'
+    echo '  Produces JSON output (a parsed CIDR instead of a standard-form string).'
+    echo ''
+    echo 'Commands:'
+    echo ''
+    echo 'add-subnet <cidr> <address>/<bits>'
+    echo '  Appends the given number of bits to the CIDR, whose value is <address>'
+    echo '  (an integer).'
+    echo 'print <cidr>'
+    echo '  Validate and print a CIDR value.'
+    echo ''
+    echo "${progName} [--help | -h]"
+    echo '  Displays this message.'
+    exit "${argError}"
+fi
+
+
+#
+# Main script
+#
+
+commandFunc="command_${command}"
+if ! declare -F "${commandFunc}" >/dev/null; then
+    echo 1>&2 "No such command: ${command}"
+    exit 1
+fi
+
+result="$("${commandFunc}" "$@")" \
+|| exit "$?"
+
+case "${outputStyle}" in
+    compact-json)
+        jval --compact result:json="${result}" '$result'
+        ;;
+    json)
+        jval result:json="${result}" '$result'
+        ;;
+    string)
+        lib cidr-from-json "${result}"
+        ;;
+esac
