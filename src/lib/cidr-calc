@@ -46,6 +46,19 @@ function command_add-subnet {
     local cidr="$1"
     local addressAndBits="$2"
 
+    if ! [[ "${addressAndBits}" =~ ^([0-9]+)/([0-9]+)$ ]]; then
+        echo 1>&2 'Invalid <address> argument.'
+        return 1
+    fi
+
+    local address="${BASH_REMATCH[1]}"
+    local bits="${BASH_REMATCH[2]}"
+
+    if (( ${address} >= (1 << ${bits}) )); then
+        echo 1>&2 "Address does not fit: ${address} in ${bits} bit(s)"
+        return 1
+    fi
+
     # TODO!
     echo 1>&2 TODO
     return 1
