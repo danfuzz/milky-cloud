@@ -30,6 +30,7 @@ init-prog
 # Prints out a V4 address from a CIDR in the usual form.
 function v4-address {
     local cidr="$1"
+    local netmaskBits="$2"
 
     local address="$(jval --raw \
         cidr:json="${cidr}" \
@@ -45,9 +46,12 @@ function v4-address {
         '
     )"
 
-    # Drop any `.0`s at the end of the result.
-    while [[ "${address}" =~ ^(.*)\.0$ ]]; do
+    # Drop octets at the end of the result that aren't covered by the netmask
+    # (so, e.g. `10.0.0.0/16` gets rendered as `10.0/16`).
+    local dropOctets=$(( (32 - ${netmaskBits}) / 8 ))
+    while (( ${dropOctets} > 0 )) && [[ "${address}" =~ ^(.*)\.0$ ]]; do
         address="${BASH_REMATCH[1]}"
+        (( dropOctets-- ))
     done
 
     echo "${address}"
@@ -175,7 +179,7 @@ netmaskBits="$(jval cidr:json="${value}" '$cidr.netmaskBits')" \
 
 case "${type}" in
     v4)
-        address="$(v4-address "${value}")"
+        address="$(v4-address "${value}" "${netmaskBits}")"
         ;;
     v6)
         address="$(v6-address "${value}")"
