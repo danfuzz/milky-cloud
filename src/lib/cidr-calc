@@ -54,14 +54,64 @@ function command_add-subnet {
     local address="${BASH_REMATCH[1]}"
     local bits="${BASH_REMATCH[2]}"
 
-    if (( ${address} >= (1 << ${bits}) )); then
+    if (( ${bits} > 16 )); then
+        echo 1>&2 "Too many bits: ${bits}"
+        return 1
+    elif (( ${#address} > 5 )); then
+        echo 1>&2 "Address too large: ${address}"
+        return 1
+    elif (( ${address} >= (1 << ${bits}) )); then
         echo 1>&2 "Address does not fit: ${address} in ${bits} bit(s)"
         return 1
     fi
 
-    # TODO!
-    echo 1>&2 TODO
-    return 1
+    cidr="$(json-from-any "${cidr}")" \
+    || return "$?"
+
+    local netmaskBits="$(jval cidr:json="${cidr}" '$cidr.netmaskBits')"
+    local origAddress="$(jval cidr:json="${cidr}" '$cidr.address')"
+    local hextetCount="$(jval address:json="${origAddress}" '$address | length')"
+
+    local finalNetmaskBits="$(( ${netmaskBits} + ${bits} ))"
+    local newBits=$(( ${address} << (16 - ${bits}) ))
+    local partialShift="$(( ${netmaskBits} % 16 ))"
+
+    if (( ${partialShift} != 0 )); then
+        local overflow=$(( ${newBits} & ((1 << ${partialShift}) - 1) ))
+        local hextet1=$(( ${newBits} >> ${partialShift} ))
+        local hextet2=$(( ${overflow} << (16 - ${partialShift}) ))
+        newBits=("${hextet1}" "${hextet2}")
+        (( netmaskBits -= "${partialShift}" ))
+    else
+        newBits=("${newBits}")
+    fi
+
+    while (( ${netmaskBits} >= 16 )); do
+        newBits=(0 "${newBits[@]}")
+        (( netmaskBits -= 16 ))
+    done
+
+    while (( ${#newBits[@]} < ${hextetCount} )); do
+        newBits+=(0)
+    done
+
+    newBits="$(lib json-array "${newBits[@]}")"
+
+    newBits="$(jval \
+        address:json="${origAddress}" \
+        newBits:json="${newBits}" \
+        '[$address, $newBits] | transpose | map(.[0] + .[1])'
+    )"
+
+    jval \
+        cidr:json="${cidr}" \
+        address:json="${newBits}" \
+        netmaskBits:json="${finalNetmaskBits}" \
+        '{
+            type: $cidr.type,
+            address: $address,
+            netmaskBits: $netmaskBits
+        }'
 }
 
 # Command: Print a CIDR.
@@ -112,7 +162,6 @@ function json-validate {
             (($cidr | type) == "object")
         and (($cidr | keys) == ["address", "netmask", "netmaskBits", "type"])
         and (($cidr.address | type) == "array")
-        and (($cidr.netmask | type) == "array")
         and (($cidr.address | length) == ($cidr.netmask | length))
         and (($cidr.netmaskBits | type) == "number")
         and (($cidr.netmaskBits >= 0) and ($cidr.netmaskBits <= 128))
