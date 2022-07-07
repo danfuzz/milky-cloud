@@ -27,6 +27,110 @@ init-prog
 # Helper functions
 #
 
+# Prints out a V4 address from a CIDR in the usual form.
+function cidr-v4-address {
+    local cidr="$1"
+    local netmaskBits="$2"
+
+    local address="$(jval --raw \
+        cidr:json="${cidr}" \
+        '$cidr.address as $address
+        |
+        [
+            (($address[0] / 256) | floor | tostring),
+            (($address[0] % 256) | tostring),
+            (($address[1] / 256) | floor | tostring),
+            (($address[1] % 256) | tostring)
+        ]
+        | join(".")
+        '
+    )"
+
+    # Drop octets at the end of the result that aren't covered by the netmask
+    # (so, e.g. `10.0.0.0/16` gets rendered as `10.0/16`).
+    local dropOctets=$(( (32 - ${netmaskBits}) / 8 ))
+    while (( ${dropOctets} > 0 )) && [[ "${address}" =~ ^(.*)\.0$ ]]; do
+        address="${BASH_REMATCH[1]}"
+        (( dropOctets-- ))
+    done
+
+    echo "${address}"
+}
+
+# Prints out a V6 address from a CIDR in the usual form.
+function cidr-v6-address {
+    local cidr="$1"
+
+    local address="$(jval --raw \
+        cidr:json="${cidr}" \
+        '$cidr.address | map(tostring) | join(" ")'
+    )"
+
+    # Go from space-separated string to array of elements.
+    address=(${address})
+
+    # Find a run of zeros, if any.
+    local zerosAt=-1
+    local zeroCount=1 # 1 here to avoid detecting runs of length 1.
+    local n z
+    for (( n=0; n < 8; n++ )); do
+        for (( z=${n}; z < 8; z++ )); do
+            if (( ${address[${z}]} != 0)); then
+                break
+            fi
+        done
+
+        local thisCount=$(( ${z} - ${n} ))
+        if (( ${thisCount} > ${zeroCount} )); then
+            zeroCount="${thisCount}"
+            zerosAt="${n}"
+        fi
+
+        n="${z}" # No need to "relitigate" anything that's been scanned.
+    done
+
+    local result=''
+    local n
+    for (( n=0; n < 8; n++ )); do
+        if (( ${n} == ${zerosAt} )); then
+            result+='::'
+            n=$(( ${n} + ${zeroCount} - 1 ))
+        else
+            if ! ( [[ ${result} =~ :$ ]] || (( ${n} == 0 )) ); then
+                result+=':'
+            fi
+
+            result+="$(printf '%x' "${address[${n}]}")"
+        fi
+    done
+
+    echo "${result}"
+}
+
+# Converts a JSON-CIDR into a standard-form CIDR string.
+function cidr-from-json {
+    local cidr="$1"
+
+    local type="$(jval --raw cidr:json="${cidr}" '$cidr.type')"
+    local netmaskBits="$(jval cidr:json="${cidr}" '$cidr.netmaskBits')"
+    local address
+
+    case "${type}" in
+        v4)
+            address="$(cidr-v4-address "${cidr}" "${netmaskBits}")"
+            ;;
+        v6)
+            address="$(cidr-v6-address "${cidr}")"
+            ;;
+        *)
+            echo 1>&2 'Unrecognized address type.'
+            return 1
+            ;;
+    esac
+
+    echo "${address}/${netmaskBits}"
+}
+
 # Command: Add a value to the network address.
 function command_add-to-network {
     case "$#" in
@@ -368,7 +472,7 @@ if [[ ${result} =~ ^'{' ]]; then
             jval result:json="${result}" '$result'
             ;;
         string)
-            lib cidr-from-json "${result}"
+            cidr-from-json "${result}"
             ;;
     esac
 else
