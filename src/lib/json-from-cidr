@@ -270,7 +270,8 @@ fi
 # Main script
 #
 
-if ! [[ ${value} =~ ^([.:0-9a-f]+)/([0-9]+)$ ]]; then
+# Note: The repetition limits are generous enough to cover everything valid.
+if ! [[ ${value} =~ ^([.:0-9a-f]{1,100})/([1-9][0-9]{0,5})$ ]]; then
     echo 1>&2 "Unparseable CIDR: ${value}"
     exit 1
 fi
