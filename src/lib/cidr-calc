@@ -298,7 +298,7 @@ function command_add-to-network {
 
     jval \
         cidr:json="${cidr}" \
-        address:json="$(lib json-array "${address[@]}")" \
+        address:json="$(jarray "${address[@]}")" \
         '{
             type: $cidr.type,
             address: $address,
@@ -468,7 +468,7 @@ function json-from-cidr {
     address=($(mask-address-words "${netmaskBits}" "${address[@]}"))
 
     jval \
-        address:json="$(lib json-array "${address[@]}")" \
+        address:json="$(jarray "${address[@]}")" \
         netmaskBits:json="${netmaskBits}" \
         type="${type}" \
         '{

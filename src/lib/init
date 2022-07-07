@@ -23,6 +23,12 @@ function ec2-json {
     lib aws-json ec2 "$@"
 }
 
+# Calls `json-array`. This script is used enough to warrant having it be easier
+# to say than `lib json-array ...`.
+function jarray {
+    lib json-array "$@"
+}
+
 # Calls `json-val`. This script is used enough to warrant having it be easier to
 # say than `lib json-val ...`.
 function jval {
