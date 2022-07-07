@@ -42,7 +42,7 @@ function mask-address {
         # the network portion of the address.
         local mask
         (( mask = (1 << (${partialBits} + 1)) - 1 ))
-        (( mask = ${mask} << (16 - ${partialBits})  ))
+        (( mask <<= 16 - ${partialBits}  ))
         (( address[${at}] &= ${mask} ))
         (( at++ ))
     fi
