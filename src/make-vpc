@@ -181,7 +181,7 @@ error=1
 
 # Do cleanup if necessary.
 
-if (( ${error} )); then
+if (( error )); then
     echo 1>&2 'Error(s) after VPC creation. Attempting cleanup!'
 
     if (( ${gatewayAttached} )); then

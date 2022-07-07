@@ -240,7 +240,7 @@ fi
 
 # Do cleanup if necessary.
 
-if (( ${error} )); then
+if (( error )); then
     echo 1>&2 'Error(s) after group creation. Attempting cleanup!'
     ec2-json delete-security-group \
         --in="${inRegion}" \
