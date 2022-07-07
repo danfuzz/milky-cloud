@@ -179,7 +179,7 @@ case "${outputStyle}" in
         ;;
 esac
 
-for (( i = 0; ${i} < ${#varTypes[@]}; i++ )); do
+for (( i = 0; i < ${#varTypes[@]}; i++ )); do
     varType="${varTypes[${i}]}"
     case "${varType}" in
         json)
