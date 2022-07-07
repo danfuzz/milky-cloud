@@ -179,7 +179,7 @@ function command_widen {
     cidr="$(json-from-any "${cidr}")" \
     || return "$?"
 
-    if ! [[ "${bits}" =~ ^0|([1-9][0-9]{0,2})$ ]]; then
+    if ! [[ "${bits}" =~ ^(0|([1-9][0-9]{0,5}))$ ]]; then
         echo 1>&2 'Invalid <bits> argument.'
         return 1
     fi
