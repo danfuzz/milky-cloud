@@ -313,9 +313,11 @@ if (( ${showHelp} || ${argError} )); then
     echo 'as are produced by the `--json` option of this tool).'
     echo
     echo '--compact-json'
-    echo '  Produces compact JSON output.'
+    echo '  Like `--json`, except produces compact output.'
     echo '--json'
-    echo '  Produces JSON output (a parsed CIDR instead of a standard-form string).'
+    echo '  Produces JSON output representing the parsed components of a CIDR'
+    echo '  value, instead of a standard-form CIDR string. This only affects'
+    echo '  commands that output CIDR values.'
     echo ''
     echo 'Commands:'
     echo ''
