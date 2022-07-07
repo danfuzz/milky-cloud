@@ -166,7 +166,7 @@ filterSpec="$(lib filter-spec \
     architecture="${architecture}" \
     name="${amiNamePattern}" \
     creation-date="${thisYear}*" \
-    creation-date="$(( thisYear - 1))*" \
+    creation-date="$(( thisYear - 1 ))*" \
     image-type=machine \
     root-device-type=ebs \
 )"
