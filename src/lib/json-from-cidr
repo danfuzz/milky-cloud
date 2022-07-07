@@ -30,63 +30,29 @@ init-prog
 # Masks an address with a netmask (that is, logical-ANDs the address with the
 # netmask). This canonicalizes an address being used as a network specifier.
 function mask-address {
-    local address="$1"
-    local netmask="$2"
-
-    local pairs="$(jval --compact \
-        address:json="${address}" \
-        netmask:json="${netmask}" \
-        '[$address, $netmask] | transpose'
-    )"
-
-    # This is kinda awful. We do the logical-AND of pairs this way because `jq`
-    # -- surprisingly -- doesn't offer bitwise operations. If it did, we could
-    # just do something like `| map(.[0] & .[1])` in the invocation above.
-    local before after v1 v2 combo
-    while true; do
-        [[ ${pairs} =~ ^(\[.*)(\[([0-9]+),([0-9]+)\])(.*\])$ ]] \
-        || break
-        before="${BASH_REMATCH[1]}"
-        v1="${BASH_REMATCH[3]}"
-        v2="${BASH_REMATCH[4]}"
-        after="${BASH_REMATCH[5]}"
-        combo=$(( ${v1} & ${v2} ))
-        pairs="${before}${combo}${after}"
-    done
-
-    echo "${pairs}"
-}
-
-# Prints a netmask array.
-function netmask-array {
     local netmaskBits="$1"
-    local totalBits="$2"
+    shift
+    local address=("$@")
 
-    if (( ${netmaskBits} > ${totalBits} )); then
-        echo 1>&2 'Too few total bits!'
-        return 1
-    elif (( (${totalBits} % 16) != 0 )); then
-        echo 1>&2 'Total bits must be a multiple of 16!'
-        return 1
+    local at="$(( ${netmaskBits} / 16 ))"
+    local partialBits="$(( ${netmaskBits} % 16 ))"
+
+    if (( ${partialBits} != 0 )); then
+        # Mask off the top part of the word that contains the final bit(s) of
+        # the network portion of the address.
+        local mask
+        (( mask = (1 << (${partialBits} + 1)) - 1 ))
+        (( mask = ${mask} << (16 - ${partialBits})  ))
+        (( address[${at}] &= ${mask} ))
+        (( at++ ))
     fi
 
-    local totalWords=$(( ${totalBits} / 16 ))
-    local result=()
-
-    while (( ${netmaskBits} > 16 )); do
-        result+=(65535)
-        (( netmaskBits -= 16 ))
+    while (( ${at} < ${#address[@]} )); do
+        (( address[${at}] = 0 ))
+        (( at++ ))
     done
 
-    if (( ${netmaskBits} != 0 )); then
-        result+=($(( ((1 << ${netmaskBits}) - 1) << (16 - ${netmaskBits}) )))
-    fi
-
-    while (( ${#result[@]} < ${totalWords} )); do
-        result+=(0)
-    done
-
-    lib json-array "${result[@]}"
+    echo "${address[@]}"
 }
 
 # Validates and prints out the words (16-bit elements) of an IPv4 address,
@@ -129,11 +95,11 @@ function v4-words {
 
     # The array form uses 16-bit words, so combine the four 8-bit octets to
     # to produce the final result.
-    echo '['
-    echo $(( (${result[0]} << 8) + ${result[1]} ))
-    echo ','
-    echo $(( (${result[2]} << 8) + ${result[3]} ))
-    echo ']'
+    result=(
+        $(( (${result[0]} << 8) + ${result[1]} ))
+        $(( (${result[2]} << 8) + ${result[3]} ))
+    )
+    echo "${result[@]}"
 }
 
 # Validates and prints out the  words (16-bit elements) of an IPv6 address,
@@ -186,24 +152,21 @@ function v6-words {
         fi
     fi
 
-    local result=''
+    local result=()
     local n
-
     for n in "${nums[@]}"; do
         if [[ ${n} == 'gap' ]]; then
             while (( ${zeroCount} > 0 )); do
-                result="${result}, 0"
+                result+=(0)
                 (( zeroCount-- ))
             done
         else
             # The math expression converts from hex to decimal.
-            result="${result}, $(( ${n} ))"
+            result+=("$(( ${n} ))")
         fi
     done
 
-    # Drop the extra comma and space from the result, and put it in brackets.
-    [[ ${result} =~ ^[,\ ]+(.*)$ ]]
-    echo "[${BASH_REMATCH[1]}]"
+    echo "${result[@]}"
 }
 
 
@@ -285,25 +248,23 @@ if [[ ${address} =~ : ]]; then
     # It's apparently IPv6.
     type=v6
     totalBits=128
-    addressWords="$(v6-words "${address}")" \
+    address=($(v6-words "${address}")) \
     || exit "$?"
 elif [[ ${address} =~ \. ]]; then
     # It's apparently IPv4.
     type=v4
     totalBits=32
-    addressWords="$(v4-words "${address}")" \
+    address=($(v4-words "${address}")) \
     || exit "$?"
 else
     echo 1>&2 "Unparseable CIDR: ${value}"
     exit 1
 fi
 
-netmask="$(netmask-array "${netmaskBits}" "${totalBits}" )"
-addressWords="$(mask-address "${addressWords}" "${netmask}")"
+address=($(mask-address "${netmaskBits}" "${address[@]}"))
 
 jval \
-    address:json="${addressWords}" \
-    netmask:json="${netmask}" \
+    address:json="$(lib json-array "${address[@]}")" \
     netmaskBits:json="${netmaskBits}" \
     type="${type}" \
     '{
