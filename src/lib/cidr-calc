@@ -46,19 +46,23 @@ function command_add-subnet {
     local cidr="$1"
     local addressAndBits="$2"
 
-    if ! [[ "${addressAndBits}" =~ ^([0-9]+)/([0-9]+)$ ]]; then
+    if ! [[ "${addressAndBits}" =~ ^((::[0-9a-f]{1,4})|([0-9]{1,5}))/([0-9]{1,2})$ ]]; then
         echo 1>&2 'Invalid <address> argument.'
         return 1
     fi
 
-    local address="${BASH_REMATCH[1]}"
-    local bits="${BASH_REMATCH[2]}"
+    local addressHex="${BASH_REMATCH[2]}"
+    local address="${BASH_REMATCH[3]}"
+    local bits="${BASH_REMATCH[4]}"
+
+    if [[ ${addressHex} != '' ]]; then
+        [[ "${addressHex}" =~ ^::(.*)$ ]]
+        addressHex="0x${BASH_REMATCH[1]}"
+        address=$(( ${addressHex} )) # Convert hex to dec.
+    fi
 
     if (( ${bits} > 16 )); then
         echo 1>&2 "Too many bits: ${bits}"
-        return 1
-    elif (( ${#address} > 5 )); then
-        echo 1>&2 "Address too large: ${address}"
         return 1
     elif (( ${address} >= (1 << ${bits}) )); then
         echo 1>&2 "Address does not fit: ${address} in ${bits} bit(s)"
@@ -253,8 +257,10 @@ if (( ${showHelp} || ${argError} )); then
     echo 'Commands:'
     echo ''
     echo 'add-subnet <cidr> <address>/<bits>'
-    echo '  Appends the given number of bits to the CIDR, whose value is <address>'
-    echo '  (an integer).'
+    echo '  Appends the given number of bits to the end of the CIDR address, with'
+    echo '  the given address value. The address must be either a decimal integer'
+    echo '  or `::` followed by a hexadecimal integer; and it must fit in the'
+    echo '  specified number of bits.'
     echo 'print <cidr>'
     echo '  Validate and print a CIDR value.'
     echo ''
