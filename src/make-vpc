@@ -131,7 +131,7 @@ error=0
 
 # Create a security group.
 groupId=''
-if (( !${error} )); then
+if (( !error )); then
     groupId="$(
     lib make-security-group \
         --in="${inRegion}" --name="standard-for-${name}" --vpc="${vpcId}" \
@@ -141,7 +141,7 @@ fi
 
 # Create an internet gateway.
 gatewayId=''
-if (( !${error} )); then
+if (( !error )); then
     gatewayId="$(ec2-json create-internet-gateway \
         --in="${inRegion}" \
         "$(lib name-tag-spec internet-gateway "${name}")" \
@@ -153,7 +153,7 @@ fi
 
 # Attach the internet gateway to the VPC.
 gatewayAttached=0
-if (( !${error} )); then
+if (( !error )); then
     ec2-json attach-internet-gateway \
         --in="${inRegion}" \
         gatewayId="${gatewayId}" \
