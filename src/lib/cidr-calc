@@ -139,6 +139,76 @@ function command_print {
     json-from-any "${cidr}"
 }
 
+# Command: Gets the total number of bits in the address.
+function command_total-bits {
+    case "$#" in
+        0)
+            echo 1>&2 'Missing <cidr> argument.'
+            return 1
+            ;;
+        1)
+            : # It's good.
+            ;;
+        *)
+            echo 1>&2 'Too many arguments.'
+            return 1
+            ;;
+    esac
+
+    local cidr="$1"
+
+    cidr="$(json-from-any "${cidr}")" \
+    || return "$?"
+
+    jval cidr:json="${cidr}" '($cidr.address | length) * 16'
+}
+
+# Command: Widen the network by a number of bits.
+function command_widen {
+    case "$#" in
+        0|1)
+            echo 1>&2 'Missing <cidr> and/or <bits> argument.'
+            return 1
+            ;;
+        2)
+            : # It's good.
+            ;;
+        *)
+            echo 1>&2 'Too many arguments.'
+            return 1
+            ;;
+    esac
+
+    local cidr="$1"
+    local bits="$2"
+
+    cidr="$(json-from-any "${cidr}")" \
+    || return "$?"
+
+    if ! [[ "${bits}" =~ ^0|([1-9][0-9]{0,2})$ ]]; then
+        echo 1>&2 'Invalid <bits> argument.'
+        return 1
+    fi
+
+    totalBits="$(command_total-bits "${cidr}")"
+    netmaskBits="$(jval cidr:json="${cidr}" '$cidr.netmaskBits')"
+    (( netmaskBits += ${bits} ))
+
+    if (( ${netmaskBits} > ${totalBits} )); then
+        echo 1>&2 "Resulting netmask too long: ${netmaskBits}"
+        return 1
+    fi
+
+    jval \
+        cidr:json="${cidr}" \
+        netmaskBits:json="${netmaskBits}" \
+        '{
+            type: $cidr.type,
+            address: $cidr.address,
+            netmaskBits: $netmaskBits
+        }'
+}
+
 # Get or validate a JSON-CIDR from the given value. If a standard-form string,
 # converts it. If JSON, validates it.
 function json-from-any {
@@ -164,9 +234,8 @@ function json-validate {
     result="$(jval cidr:json="${value}" \
         '
             (($cidr | type) == "object")
-        and (($cidr | keys) == ["address", "netmask", "netmaskBits", "type"])
+        and (($cidr | keys) == ["address", "netmaskBits", "type"])
         and (($cidr.address | type) == "array")
-        and (($cidr.address | length) == ($cidr.netmask | length))
         and (($cidr.netmaskBits | type) == "number")
         and (($cidr.netmaskBits >= 0) and ($cidr.netmaskBits <= 128))
         and (($cidr.type == "v4") or ($cidr.type == "v6"))
@@ -262,7 +331,12 @@ if (( ${showHelp} || ${argError} )); then
     echo '  or `::` followed by a hexadecimal integer; and it must fit in the'
     echo '  specified number of bits.'
     echo 'print <cidr>'
-    echo '  Validate and print a CIDR value.'
+    echo '  Prints a CIDR value.'
+    echo 'total-bits <cidr>'
+    echo '  Gets the total number of bits in the address (not just the netmask).'
+    echo 'widen <cidr> <bits>'
+    echo '  Widen the address in a CIDR by adding the indicated number of low-order'
+    echo '  zero bits.'
     echo ''
     echo "${progName} [--help | -h]"
     echo '  Displays this message.'
@@ -283,14 +357,21 @@ fi
 result="$("${commandFunc}" "$@")" \
 || exit "$?"
 
-case "${outputStyle}" in
-    compact-json)
-        jval --compact result:json="${result}" '$result'
-        ;;
-    json)
-        jval result:json="${result}" '$result'
-        ;;
-    string)
-        lib cidr-from-json "${result}"
-        ;;
-esac
+if [[ ${result} =~ ^'{' ]]; then
+    # A JSON result is interpreted as a CIDR, in which case the output style
+    # matters.
+    case "${outputStyle}" in
+        compact-json)
+            jval --compact result:json="${result}" '$result'
+            ;;
+        json)
+            jval result:json="${result}" '$result'
+            ;;
+        string)
+            lib cidr-from-json "${result}"
+            ;;
+    esac
+else
+    # Not a CIDR. Just print the result.
+    echo "${result}"
+fi
