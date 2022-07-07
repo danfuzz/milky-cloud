@@ -27,97 +27,6 @@ init-prog
 # Helper functions
 #
 
-# Command: Add a subnet to the end of a CIDR's network.
-function command_add-subnet {
-    case "$#" in
-        0|1)
-            echo 1>&2 'Missing <cidr> and/or <address> argument.'
-            return 1
-            ;;
-        2)
-            : # It's good.
-            ;;
-        *)
-            echo 1>&2 'Too many arguments.'
-            return 1
-            ;;
-    esac
-
-    local cidr="$1"
-    local addressAndBits="$2"
-
-    if ! [[ "${addressAndBits}" =~ ^((::[0-9a-f]{1,4})|([0-9]{1,5}))/([0-9]{1,2})$ ]]; then
-        echo 1>&2 'Invalid <address> argument.'
-        return 1
-    fi
-
-    local addressHex="${BASH_REMATCH[2]}"
-    local address="${BASH_REMATCH[3]}"
-    local bits="${BASH_REMATCH[4]}"
-
-    if [[ ${addressHex} != '' ]]; then
-        [[ "${addressHex}" =~ ^::(.*)$ ]]
-        addressHex="0x${BASH_REMATCH[1]}"
-        address=$(( ${addressHex} )) # Convert hex to dec.
-    fi
-
-    if (( ${bits} > 16 )); then
-        echo 1>&2 "Too many bits: ${bits}"
-        return 1
-    elif (( ${address} >= (1 << ${bits}) )); then
-        echo 1>&2 "Address does not fit: ${address} in ${bits} bit(s)"
-        return 1
-    fi
-
-    cidr="$(json-from-any "${cidr}")" \
-    || return "$?"
-
-    local netmaskBits="$(jval cidr:json="${cidr}" '$cidr.netmaskBits')"
-    local origAddress="$(jval cidr:json="${cidr}" '$cidr.address')"
-    local hextetCount="$(jval address:json="${origAddress}" '$address | length')"
-
-    local finalNetmaskBits="$(( ${netmaskBits} + ${bits} ))"
-    local newBits=$(( ${address} << (16 - ${bits}) ))
-    local partialShift="$(( ${netmaskBits} % 16 ))"
-
-    if (( ${partialShift} != 0 )); then
-        local overflow=$(( ${newBits} & ((1 << ${partialShift}) - 1) ))
-        local hextet1=$(( ${newBits} >> ${partialShift} ))
-        local hextet2=$(( ${overflow} << (16 - ${partialShift}) ))
-        newBits=("${hextet1}" "${hextet2}")
-        (( netmaskBits -= "${partialShift}" ))
-    else
-        newBits=("${newBits}")
-    fi
-
-    while (( ${netmaskBits} >= 16 )); do
-        newBits=(0 "${newBits[@]}")
-        (( netmaskBits -= 16 ))
-    done
-
-    while (( ${#newBits[@]} < ${hextetCount} )); do
-        newBits+=(0)
-    done
-
-    newBits="$(lib json-array "${newBits[@]}")"
-
-    newBits="$(jval \
-        address:json="${origAddress}" \
-        newBits:json="${newBits}" \
-        '[$address, $newBits] | transpose | map(.[0] + .[1])'
-    )"
-
-    jval \
-        cidr:json="${cidr}" \
-        address:json="${newBits}" \
-        netmaskBits:json="${finalNetmaskBits}" \
-        '{
-            type: $cidr.type,
-            address: $address,
-            netmaskBits: $netmaskBits
-        }'
-}
-
 # Command: Add a value to the network address.
 function command_add-to-network {
     case "$#" in
@@ -179,6 +88,30 @@ function command_add-to-network {
         }'
 }
 
+# Command: Gets the total number of bits in the address.
+function command_address-length {
+    case "$#" in
+        0)
+            echo 1>&2 'Missing <cidr> argument.'
+            return 1
+            ;;
+        1)
+            : # It's good.
+            ;;
+        *)
+            echo 1>&2 'Too many arguments.'
+            return 1
+            ;;
+    esac
+
+    local cidr="$1"
+
+    cidr="$(json-from-any "${cidr}")" \
+    || return "$?"
+
+    jval cidr:json="${cidr}" '($cidr.address | length) * 16'
+}
+
 # Command: Gets the words of the address.
 function command_address-words {
     case "$#" in
@@ -224,30 +157,6 @@ function command_print {
     json-from-any "${cidr}"
 }
 
-# Command: Gets the total number of bits in the address.
-function command_total-bits {
-    case "$#" in
-        0)
-            echo 1>&2 'Missing <cidr> argument.'
-            return 1
-            ;;
-        1)
-            : # It's good.
-            ;;
-        *)
-            echo 1>&2 'Too many arguments.'
-            return 1
-            ;;
-    esac
-
-    local cidr="$1"
-
-    cidr="$(json-from-any "${cidr}")" \
-    || return "$?"
-
-    jval cidr:json="${cidr}" '($cidr.address | length) * 16'
-}
-
 # Command: Widen the network by a number of bits.
 function command_widen {
     case "$#" in
@@ -275,7 +184,7 @@ function command_widen {
         return 1
     fi
 
-    totalBits="$(command_total-bits "${cidr}")"
+    totalBits="$(command_address-length "${cidr}")"
     netmaskBits="$(jval cidr:json="${cidr}" '$cidr.netmaskBits')"
     (( netmaskBits += ${bits} ))
 
@@ -410,23 +319,19 @@ if (( ${showHelp} || ${argError} )); then
     echo ''
     echo 'Commands:'
     echo ''
-    echo 'add-subnet <cidr> <address>/<bits>'
-    echo '  Appends the given number of bits to the end of the CIDR address, with'
-    echo '  the given address value. The address must be either a decimal integer'
-    echo '  or `::` followed by a hexadecimal integer; and it must fit in the'
-    echo '  specified number of bits.'
     echo 'add-to-network <cidr> <amount>'
     echo '  Adds the given amount (a positive decimal integer) to the network'
     echo '  address. This can be used in conjunction with `widen` to enumerate'
     echo '  subnet addresses.'
+    echo 'address-length <cidr>'
+    echo '  Gets the length (total number of bits) in the address (not just the'
+    echo '  netmask).'
     echo 'address-words'
     echo '  Prints the words (16-bit components) of the full address, in a'
     echo '  shell-friendly space-separated decimal form. Note: Even an IPv4'
     echo '  address gets chunked as 16-bit words by this command.'
     echo 'print <cidr>'
     echo '  Prints a CIDR value.'
-    echo 'total-bits <cidr>'
-    echo '  Gets the total number of bits in the address (not just the netmask).'
     echo 'widen <cidr> <bits>'
     echo '  Widen the address in a CIDR by adding the indicated number of low-order'
     echo '  zero bits.'
