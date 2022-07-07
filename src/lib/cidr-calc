@@ -27,6 +27,120 @@ init-prog
 # Helper functions
 #
 
+# Validates and prints out the words (16-bit elements) of an IPv4 address,
+# suitable for subsequent inclusion in a CIDR-JSON result.
+function cidr-address-words-v4 {
+    local address="$1"
+    local errorMsg="Unparseable IPv4 address: ${address}"
+    local result=()
+
+    address=".${address}" # Avoids a special case for the first iteration.
+
+    local num
+    while [[ ${address} != '' ]]; do
+        # `0*` below strips leading zeros, so that the number doesn't get
+        # interpreted as octal.
+        if ! [[ ${address} =~ ^\.0*([0-9]+)(.*)$ ]]; then
+            echo 1>&2 "${errorMsg}"
+            return 1
+        fi
+
+        num="${BASH_REMATCH[1]}"
+        address="${BASH_REMATCH[2]}"
+
+        if (( ${num} > 255 )); then
+            echo 1>&2 "${errorMsg}"
+            return 1
+        fi
+
+        result+=("${num}")
+    done
+
+    if (( ${#result[@]} > 4 )); then
+        echo 1>&2 "${errorMsg}"
+        return 1
+    fi
+
+    while (( ${#result[@]} < 4 )); do
+        result+=(0)
+    done
+
+    # The array form uses 16-bit words, so combine the four 8-bit octets to
+    # to produce the final result.
+    result=(
+        $(( (${result[0]} << 8) + ${result[1]} ))
+        $(( (${result[2]} << 8) + ${result[3]} ))
+    )
+    echo "${result[@]}"
+}
+
+# Validates and prints out the words (16-bit elements) of an IPv6 address,
+# suitable for subsequent inclusion in a final CIDR-JSON result.
+function cidr-address-words-v6 {
+    local address="$1"
+    local errorMsg="Unparseable IPv6 address: ${address}"
+    local gotGap=0
+    local nums=()
+
+    if ! [[ ${address} =~ ^([:0-9a-f]*)(::([:0-9a-f]*))?$ ]]; then
+        echo 1>&2 "${errorMsg}"
+        return 1
+    fi
+
+    while [[ ${address} != '' ]]; do
+        if [[ ${address} =~ ^::(.*)$ ]]; then
+            if (( ${gotGap} )); then
+                # Double gap.
+                echo 1>&2 "${errorMsg}"
+                return 1
+            fi
+            gotGap=1
+            nums+=(gap)
+            address="${BASH_REMATCH[1]}"
+        elif [[ ${address} =~ ^([0-9a-f]{1,4})((:.*)|$) ]]; then
+            nums+=("0x${BASH_REMATCH[1]}")
+            address="${BASH_REMATCH[2]}"
+            if [[ ${address} =~ ^:([^:].*)$ ]]; then
+                # Strip `:` separator but not `::` gap.
+                address="${BASH_REMATCH[1]}"
+            fi
+        else
+            echo 1>&2 "${errorMsg}"
+            return 1
+        fi
+    done
+
+    local zeroCount=0
+    if (( ${gotGap} )); then
+        if (( ${#nums[@]} > 8 )); then
+            echo 1>&2 "${errorMsg}"
+            return 1
+        fi
+        zeroCount=$(( 9 - ${#nums[@]} ))
+    else
+        if (( ${#nums[@]} != 8 )); then
+            echo 1>&2 "${errorMsg}"
+            return 1
+        fi
+    fi
+
+    local result=()
+    local n
+    for n in "${nums[@]}"; do
+        if [[ ${n} == 'gap' ]]; then
+            while (( ${zeroCount} > 0 )); do
+                result+=(0)
+                (( zeroCount-- ))
+            done
+        else
+            # The math expression converts from hex to decimal.
+            result+=("$(( ${n} ))")
+        fi
+    done
+
+    echo "${result[@]}"
+}
+
 # Prints out a V4 address from a CIDR in the usual form.
 function cidr-v4-address {
     local cidr="$1"
@@ -315,11 +429,53 @@ function json-from-any {
     if [[ ${value} =~ ^'{' ]]; then
         json-validate "${value}"
     elif [[ ${value} =~ ^[:./0-9a-f]+$ ]]; then
-        lib json-from-cidr "${value}"
+        json-from-cidr "${value}"
     else
         echo 1>&2 "Unparseable CIDR: ${value}"
         return 1
     fi
+}
+
+# Converts a standard form CIDR string to the JSON form.
+function json-from-cidr {
+    local cidr="$1"
+
+    # Note: The repetition limits are generous enough to cover everything valid.
+    if ! [[ ${cidr} =~ ^([.:0-9a-f]{1,100})/([1-9][0-9]{0,5})$ ]]; then
+        echo 1>&2 "Unparseable CIDR: ${cidr}"
+        return 1
+    fi
+
+    local address="${BASH_REMATCH[1]}"
+    local netmaskBits="${BASH_REMATCH[2]}"
+    local type
+
+    if [[ ${address} =~ : ]]; then
+        # It's apparently IPv6.
+        type=v6
+        address=($(cidr-address-words-v6 "${address}")) \
+        || exit "$?"
+    elif [[ ${address} =~ \. ]]; then
+        # It's apparently IPv4.
+        type=v4
+        address=($(cidr-address-words-v4 "${address}")) \
+        || exit "$?"
+    else
+        echo 1>&2 "Unparseable CIDR: ${value}"
+        exit 1
+    fi
+
+    address=($(mask-address-words "${netmaskBits}" "${address[@]}"))
+
+    jval \
+        address:json="$(lib json-array "${address[@]}")" \
+        netmaskBits:json="${netmaskBits}" \
+        type="${type}" \
+        '{
+            address: $address,
+            netmaskBits: $netmaskBits,
+            type: $type
+        }'
 }
 
 # Validates a JSON-CIDR value. On success, prints the value.
@@ -349,6 +505,35 @@ function json-validate {
     fi
 
     echo "${result}"
+}
+
+# Helper for `json-from-cidr`, which masks a list of address words with a
+# netmask (that is, logical-ANDs the address with the netmask). This
+# canonicalizes an address being used as a network specifier.
+function mask-address-words {
+    local netmaskBits="$1"
+    shift
+    local address=("$@")
+
+    local at="$(( ${netmaskBits} / 16 ))"
+    local partialBits="$(( ${netmaskBits} % 16 ))"
+
+    if (( ${partialBits} != 0 )); then
+        # Mask off the top part of the word that contains the final bit(s) of
+        # the network portion of the address.
+        local mask
+        (( mask = (1 << (${partialBits} + 1)) - 1 ))
+        (( mask <<= 16 - ${partialBits}  ))
+        (( address[${at}] &= ${mask} ))
+        (( at++ ))
+    fi
+
+    while (( ${at} < ${#address[@]} )); do
+        (( address[${at}] = 0 ))
+        (( at++ ))
+    done
+
+    echo "${address[@]}"
 }
 
 
