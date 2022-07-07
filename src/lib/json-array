@@ -97,35 +97,16 @@ fi
 # Main script
 #
 
-# Construct the basic result.
-
-result="$(
-    echo '['
-
-    first=1
-    for arg in "${args[@]}"; do
-        if (( ${first} )); then
-            first=0
-        else
-            echo ','
-        fi
-
-        if (( ${strings} )); then
-            jq --null-input --raw-output --arg arg "${arg}" '$arg | @json'
-        else
-            jq --null-input --raw-output --argjson arg "${arg}" '$arg | @json'
-        fi
-    done
-
-    echo ']'
-)"
-
-# Pass the result through `jq` for final formatting.
-
-jqArgs=()
+jqArgs=('--null-input')
 
 if (( ${compactOutput} )); then
     jqArgs+=('--compact-output')
 fi
 
-exec jq "${jqArgs[@]}" <<<"${result}"
+if (( ${strings} )); then
+    jqArgs+=('--args')
+else
+    jqArgs+=('--jsonargs')
+fi
+
+exec jq "${jqArgs[@]}" '$ARGS.positional' "${args[@]}"
