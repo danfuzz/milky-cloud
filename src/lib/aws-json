@@ -237,7 +237,7 @@ if [[ -x ${specialCaseHandler} ]]; then
 
     dashArgsLength="$(jval p:json="${commandParts}" '$p.dashArgs | length')"
     dashArgs=()
-    for (( i=0; ${i} < ${dashArgsLength}; i++ )); do
+    for (( i = 0; ${i} < ${dashArgsLength}; i++ )); do
         dashArgs+=("$(jval --raw p:json="${commandParts}" i:json="${i}" '$p.dashArgs[$i]')")
     done
 fi

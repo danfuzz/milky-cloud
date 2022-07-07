@@ -187,8 +187,8 @@ function cidr-v6-address {
     local zerosAt=-1
     local zeroCount=1 # 1 here to avoid detecting runs of length 1.
     local n z
-    for (( n=0; n < 8; n++ )); do
-        for (( z=${n}; z < 8; z++ )); do
+    for (( n = 0; n < 8; n++ )); do
+        for (( z = ${n}; z < 8; z++ )); do
             if (( ${address[${z}]} != 0)); then
                 break
             fi
@@ -205,7 +205,7 @@ function cidr-v6-address {
 
     local result=''
     local n
-    for (( n=0; n < 8; n++ )); do
+    for (( n = 0; n < 8; n++ )); do
         if (( ${n} == ${zerosAt} )); then
             result+='::'
             n=$(( ${n} + ${zeroCount} - 1 ))

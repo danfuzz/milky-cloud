@@ -178,14 +178,14 @@ azBits="$(bits-needed "${azCount}")"
 azIndexes=($(seq 0 "$(( ${azCount} - 1 ))"))
 
 if [[ ${cidr4} != 'none' ]]; then
-    for (( n=0; n < "${azCount}"; n++ )); do
+    for (( n = 0; n < "${azCount}"; n++ )); do
         lib cidr-calc add-subnet "${cidr4}" "${n}/${azBits}"
     done
     # TODO
 fi
 
 if [[ ${cidr6} != 'none' ]]; then
-    for (( n=0; n < "${azCount}"; n++ )); do
+    for (( n = 0; n < "${azCount}"; n++ )); do
         lib cidr-calc add-subnet "${cidr6}" "${n}/${azBits}"
     done
 fi
