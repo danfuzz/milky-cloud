@@ -120,7 +120,7 @@ fi
 
 jqArgs=(-n)
 
-if (( ${compactOutput} )); then
+if (( compactOutput )); then
     jqArgs+=('--compact-output')
 fi
 

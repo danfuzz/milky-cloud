@@ -33,7 +33,7 @@ function bits-needed {
     local n="$1"
     local count=0
 
-    while (( ${n} > 0 )); do
+    while (( n > 0 )); do
         (( count++ ))
         (( n >>= 1 ))
     done
@@ -175,7 +175,7 @@ echo '#### IPV6:' "${cidr6}"
 
 azCount="$(lib json-length "${azList}")"
 azBits="$(bits-needed "${azCount}")"
-azIndexes=($(seq 0 "$(( ${azCount} - 1 ))"))
+azIndexes=($(seq 0 "$(( azCount - 1 ))"))
 
 if [[ ${cidr4} != 'none' ]]; then
     for (( n = 0; n < azCount; n++ )); do

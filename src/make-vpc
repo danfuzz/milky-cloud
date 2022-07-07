@@ -184,7 +184,7 @@ error=1
 if (( error )); then
     echo 1>&2 'Error(s) after VPC creation. Attempting cleanup!'
 
-    if (( ${gatewayAttached} )); then
+    if (( gatewayAttached )); then
         echo 1>&2 'Detaching internet gateway...'
         ec2-json detach-internet-gateway \
             --in="${inRegion}" \

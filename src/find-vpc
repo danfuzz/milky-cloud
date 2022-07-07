@@ -75,7 +75,7 @@ function do-find {
             ;;
     esac
 
-    if (( ${printAll} )); then
+    if (( printAll )); then
         if [[ ${topKey} != 'Vpcs' ]]; then
             # We got the ID out of some other object (e.g. a security group),
             # and we've been asked for full info. So we need to actually get

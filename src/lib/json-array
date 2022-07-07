@@ -99,11 +99,11 @@ fi
 
 jqArgs=('--null-input')
 
-if (( ${compactOutput} )); then
+if (( compactOutput )); then
     jqArgs+=('--compact-output')
 fi
 
-if (( ${strings} )); then
+if (( compactOutput )); then
     jqArgs+=('--args')
 else
     jqArgs+=('--jsonargs')

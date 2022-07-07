@@ -206,7 +206,7 @@ if [[ ${ingressRuleIds} != '[]' ]]; then
     || exit "$?"
 fi
 
-if (( !${quiet} )); then
+if (( !quiet )); then
     jval \
         ids:json="[${egressRuleIds}, ${ingressRuleIds}]" \
         '$ids | flatten | sort'

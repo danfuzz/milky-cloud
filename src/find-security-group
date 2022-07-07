@@ -134,7 +134,7 @@ id="$(jval --raw "${result}" '.id')"
 if (( count == 0 )); then
     echo 1>&2 'No such security group.'
     exit 1
-elif (( ${count} != 1 )); then
+elif (( count != 1 )); then
     echo 1>&2 'Ambiguous name or ID matches all of:'
     jval --raw 1>&2 "${result}" '.all[] | "  " + .'
     exit 1
