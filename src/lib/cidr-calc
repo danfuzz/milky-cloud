@@ -472,21 +472,29 @@ function json-from-cidr {
 
     local address="${BASH_REMATCH[1]}"
     local netmaskBits="${BASH_REMATCH[2]}"
+    local totalBits
     local type
 
     if [[ ${address} =~ : ]]; then
         # It's apparently IPv6.
         type=v6
+        totalBits=128
         address=($(cidr-address-words-v6 "${address}")) \
-        || exit "$?"
+        || return "$?"
     elif [[ ${address} =~ \. ]]; then
         # It's apparently IPv4.
         type=v4
+        totalBits=32
         address=($(cidr-address-words-v4 "${address}")) \
-        || exit "$?"
+        || return "$?"
     else
         echo 1>&2 "Unparseable CIDR: ${value}"
-        exit 1
+        return 1
+    fi
+
+    if (( ${netmaskBits} > ${totalBits} )); then
+        echo 1>&2 "Netmask too large: ${netmaskBits} bits"
+        return 1
     fi
 
     address=($(mask-address-words "${netmaskBits}" "${address[@]}"))
