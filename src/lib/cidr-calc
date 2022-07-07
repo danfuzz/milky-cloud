@@ -624,7 +624,7 @@ else
     argError=1
 fi
 
-if (( ${showHelp} || ${argError} )); then
+if (( showHelp || argError )); then
     echo 'Usage:'
     echo ''
     echo "${progName} [<opt> ...] <command> <arg> ..."

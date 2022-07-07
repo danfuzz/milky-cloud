@@ -64,14 +64,14 @@ while (( $# > 0 )); do
     shift
 done
 
-if (( !${argError} )); then
+if (( !argError )); then
     if [[ ${inLocation} == '' ]]; then
         echo 1>&2 'Missing option: --in'
         argError=1
     fi
 fi
 
-if (( ${showHelp} || ${argError} )); then
+if (( showHelp || argError )); then
     echo 'Usage:'
     echo ''
     echo "${progName} [<opt> ...]"

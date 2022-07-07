@@ -74,7 +74,7 @@ done
 # Collect remaining arguments.
 args=("$@")
 
-if (( ${showHelp} || ${argError} )); then
+if (( showHelp || argError )); then
     echo 'Usage:'
     echo ''
     echo "${progName} [<opt> ...] [--] [<value> ...]"

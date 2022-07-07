@@ -95,7 +95,7 @@ else
     shift
 fi
 
-if (( ${showHelp} || ${argError} )); then
+if (( showHelp || argError )); then
     echo 'Usage:'
     echo ''
     echo "${progName} <zone-or-region>"

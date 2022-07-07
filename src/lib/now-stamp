@@ -65,7 +65,7 @@ if [[ $# > 0 ]]; then
     suffix="$1"
 fi
 
-if (( ${showHelp} || ${argError} )); then
+if (( showHelp || argError )); then
     echo 'Usage:'
     echo ''
     echo "${progName} [<suffix>]"

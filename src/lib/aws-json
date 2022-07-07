@@ -114,7 +114,7 @@ while (( $# > 0 && !${argError} )); do
     shift
 done
 
-if (( !${argError} )); then
+if (( !argError )); then
     if [[ ${inLocation} == '' ]]; then
         echo 1>&2 'Missing option: --in'
         argError=1
@@ -167,7 +167,7 @@ done
 
 resultConstructor=("$@")
 
-if (( ${showHelp} || ${argError} )); then
+if (( showHelp || argError )); then
     echo 'Usage:'
     echo ''
     echo "${progName} <cmd> <subcommand> [<opt> ...] [--] [<assignment> ...]"

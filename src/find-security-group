@@ -64,7 +64,7 @@ while (( $# > 0 )); do
     shift
 done
 
-if [[ $# < 1 ]]; then
+if (( !argError && ($# < 1) )); then
     echo 1>&2 'Missing argument: name or ID'
     argError=1
 else
@@ -72,14 +72,14 @@ else
     shift
 fi
 
-if (( !${argError} )); then
+if (( !argError )); then
     if [[ ${inLocation} == '' ]]; then
         echo 1>&2 'Missing option: --in'
         argError=1
     fi
 fi
 
-if (( ${showHelp} || ${argError} )); then
+if (( showHelp || argError )); then
     echo 'Usage:'
     echo ''
     echo "${progName} [<opt> ...] <name-or-id>"
