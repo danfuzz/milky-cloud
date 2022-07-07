@@ -70,7 +70,7 @@ function netmask-array {
         return 1
     fi
 
-    local totalHextets=$(( ${totalBits} / 16 ))
+    local totalWords=$(( ${totalBits} / 16 ))
     local result=()
 
     while (( ${netmaskBits} > 16 )); do
@@ -82,16 +82,16 @@ function netmask-array {
         result+=($(( ((1 << ${netmaskBits}) - 1) << (16 - ${netmaskBits}) )))
     fi
 
-    while (( ${#result[@]} < ${totalHextets} )); do
+    while (( ${#result[@]} < ${totalWords} )); do
         result+=(0)
     done
 
     lib json-array "${result[@]}"
 }
 
-# Validates and prints out the hextets of an IPv4 address, suitable for
-# subsequent inclusion in a final result.
-function v4-hextets {
+# Validates and prints out the words (16-bit elements) of an IPv4 address,
+# suitable for subsequent inclusion in a final result.
+function v4-words {
     local address="$1"
     local errorMsg="Unparseable IPv4 address: ${address}"
     local result=()
@@ -136,9 +136,9 @@ function v4-hextets {
     echo ']'
 }
 
-# Validates and prints out the hextets of an IPv6 address, suitable for
-# subsequent inclusion in a final result.
-function v6-hextets {
+# Validates and prints out the  words (16-bit elements) of an IPv6 address,
+# suitable for subsequent inclusion in a final result.
+function v6-words {
     local address="$1"
     local errorMsg="Unparseable IPv6 address: ${address}"
     local gotGap=0
@@ -285,13 +285,13 @@ if [[ ${address} =~ : ]]; then
     # It's apparently IPv6.
     type=v6
     totalBits=128
-    addressHextets="$(v6-hextets "${address}")" \
+    addressWords="$(v6-words "${address}")" \
     || exit "$?"
 elif [[ ${address} =~ \. ]]; then
     # It's apparently IPv4.
     type=v4
     totalBits=32
-    addressHextets="$(v4-hextets "${address}")" \
+    addressWords="$(v4-words "${address}")" \
     || exit "$?"
 else
     echo 1>&2 "Unparseable CIDR: ${value}"
@@ -299,10 +299,10 @@ else
 fi
 
 netmask="$(netmask-array "${netmaskBits}" "${totalBits}" )"
-addressHextets="$(mask-address "${addressHextets}" "${netmask}")"
+addressWords="$(mask-address "${addressWords}" "${netmask}")"
 
 jval \
-    address:json="${addressHextets}" \
+    address:json="${addressWords}" \
     netmask:json="${netmask}" \
     netmaskBits:json="${netmaskBits}" \
     type="${type}" \
