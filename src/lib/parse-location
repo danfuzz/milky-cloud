@@ -87,7 +87,7 @@ if [[ ${printItem} =~ ^zone ]]; then
     inputType='zone'
 fi
 
-if [[ $# < 1 ]]; then
+if (( $# < 1 )); then
     echo 1>&2 'Missing argument: zone or region'
     argError=1
 else

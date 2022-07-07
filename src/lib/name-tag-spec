@@ -70,7 +70,7 @@ while (( $# > 0 )); do
     shift
 done
 
-if [[ $# < 2 ]]; then
+if (( $# < 2 )); then
     echo 1>&2 'Missing argument: resource type and/or name'
     argError=1
 fi

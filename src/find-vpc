@@ -156,7 +156,7 @@ while (( $# > 0 )); do
     shift
 done
 
-if [[ $# < 1 ]]; then
+if (( $# < 1 )); then
     echo 1>&2 'Missing argument: name or ID'
     argError=1
 else

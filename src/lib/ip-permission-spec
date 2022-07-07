@@ -73,7 +73,7 @@ done
 protocol="$1"
 port="$2"
 
-if [[ $# < 2 ]]; then
+if (( $# < 2 )); then
     echo 1>&2 'Missing argument: protocol and/or port'
     argError=1
 else
