@@ -48,7 +48,7 @@ function cidr-address-words-v4 {
         num="${BASH_REMATCH[1]}"
         address="${BASH_REMATCH[2]}"
 
-        if (( ${num} > 255 )); then
+        if (( num > 255 )); then
             echo 1>&2 "${errorMsg}"
             return 1
         fi
@@ -89,7 +89,7 @@ function cidr-address-words-v6 {
 
     while [[ ${address} != '' ]]; do
         if [[ ${address} =~ ^::(.*)$ ]]; then
-            if (( ${gotGap} )); then
+            if (( gotGap )); then
                 # Double gap.
                 echo 1>&2 "${errorMsg}"
                 return 1
@@ -111,7 +111,7 @@ function cidr-address-words-v6 {
     done
 
     local zeroCount=0
-    if (( ${gotGap} )); then
+    if (( gotGap )); then
         if (( ${#nums[@]} > 8 )); then
             echo 1>&2 "${errorMsg}"
             return 1
@@ -128,13 +128,13 @@ function cidr-address-words-v6 {
     local n
     for n in "${nums[@]}"; do
         if [[ ${n} == 'gap' ]]; then
-            while (( ${zeroCount} > 0 )); do
+            while (( zeroCount > 0 )); do
                 result+=(0)
                 (( zeroCount-- ))
             done
         else
             # The math expression converts from hex to decimal.
-            result+=("$(( ${n} ))")
+            result+=("$(( n ))")
         fi
     done
 
