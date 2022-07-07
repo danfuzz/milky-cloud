@@ -83,7 +83,7 @@ argConstructor=()
 # postprocessing.
 resultConstructor=()
 
-while (( $# > 0 && !${argError} )); do
+while (( $# > 0 )); do
     case "$1" in
         --in=?*)
             inLocation="${1#*=}"
@@ -122,7 +122,7 @@ if (( !argError )); then
 fi
 
 # "Parse" constructor arguments.
-while (( $# > 0 && !${argError} )); do
+while (( $# > 0 && !argError )); do
     arg="$1"
     if [[ ${arg} == '::' ]]; then
         shift
@@ -135,7 +135,7 @@ done
 
 # Process postprocessor arguments, if any.
 
-while (( $# > 0 && !${argError} )); do
+while (( $# > 0 && !argError )); do
     case "$1" in
         --compact)
             outputStyle=compact

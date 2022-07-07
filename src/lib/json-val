@@ -86,7 +86,7 @@ while (( $# > 0 )); do
 done
 
 # Parse assignments.
-while (( $# > 0 && !${argError} )); do
+while (( $# > 0 && !argError )); do
     arg="$1"
     if [[ ${arg} == '--' ]]; then
         shift
