@@ -131,7 +131,7 @@ ec2-json describe-security-groups \
 count="$(jval "${result}" '.count')"
 id="$(jval --raw "${result}" '.id')"
 
-if (( ${count} == 0 )); then
+if (( count == 0 )); then
     echo 1>&2 'No such security group.'
     exit 1
 elif (( ${count} != 1 )); then
