@@ -116,7 +116,7 @@ function cidr-address-words-v6 {
             echo 1>&2 "${errorMsg}"
             return 1
         fi
-        zeroCount=$(( 9 - ${#nums[@]} ))
+        (( zeroCount = 9 - ${#nums[@]} ))
     else
         if (( ${#nums[@]} != 8 )); then
             echo 1>&2 "${errorMsg}"
@@ -162,7 +162,8 @@ function cidr-v4-address {
 
     # Drop octets at the end of the result that aren't covered by the netmask
     # (so, e.g. `10.0.0.0/16` gets rendered as `10.0/16`).
-    local dropOctets=$(( (32 - ${netmaskBits}) / 8 ))
+    local dropOctets
+    (( dropOctets = (32 - netmaskBits) / 8 ))
     while (( dropOctets > 0 )) && [[ "${address}" =~ ^(.*)\.0$ ]]; do
         address="${BASH_REMATCH[1]}"
         (( dropOctets-- ))
@@ -194,13 +195,14 @@ function cidr-v6-address {
             fi
         done
 
-        local thisCount=$(( z - n ))
+        local thisCount
+        (( thisCount = z - n ))
         if (( thisCount > zeroCount )); then
             (( zeroCount = thisCount ))
             (( zerosAt = n ))
         fi
 
-        n="${z}" # No need to "relitigate" anything that's been scanned.
+        (( n = z )) # No need to "relitigate" anything that's been scanned.
     done
 
     local result=''
