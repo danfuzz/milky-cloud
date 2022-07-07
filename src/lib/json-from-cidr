@@ -127,7 +127,7 @@ function v4-words {
         result+=(0)
     done
 
-    # The array form uses 16-bit elements, so combine the four 8-bit elements
+    # The array form uses 16-bit words, so combine the four 8-bit octets to
     # to produce the final result.
     echo '['
     echo $(( (${result[0]} << 8) + ${result[1]} ))
