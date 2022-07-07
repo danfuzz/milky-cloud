@@ -269,10 +269,8 @@ function command_add-to-network {
     cidr="$(json-from-any "${cidr}")" \
     || return "$?"
 
-    if ! [[ "${amount}" =~ ^(0|([1-9][0-9]{0,5}))$ ]]; then
-        echo 1>&2 'Invalid <amount> argument.'
-        return 1
-    fi
+    amount="$(parse-number "${amount}" 0 65535)" \
+    || return "$?"
 
     local address=($(command_address-words "${cidr}"))
     local netmaskBits="$(jval cidr:json="${cidr}" '$cidr.netmaskBits')"
@@ -570,6 +568,47 @@ function mask-address-words {
     echo "${address[@]}"
 }
 
+# Parses an integer in one of the standard forms.
+function parse-number {
+    local num="$1"
+    local min="$2"
+    local max="$3"
+
+    if [[ ${min} == '' ]]; then
+        (( min = 0 ))
+    fi
+
+    if [[ ${max} == '' ]]; then
+        (( max = 0xffffffff ))
+        min='0'
+    fi
+
+    if [[ "${num}" =~ ^[0-9]{1,40}$ ]]; then
+        if [[ "${num}" =~ ^0+(.+)$ ]]; then
+            # Strip leading `0`s to prevent the number from being interpreted as
+            # octal.
+            num="${BASH_REMATCH[1]}"
+        fi
+    elif [[ "${num}" =~ ^::([0-9a-fA-F]{1,16})$ ]]; then
+        num="0x${BASH_REMATCH[1]}"
+    else
+        echo 1>&2 "Unparseable number: ${num}"
+        return 1
+    fi
+
+    (( num = num )) # Canonicalize to decimal.
+
+    if (( num < min )); then
+        echo 1>&2 "Number too small: ${num}"
+        return 1
+    elif (( num > max )); then
+        echo 1>&2 "Number too large: ${num}"
+        return 1
+    fi
+
+    echo "${num}"
+}
+
 
 #
 # Argument parsing
@@ -645,9 +684,10 @@ if (( showHelp || argError )); then
     echo 'Commands:'
     echo ''
     echo 'add-to-network <cidr> <amount>'
-    echo '  Adds the given amount (a positive decimal integer) to the network'
-    echo '  address, and prints the resulting CIDR. This can be used in conjunction'
-    echo '  with `widen` to enumerate subnet addresses.'
+    echo '  Adds the given amount (a positive integer) to the network address, and'
+    echo '  prints the resulting CIDR. This can be used in conjunction with `widen`'
+    echo '  to enumerate subnet addresses. `<amount>` can be specified either in'
+    echo '  decimal or hex. Use the suggestive prefix `::` to indicate hex.'
     echo 'address-length <cidr>'
     echo '  Prints the length (number of bits) of the address (not just the'
     echo '  netmask).'
