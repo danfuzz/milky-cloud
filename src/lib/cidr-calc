@@ -278,12 +278,13 @@ function command_add-to-network {
     # Add the amount at the bottom of the network, that is, at the word which
     # has the last bit of the network and shifted appropriately so that lower
     # bits aren't affected.
-    local at="$(( (${netmaskBits} - 1) / 16 ))"
-    local partialShift="$(( (16 - (${netmaskBits} % 16)) % 16 ))"
-    address[${at}]="$(( ${address[${at}]} + (${amount} << ${partialShift}) ))"
+    local at partialShift
+    (( at = (netmaskBits - 1) / 16 ))
+    (( partialShift = (16 - (netmaskBits % 16)) % 16 ))
+    (( address[at] += amount << partialShift ))
 
     # Perform overflow to higher-order words as necessary.
-    while (( (${at} > 0) && (${address[${at}]} > 0xffff) )); do
+    while (( (at > 0) && (address[at] > 0xffff) )); do
         (( address[at - 1] += address[at] >> 16 ))
         (( address[at] &= 0xffff ))
         (( at-- ))
