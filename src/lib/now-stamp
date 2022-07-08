@@ -61,7 +61,7 @@ while (( $# > 0 )); do
     shift
 done
 
-if [[ $# > 0 ]]; then
+if (( $# > 0 )); then
     suffix="$1"
 fi
 

@@ -61,8 +61,11 @@ while (( $# > 0 )); do
     shift
 done
 
-if [[ $# > 0 ]]; then
+if (( $# > 0 )); then
     value="$1"
+else
+    echo 1>&2 'Missing JSON value argument.'
+    argError=1
 fi
 
 if (( showHelp || argError )); then
