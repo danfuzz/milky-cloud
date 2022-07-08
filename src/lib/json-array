@@ -97,16 +97,34 @@ fi
 # Main script
 #
 
-jqArgs=('--null-input')
+# Note: An earlier -- and to be clear buggy -- version of this script tried to
+# use `jq`'s options `--args` or `--jsonargs` which promised to make this script
+# much simpler. Unfortunately, because `jq` doesn't actually do the usual shell
+# command behavior of not attempting to interpret things that look like options
+# but are positioned after non-option arguments, it's not actually possible to
+# use `--args` or `--json-args`, especially if we want to be resilient to errant
+# input to this script (and not blithely pass it into a `jq` which will do
+# who-knows-what with it).
+
+jqArgs=(--null-input)
 
 if (( compactOutput )); then
     jqArgs+=('--compact-output')
 fi
 
-if (( compactOutput )); then
-    jqArgs+=('--args')
+if (( strings )); then
+    argOpt='--arg'
 else
-    jqArgs+=('--jsonargs')
+    argOpt='--argjson'
 fi
 
-exec jq "${jqArgs[@]}" '$ARGS.positional' "${args[@]}"
+expr=''
+for (( n = 0; n < ${#args[@]}; n++ )); do
+    jqArgs+=("${argOpt}" "a${n}" "${args[${n}]}")
+    if (( n != 0 )); then
+        expr+=','
+    fi
+    expr+='$a'"${n}"
+done
+
+exec jq "${jqArgs[@]}" "[${expr}]"
