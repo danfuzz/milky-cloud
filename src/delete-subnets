@@ -1,0 +1,178 @@
+#!/bin/bash
+#
+# Copyright 2022 Dan Bornstein.
+# Licensed AS IS and WITHOUT WARRANTY under the Apache License,
+# Version 2.0. Details: <http://www.apache.org/licenses/LICENSE-2.0>
+
+# Set `progName` to the program name, `progDir` to its directory, and `baseDir`
+# to `progDir`'s directory. Follows symlinks.
+function init-prog {
+    local newp p="$0"
+
+    while newp="$(readlink "$p")"; do
+        [[ ${newp} =~ ^/ ]] && p="${newp}" || p="$(dirname "$p")/${newp}"
+    done
+
+    progName="${p##*/}"
+    progDir="$(cd "$(dirname "$p")"; /bin/pwd -P)"
+    baseDir="$(cd "${progDir}/.."; /bin/pwd -P)"
+}
+init-prog
+
+# Load the helper library.
+. "${progDir}/lib/init"
+
+
+#
+# Argument parsing
+#
+
+# Error during argument processing?
+argError=0
+
+# Need help?
+showHelp=0
+
+# Filter to apply, to determine which subnet(s) to remove.
+filterArgs=()
+
+# Name or ID of the VPC.
+vpcNameOrId=''
+
+# Location (region or availability zone).
+inLocation=''
+
+# Quiet?
+quiet=0
+
+while (( $# > 0 )); do
+    case "$1" in
+        --all)
+            filterArgs=('.')
+            ;;
+        --in=?*)
+            inLocation="${1#*=}"
+            ;;
+        --quiet)
+            quiet=1
+            ;;
+        --vpc=?*)
+            vpcNameOrId="${1#*=}"
+            ;;
+        -h|--help)
+            showHelp=1
+            break
+            ;;
+        --)
+            # Explicit end of options
+            shift
+            break
+            ;;
+        -?*)
+            echo 1>&2 "Unknown option: $1"
+            argError=1
+            break
+            ;;
+        *)
+            # Non-option argument
+            break
+            ;;
+    esac
+
+    shift
+done
+
+if (( !argError )); then
+    if [[ ${inLocation} == '' ]]; then
+        echo 1>&2 'Missing option: --in'
+        argError=1
+    fi
+    if [[ ${vpcNameOrId} == '' ]]; then
+        echo 1>&2 'Missing option: --vpc'
+        argError=1
+    fi
+fi
+
+if (( ${#filterArgs[@]} == 0 )); then
+    if (( $# == 0 )); then
+        echo 1>&2 'Missing filter option or arguments.'
+        argError=1
+    fi
+    filterArgs=("$@")
+elif (( $# > 0 )); then
+    echo 1>&2 'Cannot specify both filter option and arguments.'
+    argError=1
+fi
+
+if (( showHelp || argError )); then
+    echo 'Usage:'
+    echo ''
+    echo "${progName} [<opt> ...] [<assignment> ...] <jq-expression> ..."
+    echo '  Removes rules from an existing subnet, based on given filter criteria.'
+    echo '  Simple filters can be specified via options, or if no such option is'
+    echo '  used, a general filter can be specified via assignment and expression'
+    echo '  arguments, similar to `aws-json`. This filter is expected to accept'
+    echo '  to accept `Subnet` objects and then re-output the ones to be removed.'
+    echo ''
+    echo '  On success, prints a JSON array of the IDs of all removed subnets.'
+    echo ''
+    echo '  --all'
+    echo '    Remove all subnets.'
+    echo '  --in=<region-or-zone>'
+    echo '    What region to make the security group in. Must be specified. If'
+    echo '    specified as an availability zone, only the region portion matters.'
+    echo '  --quiet'
+    echo '    Suppress non-error output.'
+    echo '  --security-group=<name-or-id>'
+    echo '    Name or ID of the security group to add to.'
+    echo ''
+    echo "${progName} [--help | -h]"
+    echo '  Displays this message.'
+    exit "${argError}"
+fi
+
+
+#
+# Main script
+#
+
+inRegion="$(lib region-from-location "${inLocation}")" \
+|| exit "$?"
+
+# Validate or find the ID of the VPC.
+vpcId="$(lib find-vpc --in="${inRegion}" "${vpcNameOrId}")" \
+|| exit "$?"
+
+allSubnets="$(ec2-json describe-subnets \
+    --in="${inRegion}" \
+    "$(lib filter-spec vpc-id="${vpcId}")" \
+    :: '.Subnets[]'
+)" \
+|| exit "$?"
+
+echo "${allSubnets}"
+
+selectedSubnets="$(
+    jval <<<"${allSubnets}" --read-stdin -- "${filterArgs[@]}"
+)" \
+|| exit "$?"
+
+subnetIds=($(
+    jval <<<"${selectedSubnets}" --words --slurp-stdin 'map(.SubnetId) | sort'
+)) \
+|| exit "$?"
+
+for id in "${subnetIds[@]}"; do
+    ec2-json delete-subnet \
+        --in="${inRegion}" \
+        id="${id}" \
+        '{
+            DryRun: true,
+            SubnetId: $id
+        }' \
+    || exit "$?"
+done
+
+if (( !quiet )); then
+    jarray "${subnetIds[@]}"
+fi
