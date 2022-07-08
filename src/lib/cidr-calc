@@ -155,6 +155,36 @@ function cidr-address-words-v6 {
     echo "${result[@]}"
 }
 
+# Converts a JSON-CIDR into a standard-form CIDR string.
+function cidr-from-json {
+    local fullOpt=()
+    if [[ "$1" == '--full' ]]; then
+        fullOpt=('--full')
+        shift
+    fi
+
+    local cidr="$1"
+
+    local type="$(jval --raw cidr:json="${cidr}" '$cidr.type')"
+    local netmaskBits="$(jval cidr:json="${cidr}" '$cidr.netmaskBits')"
+    local address
+
+    case "${type}" in
+        v4)
+            address="$(cidr-v4-address "${fullOpt[@]}" "${cidr}" "${netmaskBits}")"
+            ;;
+        v6)
+            address="$(cidr-v6-address "${fullOpt[@]}" "${cidr}")"
+            ;;
+        *)
+            echo 1>&2 'Unrecognized address type.'
+            return 1
+            ;;
+    esac
+
+    echo "${address}/${netmaskBits}"
+}
+
 # Prints out a V4 address from a CIDR in the usual form.
 function cidr-v4-address {
     local full=0
@@ -253,36 +283,6 @@ function cidr-v6-address {
     done
 
     echo "${result}"
-}
-
-# Converts a JSON-CIDR into a standard-form CIDR string.
-function cidr-from-json {
-    local fullOpt=()
-    if [[ "$1" == '--full' ]]; then
-        fullOpt=('--full')
-        shift
-    fi
-
-    local cidr="$1"
-
-    local type="$(jval --raw cidr:json="${cidr}" '$cidr.type')"
-    local netmaskBits="$(jval cidr:json="${cidr}" '$cidr.netmaskBits')"
-    local address
-
-    case "${type}" in
-        v4)
-            address="$(cidr-v4-address "${fullOpt[@]}" "${cidr}" "${netmaskBits}")"
-            ;;
-        v6)
-            address="$(cidr-v6-address "${fullOpt[@]}" "${cidr}")"
-            ;;
-        *)
-            echo 1>&2 'Unrecognized address type.'
-            return 1
-            ;;
-    esac
-
-    echo "${address}/${netmaskBits}"
 }
 
 # Get or validate a JSON-CIDR from the given value. If a standard-form string,
@@ -449,6 +449,7 @@ function parse-number {
 
     echo "${num}"
 }
+
 
 #
 # Command implementations
