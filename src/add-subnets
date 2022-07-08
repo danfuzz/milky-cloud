@@ -135,7 +135,7 @@ fi
 inRegion="$(lib region-from-location "${inLocation}")" \
 || exit "$?"
 
-azList="$(lib list-availability-zones --in="${inRegion}")" \
+azList=($(lib list-availability-zones --in="${inRegion}")) \
 || exit "$?"
 
 # Get all the VPC info.
@@ -173,7 +173,7 @@ fi
 echo '#### IPV4:' "${cidr4}"
 echo '#### IPV6:' "${cidr6}"
 
-azCount="$(lib json-length "${azList}")"
+azCount="${#azList[@]}"
 v4Subnets=()
 v6Subnets=()
 
