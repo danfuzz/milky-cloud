@@ -247,6 +247,175 @@ function cidr-from-json {
     echo "${address}/${netmaskBits}"
 }
 
+# Get or validate a JSON-CIDR from the given value. If a standard-form string,
+# converts it. If JSON, validates it.
+function json-from-any {
+    local value="$1"
+
+    if [[ ${value} =~ ^'{' ]]; then
+        json-validate "${value}"
+    elif [[ ${value} =~ ^[:./0-9a-f]+$ ]]; then
+        json-from-cidr "${value}"
+    else
+        echo 1>&2 "Unparseable CIDR: ${value}"
+        return 1
+    fi
+}
+
+# Converts a standard form CIDR string to the JSON form.
+function json-from-cidr {
+    local cidr="$1"
+
+    # Note: The repetition limits are generous enough to cover everything valid.
+    if ! [[ ${cidr} =~ ^([.:0-9a-f]{1,100})/([1-9][0-9]{0,5})$ ]]; then
+        echo 1>&2 "Unparseable CIDR: ${cidr}"
+        return 1
+    fi
+
+    local address="${BASH_REMATCH[1]}"
+    local netmaskBits="${BASH_REMATCH[2]}"
+    local totalBits
+    local type
+
+    if [[ ${address} =~ : ]]; then
+        # It's apparently IPv6.
+        type=v6
+        totalBits=128
+        address=($(cidr-address-words-v6 "${address}")) \
+        || return "$?"
+    elif [[ ${address} =~ \. ]]; then
+        # It's apparently IPv4.
+        type=v4
+        totalBits=32
+        address=($(cidr-address-words-v4 "${address}")) \
+        || return "$?"
+    else
+        echo 1>&2 "Unparseable CIDR: ${value}"
+        return 1
+    fi
+
+    if (( netmaskBits > totalBits )); then
+        echo 1>&2 "Netmask too large: ${netmaskBits} bits"
+        return 1
+    fi
+
+    address=($(mask-address-words "${netmaskBits}" "${address[@]}"))
+
+    jval \
+        address:json="$(jarray "${address[@]}")" \
+        netmaskBits:json="${netmaskBits}" \
+        type="${type}" \
+        '{
+            address: $address,
+            netmaskBits: $netmaskBits,
+            type: $type
+        }'
+}
+
+# Validates a JSON-CIDR value. On success, prints the value.
+function json-validate {
+    local value="$1"
+
+    # This doesn't check every possible problem, but it should be sufficient to
+    # catch _unintentional_ misuse.
+    local result
+    result="$(jval cidr:json="${value}" \
+        '
+            (($cidr | type) == "object")
+        and (($cidr | keys) == ["address", "netmaskBits", "type"])
+        and (($cidr.address | type) == "array")
+        and (($cidr.netmaskBits | type) == "number")
+        and (($cidr.netmaskBits >= 0) and ($cidr.netmaskBits <= 128))
+        and (($cidr.type == "v4") or ($cidr.type == "v6"))
+        |
+        if . then $cidr else null end
+        '
+    )" \
+    || return "$?"
+
+    if [[ ${result} == 'null' ]]; then
+        echo 1>&2 "Malformed JSON-CIDR: ${value}"
+        return 1
+    fi
+
+    echo "${result}"
+}
+
+# Helper for `json-from-cidr`, which masks a list of address words with a
+# netmask (that is, logical-ANDs the address with the netmask). This
+# canonicalizes an address being used as a network specifier.
+function mask-address-words {
+    local netmaskBits="$1"
+    shift
+    local address=("$@")
+
+    local at partialBits
+    (( at = netmaskBits / 16 ))
+    (( partialBits = netmaskBits % 16 ))
+
+    if (( partialBits != 0 )); then
+        # Mask off the top part of the word that contains the final bit(s) of
+        # the network portion of the address.
+        local mask
+        (( mask = (1 << (partialBits + 1)) - 1 ))
+        (( mask <<= 16 - partialBits  ))
+        (( address[at] &= mask ))
+        (( at++ ))
+    fi
+
+    while (( at < ${#address[@]} )); do
+        (( address[at] = 0 ))
+        (( at++ ))
+    done
+
+    echo "${address[@]}"
+}
+
+# Parses an integer in one of the standard forms.
+function parse-number {
+    local num="$1"
+    local min="$2"
+    local max="$3"
+
+    if [[ ${min} == '' ]]; then
+        (( min = 0 ))
+    fi
+
+    if [[ ${max} == '' ]]; then
+        (( max = 0xffffffff ))
+        min='0'
+    fi
+
+    if [[ "${num}" =~ ^[0-9]{1,40}$ ]]; then
+        if [[ "${num}" =~ ^0+(.+)$ ]]; then
+            # Strip leading `0`s to prevent the number from being interpreted as
+            # octal.
+            num="${BASH_REMATCH[1]}"
+        fi
+    elif [[ "${num}" =~ ^::([0-9a-fA-F]{1,16})$ ]]; then
+        num="0x${BASH_REMATCH[1]}"
+    else
+        echo 1>&2 "Unparseable number: ${num}"
+        return 1
+    fi
+
+    (( num = num )) # Canonicalize to decimal.
+
+    if (( num < min )); then
+        echo 1>&2 "Number too small: ${num}"
+        return 1
+    elif (( num > max )); then
+        echo 1>&2 "Number too large: ${num}"
+        return 1
+    fi
+
+    echo "${num}"
+}
+
+#
+# Command implementations
+#
+
 # Command: Add a value to the network address.
 function command_add-to-network {
     case "$#" in
@@ -440,171 +609,6 @@ function command_widen {
             address: $cidr.address,
             netmaskBits: $netmaskBits
         }'
-}
-
-# Get or validate a JSON-CIDR from the given value. If a standard-form string,
-# converts it. If JSON, validates it.
-function json-from-any {
-    local value="$1"
-
-    if [[ ${value} =~ ^'{' ]]; then
-        json-validate "${value}"
-    elif [[ ${value} =~ ^[:./0-9a-f]+$ ]]; then
-        json-from-cidr "${value}"
-    else
-        echo 1>&2 "Unparseable CIDR: ${value}"
-        return 1
-    fi
-}
-
-# Converts a standard form CIDR string to the JSON form.
-function json-from-cidr {
-    local cidr="$1"
-
-    # Note: The repetition limits are generous enough to cover everything valid.
-    if ! [[ ${cidr} =~ ^([.:0-9a-f]{1,100})/([1-9][0-9]{0,5})$ ]]; then
-        echo 1>&2 "Unparseable CIDR: ${cidr}"
-        return 1
-    fi
-
-    local address="${BASH_REMATCH[1]}"
-    local netmaskBits="${BASH_REMATCH[2]}"
-    local totalBits
-    local type
-
-    if [[ ${address} =~ : ]]; then
-        # It's apparently IPv6.
-        type=v6
-        totalBits=128
-        address=($(cidr-address-words-v6 "${address}")) \
-        || return "$?"
-    elif [[ ${address} =~ \. ]]; then
-        # It's apparently IPv4.
-        type=v4
-        totalBits=32
-        address=($(cidr-address-words-v4 "${address}")) \
-        || return "$?"
-    else
-        echo 1>&2 "Unparseable CIDR: ${value}"
-        return 1
-    fi
-
-    if (( netmaskBits > totalBits )); then
-        echo 1>&2 "Netmask too large: ${netmaskBits} bits"
-        return 1
-    fi
-
-    address=($(mask-address-words "${netmaskBits}" "${address[@]}"))
-
-    jval \
-        address:json="$(jarray "${address[@]}")" \
-        netmaskBits:json="${netmaskBits}" \
-        type="${type}" \
-        '{
-            address: $address,
-            netmaskBits: $netmaskBits,
-            type: $type
-        }'
-}
-
-# Validates a JSON-CIDR value. On success, prints the value.
-function json-validate {
-    local value="$1"
-
-    # This doesn't check every possible problem, but it should be sufficient to
-    # catch _unintentional_ misuse.
-    local result
-    result="$(jval cidr:json="${value}" \
-        '
-            (($cidr | type) == "object")
-        and (($cidr | keys) == ["address", "netmaskBits", "type"])
-        and (($cidr.address | type) == "array")
-        and (($cidr.netmaskBits | type) == "number")
-        and (($cidr.netmaskBits >= 0) and ($cidr.netmaskBits <= 128))
-        and (($cidr.type == "v4") or ($cidr.type == "v6"))
-        |
-        if . then $cidr else null end
-        '
-    )" \
-    || return "$?"
-
-    if [[ ${result} == 'null' ]]; then
-        echo 1>&2 "Malformed JSON-CIDR: ${value}"
-        return 1
-    fi
-
-    echo "${result}"
-}
-
-# Helper for `json-from-cidr`, which masks a list of address words with a
-# netmask (that is, logical-ANDs the address with the netmask). This
-# canonicalizes an address being used as a network specifier.
-function mask-address-words {
-    local netmaskBits="$1"
-    shift
-    local address=("$@")
-
-    local at partialBits
-    (( at = netmaskBits / 16 ))
-    (( partialBits = netmaskBits % 16 ))
-
-    if (( partialBits != 0 )); then
-        # Mask off the top part of the word that contains the final bit(s) of
-        # the network portion of the address.
-        local mask
-        (( mask = (1 << (partialBits + 1)) - 1 ))
-        (( mask <<= 16 - partialBits  ))
-        (( address[at] &= mask ))
-        (( at++ ))
-    fi
-
-    while (( at < ${#address[@]} )); do
-        (( address[at] = 0 ))
-        (( at++ ))
-    done
-
-    echo "${address[@]}"
-}
-
-# Parses an integer in one of the standard forms.
-function parse-number {
-    local num="$1"
-    local min="$2"
-    local max="$3"
-
-    if [[ ${min} == '' ]]; then
-        (( min = 0 ))
-    fi
-
-    if [[ ${max} == '' ]]; then
-        (( max = 0xffffffff ))
-        min='0'
-    fi
-
-    if [[ "${num}" =~ ^[0-9]{1,40}$ ]]; then
-        if [[ "${num}" =~ ^0+(.+)$ ]]; then
-            # Strip leading `0`s to prevent the number from being interpreted as
-            # octal.
-            num="${BASH_REMATCH[1]}"
-        fi
-    elif [[ "${num}" =~ ^::([0-9a-fA-F]{1,16})$ ]]; then
-        num="0x${BASH_REMATCH[1]}"
-    else
-        echo 1>&2 "Unparseable number: ${num}"
-        return 1
-    fi
-
-    (( num = num )) # Canonicalize to decimal.
-
-    if (( num < min )); then
-        echo 1>&2 "Number too small: ${num}"
-        return 1
-    elif (( num > max )); then
-        echo 1>&2 "Number too large: ${num}"
-        return 1
-    fi
-
-    echo "${num}"
 }
 
 
