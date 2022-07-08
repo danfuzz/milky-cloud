@@ -65,6 +65,9 @@ while (( $# > 0 )); do
         --slurp-stdin)
             inputStyle=slurp
             ;;
+        --words)
+            outputStyle=words
+            ;;
         -h|--help)
             showHelp=1
             break
@@ -144,14 +147,17 @@ if (( showHelp || argError )); then
     echo '    Output in compact form (not multiline JSON).'
     echo '  --lines'
     echo '    Output each item as a single line. Similar to `--raw`, except that'
-    echo '    a newline-containing string will get treated as non-raw so as to'
-    echo '    honor the guarantee of item-per-line.'
+    echo '    a strings with newlines or CRs in them get treated as non-raw so as'
+    echo '    to maintain the guarantee of item-per-line.'
     echo '  --raw'
     echo '    Output raw strings (and other values compactly).'
     echo '  --read-stdin'
     echo '    Read value(s) from stdin to form pipeline input.'
     echo '  --slurp-stdin'
     echo '    Read all values from stdin into a single array pipeline input.'
+    echo '  --words'
+    echo '    Like `--lines`, except that the guarantee is a word per line. As such,'
+    echo '    strings with any whitespace get treated as non-raw.'
     echo ''
     echo "${progName} [--help | -h]"
     echo '  Displays this message.'
@@ -184,7 +190,7 @@ case "${outputStyle}" in
     lines)
         jqArgs+=('--raw-output' '--compact-output')
         lineHelper='
-            if type == "string" and contains("\n")
+            if type == "string" and test("[\n\r]"; "m")
             then (. | @json)
             else .
             end'
@@ -192,6 +198,15 @@ case "${outputStyle}" in
         ;;
     raw)
         jqArgs+=('--raw-output' '--compact-output')
+        ;;
+    words)
+        jqArgs+=('--raw-output' '--compact-output')
+        wordHelper='
+            if type == "string" and test("[ \n\r\t]"; "m")
+            then (. | @json)
+            else .
+            end'
+        valueExpression="(${valueExpression}) | ${wordHelper}"
         ;;
 esac
 
