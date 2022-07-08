@@ -667,7 +667,7 @@ function command_widen-by {
     cidr="$(json-from-any "${cidr}")" \
     || return "$?"
 
-    bits="$(parse-number "${bits}" 0 128)" \
+    bits="$(parse-number "${bits}" 0 999)" \
     || return "$?"
 
     totalBits="$(command_address-length "${cidr}")"
@@ -682,6 +682,52 @@ function command_widen-by {
     jval \
         cidr:json="${cidr}" \
         netmaskBits:json="${netmaskBits}" \
+        '{
+            type: $cidr.type,
+            address: $cidr.address,
+            netmaskBits: $netmaskBits
+        }'
+}
+
+# Command: Widen the network to a specific length.
+function command_widen-to {
+    case "$#" in
+        0|1)
+            echo 1>&2 'Missing <cidr> and/or <bits> argument.'
+            return 1
+            ;;
+        2)
+            : # It's good.
+            ;;
+        *)
+            echo 1>&2 'Too many arguments.'
+            return 1
+            ;;
+    esac
+
+    local cidr="$1"
+    local bits="$2"
+
+    cidr="$(json-from-any "${cidr}")" \
+    || return "$?"
+
+    bits="$(parse-number "${bits}" 1 999)" \
+    || return "$?"
+
+    totalBits="$(command_address-length "${cidr}")"
+    netmaskBits="$(jval cidr:json="${cidr}" '$cidr.netmaskBits')"
+
+    if (( bits < netmaskBits )); then
+        echo 1>&2 "Cannot shrink netmask!: ${netmaskBits} to ${bits}"
+        return 1
+    elif (( bits > totalBits )); then
+        echo 1>&2 "Resulting netmask too long: ${bits}"
+        return 1
+    fi
+
+    jval \
+        cidr:json="${cidr}" \
+        netmaskBits:json="${bits}" \
         '{
             type: $cidr.type,
             address: $cidr.address,
@@ -795,6 +841,9 @@ if (( showHelp || argError )); then
     echo 'widen-by <cidr> <bits>'
     echo '  Widens the address in a CIDR by adding the indicated number of low-order'
     echo '  zero bits. Prints the resulting CIDR.'
+    echo 'widen-to <cidr> <bits>'
+    echo '  Widens the address in a CIDR by adding enough low-order zero bits to'
+    echo '  result in the indicated length. Prints the resulting CIDR.'
     echo ''
     echo "${progName} [--help | -h]"
     echo '  Displays this message.'
