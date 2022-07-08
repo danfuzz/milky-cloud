@@ -585,7 +585,7 @@ function command_make-subnets {
     count="$(parse-number "${count}" 1 65535)" \
     || return "$?"
 
-    cidr="$(command_widen "${cidr}" "$(bits-needed "${count}")")" \
+    cidr="$(command_widen-by "${cidr}" "$(bits-needed "${count}")")" \
     || return "$?"
 
     local result=()
@@ -645,7 +645,7 @@ function command_print {
 }
 
 # Command: Widen the network by a number of bits.
-function command_widen {
+function command_widen-by {
     case "$#" in
         0|1)
             echo 1>&2 'Missing <cidr> and/or <bits> argument.'
@@ -770,8 +770,9 @@ if (( showHelp || argError )); then
     echo ''
     echo 'add-to-network <cidr> <amount>'
     echo '  Adds the given amount (a positive integer) to the network address, and'
-    echo '  prints the resulting CIDR. This can be used in conjunction with `widen`'
-    echo '  to enumerate subnet addresses. `<amount>` can be specified either in'
+    echo '  prints the resulting CIDR. This can be used in conjunction with'
+    echo '  `widen-by` to enumerate subnet addresses (though `make-subnets` may be'
+    echo '  preferred for that use case). `<amount>` can be specified either in'
     echo '  decimal or hex. Use the suggestive prefix `::` to indicate hex.'
     echo 'address-length <cidr>'
     echo '  Prints the length (number of bits) of the address (not just the'
@@ -780,15 +781,17 @@ if (( showHelp || argError )); then
     echo '  Prints the words (16-bit components) of the full address, in a'
     echo '  shell-friendly space-separated decimal form. Note: Even an IPv4'
     echo '  address gets chunked as 16-bit words by this command.'
-    echo 'make-subnets <cidr> <count>'
+    echo 'make-subnets <cidr> <count> [<new-netmask-length>]'
     echo '  Prints the indicated number of subnets of the given CIDR, created by'
-    echo '  widening the netmask by the minimum number of bits needed and filling'
-    echo '  in those new bits with the sequence of `0` through `<count> - 1`.'
+    echo '  widening the netmask and filling in the new bits with the sequence of'
+    echo '  `0` through `<count> - 1`. By default, the netmask is widened by the'
+    echo '  minimum number of bits needed, but an optional third argument indicates'
+    echo '  a specific result length.'
     echo 'netmask-length <cidr>'
     echo '  Prints the length (number of bits) in the netmask.'
     echo 'print <cidr>'
     echo '  Prints a CIDR value.'
-    echo 'widen <cidr> <bits>'
+    echo 'widen-by <cidr> <bits>'
     echo '  Widens the address in a CIDR by adding the indicated number of low-order'
     echo '  zero bits. Prints the resulting CIDR.'
     echo ''
