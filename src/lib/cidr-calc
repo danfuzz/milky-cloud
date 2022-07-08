@@ -321,7 +321,7 @@ function json-from-cidr {
         totalBits=128
         address=($(cidr-address-words-v6 "${address}")) \
         || return "$?"
-    elif [[ ${address} =~ \. ]]; then
+    elif [[ ${address} =~ ^[0-9][.0-9]+$ ]]; then
         # It's apparently IPv4.
         type=v4
         totalBits=32
