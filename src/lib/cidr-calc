@@ -157,6 +157,12 @@ function cidr-address-words-v6 {
 
 # Prints out a V4 address from a CIDR in the usual form.
 function cidr-v4-address {
+    local full=0
+    if [[ "$1" == '--full' ]]; then
+        full=1
+        shift
+    fi
+
     local cidr="$1"
     local netmaskBits="$2"
 
@@ -174,20 +180,28 @@ function cidr-v4-address {
         '
     )"
 
-    # Drop octets at the end of the result that aren't covered by the netmask
-    # (so, e.g. `10.0.0.0/16` gets rendered as `10.0/16`).
-    local dropOctets
-    (( dropOctets = (32 - netmaskBits) / 8 ))
-    while (( dropOctets > 0 )) && [[ "${address}" =~ ^(.*)\.0$ ]]; do
-        address="${BASH_REMATCH[1]}"
-        (( dropOctets-- ))
-    done
+    if (( !full )); then
+        # Drop octets at the end of the result that aren't covered by the netmask
+        # (so, e.g. `10.0.0.0/16` gets rendered as `10.0/16`).
+        local dropOctets
+        (( dropOctets = (32 - netmaskBits) / 8 ))
+        while (( dropOctets > 0 )) && [[ "${address}" =~ ^(.*)\.0$ ]]; do
+            address="${BASH_REMATCH[1]}"
+            (( dropOctets-- ))
+        done
+    fi
 
     echo "${address}"
 }
 
 # Prints out a V6 address from a CIDR in the usual form.
 function cidr-v6-address {
+    local full=0
+    if [[ "$1" == '--full' ]]; then
+        full=1
+        shift
+    fi
+
     local cidr="$1"
 
     local address="$(jval --raw \
@@ -198,26 +212,30 @@ function cidr-v6-address {
     # Go from space-separated string to array of elements.
     address=(${address})
 
-    # Find a run of zeros, if any.
     local zerosAt=-1
-    local zeroCount=1 # 1 here to avoid detecting runs of length 1.
-    local n z
-    for (( n = 0; n < 8; n++ )); do
-        for (( z = n; z < 8; z++ )); do
-            if (( address[z] != 0)); then
-                break
+    local zeroCount
+
+    if (( !full )); then
+        # Find a run of zeros, if any.
+        local n z
+        zeroCount=1 # Avoid detecting runs of length 1.
+        for (( n = 0; n < 8; n++ )); do
+            for (( z = n; z < 8; z++ )); do
+                if (( address[z] != 0)); then
+                    break
+                fi
+            done
+
+            local thisCount
+            (( thisCount = z - n ))
+            if (( thisCount > zeroCount )); then
+                (( zeroCount = thisCount ))
+                (( zerosAt = n ))
             fi
+
+            (( n = z )) # No need to "relitigate" anything that's been scanned.
         done
-
-        local thisCount
-        (( thisCount = z - n ))
-        if (( thisCount > zeroCount )); then
-            (( zeroCount = thisCount ))
-            (( zerosAt = n ))
-        fi
-
-        (( n = z )) # No need to "relitigate" anything that's been scanned.
-    done
+    fi
 
     local result=''
     local n
@@ -239,6 +257,12 @@ function cidr-v6-address {
 
 # Converts a JSON-CIDR into a standard-form CIDR string.
 function cidr-from-json {
+    local fullOpt=()
+    if [[ "$1" == '--full' ]]; then
+        fullOpt=('--full')
+        shift
+    fi
+
     local cidr="$1"
 
     local type="$(jval --raw cidr:json="${cidr}" '$cidr.type')"
@@ -247,10 +271,10 @@ function cidr-from-json {
 
     case "${type}" in
         v4)
-            address="$(cidr-v4-address "${cidr}" "${netmaskBits}")"
+            address="$(cidr-v4-address "${fullOpt[@]}" "${cidr}" "${netmaskBits}")"
             ;;
         v6)
-            address="$(cidr-v6-address "${cidr}")"
+            address="$(cidr-v6-address "${fullOpt[@]}" "${cidr}")"
             ;;
         *)
             echo 1>&2 'Unrecognized address type.'
@@ -686,6 +710,9 @@ while (( $# > 0 )); do
         --compact-json)
             outputStyle=compact-json
             ;;
+        --full)
+            outputStyle=full-string
+            ;;
         --json)
             outputStyle=json
             ;;
@@ -731,6 +758,9 @@ if (( showHelp || argError )); then
     echo
     echo '--compact-json'
     echo '  Like `--json`, except produces compact output.'
+    echo '--full'
+    echo '  Print full addresses, without dropping octets (v4) or compressing'
+    echo '  zeros (v6).'
     echo '--json'
     echo '  Produces JSON output representing the parsed components of a CIDR'
     echo '  value, instead of a standard-form CIDR string. This only affects'
@@ -803,15 +833,20 @@ if [[ ${resultType} != 'text' ]]; then
         json)
             jval result:json="${result}" '$result'
             ;;
-        string)
+        string|full-string)
+            fullOpt=()
+            if [[ ${outputStyle} == 'full-string' ]]; then
+                fullOpt=(--full)
+            fi
+
             if [[ ${resultType} == 'object' ]]; then
-                cidr-from-json "${result}"
+                cidr-from-json "${fullOpt[@]}" "${result}"
             else
                 # It's an array. Compactly print each element on a line by
                 # itself, then split by lines to convert each object.
                 jval --compact result:json="${result}" '$result[]' \
                 | while read -r line; do
-                    cidr-from-json "${line}"
+                    cidr-from-json "${fullOpt[@]}" "${line}"
                 done
             fi
             ;;
