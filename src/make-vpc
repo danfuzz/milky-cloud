@@ -174,8 +174,8 @@ fi
 # `associate-route-table`.
 
 if (( !error )); then
-    lib add-subnets -\
-        -in="${inRegion}" --vpc="${vpcId}" --name="standard-for-${name}" \
+    lib add-subnets \
+        --in="${inRegion}" --vpc="${vpcId}" --name="standard-for-${name}" \
     || error=1
 fi
 
