@@ -664,50 +664,6 @@ function command_print {
     json-from-any "${cidr}"
 }
 
-# Command: Widen the network by a number of bits.
-function command_widen-by {
-    case "$#" in
-        0|1)
-            echo 1>&2 'Missing <cidr> and/or <bits> argument.'
-            return 1
-            ;;
-        2)
-            : # It's good.
-            ;;
-        *)
-            echo 1>&2 'Too many arguments.'
-            return 1
-            ;;
-    esac
-
-    local cidr="$1"
-    local bits="$2"
-
-    cidr="$(json-from-any "${cidr}")" \
-    || return "$?"
-
-    bits="$(parse-number "${bits}" 0 999)" \
-    || return "$?"
-
-    totalBits="$(command_address-length "${cidr}")"
-    netmaskBits="$(jval cidr:json="${cidr}" '$cidr.netmaskBits')"
-    (( netmaskBits += bits ))
-
-    if (( netmaskBits > totalBits )); then
-        echo 1>&2 "Resulting netmask too long: ${netmaskBits}"
-        return 1
-    fi
-
-    jval \
-        cidr:json="${cidr}" \
-        netmaskBits:json="${netmaskBits}" \
-        '{
-            type: $cidr.type,
-            address: $cidr.address,
-            netmaskBits: $netmaskBits
-        }'
-}
-
 # Command: Widen the network to a specific length.
 function command_widen-to {
     case "$#" in
@@ -837,9 +793,9 @@ if (( showHelp || argError )); then
     echo 'add-to-network <cidr> <amount>'
     echo '  Adds the given amount (a positive integer) to the network address, and'
     echo '  prints the resulting CIDR. This can be used in conjunction with'
-    echo '  `widen-by` to enumerate subnet addresses (though `make-subnets` may be'
-    echo '  preferred for that use case). `<amount>` can be specified either in'
-    echo '  decimal or hex. Use the suggestive prefix `::` to indicate hex.'
+    echo '  `widen-to` to enumerate subnet addresses (though `make-subnets` is'
+    echo '  more convenient for that use case). `<amount>` can be specified either'
+    echo '  in decimal or hex. Use the suggestive prefix `::` to indicate hex.'
     echo 'address-length <cidr>'
     echo '  Prints the length (number of bits) of the address (not just the'
     echo '  netmask).'
@@ -857,9 +813,6 @@ if (( showHelp || argError )); then
     echo '  Prints the length (number of bits) in the netmask.'
     echo 'print <cidr>'
     echo '  Prints a CIDR value.'
-    echo 'widen-by <cidr> <bits>'
-    echo '  Widens the address in a CIDR by adding the indicated number of low-order'
-    echo '  zero bits. Prints the resulting CIDR.'
     echo 'widen-to <cidr> <bits>'
     echo '  Widens the address in a CIDR by adding enough low-order zero bits to'
     echo '  result in the indicated length. Prints the resulting CIDR.'
