@@ -173,8 +173,11 @@ fi
 # Create a subnet per availability zone. Attach the route table via
 # `associate-route-table`.
 
-lib add-subnets --in="${inRegion}" --vpc="${vpcId}" --name="standard-for-${name}" \
-|| error=1
+if (( !error )); then
+    lib add-subnets -\
+        -in="${inRegion}" --vpc="${vpcId}" --name="standard-for-${name}" \
+    || error=1
+fi
 
 # TODO: Finish this!
 error=1
