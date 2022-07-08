@@ -568,7 +568,7 @@ function command_make-subnets {
             echo 1>&2 'Missing <cidr> and/or <count> argument.'
             return 1
             ;;
-        2)
+        2|3)
             : # It's good.
             ;;
         *)
@@ -579,6 +579,7 @@ function command_make-subnets {
 
     local cidr="$1"
     local count="$2"
+    local bits="$3"
 
     cidr="$(json-from-any "${cidr}")" \
     || return "$?"
@@ -586,7 +587,25 @@ function command_make-subnets {
     count="$(parse-number "${count}" 1 65535)" \
     || return "$?"
 
-    cidr="$(command_widen-by "${cidr}" "$(bits-needed "${count}")")" \
+    local origBits="$(jval cidr:json="${cidr}" '$cidr.netmaskBits')"
+    local bitsNeeded="$(bits-needed "${count}")"
+    local newBits
+
+    (( newBits = origBits + bitsNeeded ))
+
+    if [[ ${bits} != '' ]]; then
+        bits="$(parse-number "${bits}" 1 999)" \
+        || return "$?"
+
+        if (( newBits > bits )); then
+            echo 1>&2 "Specified <bits> is too small to fit result: ${bits}"
+            return 1
+        fi
+
+        (( newBits = bits ))
+    fi
+
+    cidr="$(command_widen-to "${cidr}" "${newBits}")" \
     || return "$?"
 
     local result=()
@@ -828,12 +847,12 @@ if (( showHelp || argError )); then
     echo '  Prints the words (16-bit components) of the full address, in a'
     echo '  shell-friendly space-separated decimal form. Note: Even an IPv4'
     echo '  address gets chunked as 16-bit words by this command.'
-    echo 'make-subnets <cidr> <count> [<new-netmask-length>]'
+    echo 'make-subnets <cidr> <count> [<bits>]'
     echo '  Prints the indicated number of subnets of the given CIDR, created by'
     echo '  widening the netmask and filling in the new bits with the sequence of'
     echo '  `0` through `<count> - 1`. By default, the netmask is widened by the'
     echo '  minimum number of bits needed, but an optional third argument indicates'
-    echo '  a specific result length.'
+    echo '  a specific result netmask length in bits.'
     echo 'netmask-length <cidr>'
     echo '  Prints the length (number of bits) in the netmask.'
     echo 'print <cidr>'
