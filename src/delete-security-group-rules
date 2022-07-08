@@ -156,7 +156,7 @@ groupId="$(lib find-security-group --in="${inRegion}" "${groupNameOrId}")" \
 
 allRules="$(ec2-json describe-security-group-rules \
     --in="${inRegion}" \
-    "$(lib filter-spec "group-id=${groupId}")" \
+    "$(lib filter-spec group-id="${groupId}")" \
     :: '.SecurityGroupRules[]'
 )" \
 || exit "$?"
