@@ -142,6 +142,8 @@ azList=($(lib list-availability-zones --in="${inRegion}")) \
 vpcInfo="$(lib find-vpc --in="${inRegion}" --print-all "${vpcNameOrId}")" \
 || exit "$?"
 
+vpcId="$(jval --raw info:json="${vpcInfo}" '$info.VpcId')"
+
 cidr4="$(jval --raw vpcInfo:json="${vpcInfo}" '
     $vpcInfo.CidrBlockAssociationSet
     |
@@ -178,7 +180,8 @@ v4Subnets=()
 v6Subnets=()
 
 if [[ ${cidr4} != 'none' ]]; then
-    v4Subnets=($(lib cidr-calc make-subnets "${cidr4}" "${azCount}"))
+    # `--full` because AWS doesn't accept truncated IPv4 CIDR addresses.
+    v4Subnets=($(lib cidr-calc --full make-subnets "${cidr4}" "${azCount}"))
 fi
 
 if [[ ${cidr6} != 'none' ]]; then
@@ -199,6 +202,32 @@ for (( n = 0; n < azCount; n++ )); do
     echo "AZ: ${az}"
     echo "v4: ${v4Subnet}"
     echo "v6: ${v6Subnet}"
+    ec2-json create-subnet \
+        --in="${inRegion}" \
+        az="${azList[${n}]}" \
+        tagSpec:json="${tagSpec}" \
+        v4Subnet="${v4Subnets[${n}]}" \
+        v6Subnet="${v6Subnets[${n}]}" \
+        vpcId="${vpcId}" \
+        '
+        $tagSpec
+        +
+        {
+            AvailabilityZone: $az,
+            VpcId: $vpcId
+        }
+        +
+        if $v4Subnet == ""
+            then { Ipv6Native: true }
+            else { CidrBlock: $v4Subnet }
+        end
+        +
+        if $v6Subnet == ""
+            then { }
+            else { Ipv6CidrBlock: $v6Subnet }
+        end
+        ' \
+    || exit "$?"
 done
 echo '####################'
 
