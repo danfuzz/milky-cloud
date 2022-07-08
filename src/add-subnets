@@ -152,7 +152,7 @@ cidr4="$(jval --raw vpcInfo:json="${vpcInfo}" '
 ')"
 
 if [[ ${cidr4} == 'many' ]]; then
-    echo 1>&2 'Sorry, not set up to deal with multiple CIDR sets (IPv4).'
+    echo 1>&2 'Sorry, not set up to deal with multiple CIDRs (IPv4).'
     exit 1
 fi
 
@@ -166,7 +166,7 @@ cidr6="$(jval --raw vpcInfo:json="${vpcInfo}" '
 ')"
 
 if [[ ${cidr6} == 'many' ]]; then
-    echo 1>&2 'Sorry, not set up to deal with multiple CIDR sets (IPv6).'
+    echo 1>&2 'Sorry, not set up to deal with multiple CIDRs (IPv6).'
     exit 1
 fi
 
@@ -174,20 +174,15 @@ echo '#### IPV4:' "${cidr4}"
 echo '#### IPV6:' "${cidr6}"
 
 azCount="$(lib json-length "${azList}")"
-azBits="$(bits-needed "${azCount}")"
-azIndexes=($(seq 0 "$(( azCount - 1 ))"))
+v4Subnets=()
+v6Subnets=()
 
 if [[ ${cidr4} != 'none' ]]; then
-    for (( n = 0; n < azCount; n++ )); do
-        lib cidr-calc add-subnet "${cidr4}" "${n}/${azBits}"
-    done
-    # TODO
+    v4Subnets=($(lib cidr-calc make-subnets "${cidr4}" "${azCount}"))
 fi
 
 if [[ ${cidr6} != 'none' ]]; then
-    for (( n = 0; n < azCount; n++ )); do
-        lib cidr-calc add-subnet "${cidr6}" "${n}/${azBits}"
-    done
+    v6Subnets=($(lib cidr-calc make-subnets "${cidr6}" "${azCount}"))
 fi
 
 if [[ ${name} == '' ]]; then
@@ -195,6 +190,17 @@ if [[ ${name} == '' ]]; then
 fi
 
 tagSpec="$(lib name-tag-spec 'subnet' "${name}")"
+
+for (( n = 0; n < azCount; n++ )); do
+    az="${azList[${n}]}"
+    v4Subnet="${v4Subnets[${n}]}"
+    v6Subnet="${v6Subnets[${n}]}"
+    echo '############'
+    echo "AZ: ${az}"
+    echo "v4: ${v4Subnet}"
+    echo "v6: ${v6Subnet}"
+done
+echo '####################'
 
 # TODO: Finish this!
 
