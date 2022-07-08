@@ -27,6 +27,9 @@ init-prog
 # Argument parsing
 #
 
+# Output style.
+outputStyle=strings
+
 # Error during argument processing?
 argError=0
 
@@ -38,8 +41,14 @@ inLocation=''
 
 while (( $# > 0 )); do
     case "$1" in
+        --compact-json)
+            outputStyle=compact-json
+            ;;
         --in=?*)
             inLocation="${1#*=}"
+            ;;
+        --json)
+            outputStyle=json
             ;;
         -h|--help)
             showHelp=1
@@ -76,11 +85,16 @@ if (( showHelp || argError )); then
     echo ''
     echo "${progName} [<opt> ...]"
     echo '  Lists all accessible availability zones in a given region. The result'
-    echo '  is a JSON array of the zone names.'
+    echo '  is one zone name per line (by default), or a JSON array (given an'
+    echo '  appropriate option).'
     echo ''
+    echo '  --compact-json'
+    echo '    Produce compact JSON output.'
     echo '  --in=<region-or-zone>'
     echo '    What region to look in. Must be specified. If specified as an'
     echo '    availability zone, only the region portion matters.'
+    echo '  --json'
+    echo '    Produce JSON output.'
     echo ''
     echo "${progName} [--help | -h]"
     echo '  Displays this message.'
@@ -95,6 +109,17 @@ fi
 inRegion="$(lib region-from-location "${inLocation}")" \
 || exit "$?"
 
-ec2-json describe-availability-zones --in="${inRegion}" \
-    :: '.AvailabilityZones | map(.ZoneName) | sort' \
-|| exit "$?"
+cmd=(ec2-json describe-availability-zones --in="${inRegion}" ::)
+suffix=()
+
+case "${outputStyle}" in
+    compact-json)
+        cmd+=(--compact)
+        ;;
+    strings)
+        cmd+=(--raw)
+        suffix=('| .[]')
+        ;;
+esac
+
+"${cmd[@]}" '.AvailabilityZones | map(.ZoneName) | sort' "${suffix[@]}"
