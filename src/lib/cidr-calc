@@ -425,7 +425,7 @@ function command_widen {
 
     totalBits="$(command_address-length "${cidr}")"
     netmaskBits="$(jval cidr:json="${cidr}" '$cidr.netmaskBits')"
-    (( netmaskBits += ${bits} ))
+    (( netmaskBits += bits ))
 
     if (( netmaskBits > totalBits )); then
         echo 1>&2 "Resulting netmask too long: ${netmaskBits}"
