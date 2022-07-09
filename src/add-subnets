@@ -58,6 +58,9 @@ inLocation=''
 # Name for the subnets.
 name=''
 
+# Quiet?
+quiet=0
+
 # Name or ID of the VPC.
 vpcNameOrId=''
 
@@ -68,6 +71,9 @@ while (( $# > 0 )); do
             ;;
         --name=?*)
             name="${1#*=}"
+            ;;
+        --quiet)
+            quiet=1
             ;;
         --vpc=?*)
             vpcNameOrId="${1#*=}"
@@ -120,6 +126,8 @@ if (( showHelp || argError )); then
     echo '  --name=<name>'
     echo '    Name to use for the created subnets. If not specified, a name is'
     echo '    generated programatically.'
+    echo '  --quiet'
+    echo '    Suppress non-error output.'
     echo '  --vpc=<name-or-id>'
     echo '    Name or ID of the VPC.'
     echo ''
@@ -235,5 +243,6 @@ for (( n = 0; n < azCount; n++ )); do
     results+=("${result}")
 done
 
-jarray --strings "${results[@]}"
-exit 1 # TODO just for testing
+if (( !quiet )); then
+    jarray --strings "${results[@]}"
+fi
