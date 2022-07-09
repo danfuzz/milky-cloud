@@ -189,8 +189,7 @@ v4Subnets=()
 v6Subnets=()
 
 if [[ ${cidr4} != 'none' ]]; then
-    # `--full` because AWS doesn't accept truncated IPv4 CIDR addresses.
-    v4Subnets=($(lib cidr-calc --full make-subnets "${cidr4}" "${azCount}"))
+    v4Subnets=($(lib cidr-calc make-subnets "${cidr4}" "${azCount}"))
 fi
 
 if [[ ${cidr6} != 'none' ]]; then
