@@ -70,14 +70,10 @@ function cidr-address-words-v4 {
         result+=("${num}")
     done
 
-    if (( ${#result[@]} > 4 )); then
+    if (( ${#result[@]} != 4 )); then
         echo 1>&2 "${errorMsg}"
         return 1
     fi
-
-    while (( ${#result[@]} < 4 )); do
-        result+=(0)
-    done
 
     # The array form uses 16-bit words, so combine the four 8-bit octets to
     # to produce the final result.
@@ -290,7 +286,7 @@ function json-from-cidr {
         totalBits=128
         address=($(cidr-address-words-v6 "${address}")) \
         || return "$?"
-    elif [[ ${address} =~ ^[0-9][.0-9]+$ ]]; then
+    elif [[ ${address} =~ [.] ]]; then
         # It's apparently IPv4.
         type=v4
         totalBits=32
