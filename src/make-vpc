@@ -175,7 +175,8 @@ fi
 
 if (( !error )); then
     lib add-subnets \
-        --in="${inRegion}" --vpc="${vpcId}" --name="standard-for-${name}" \
+        --quiet --in="${inRegion}" --vpc="${vpcId}" \
+        --name="standard-for-${name}" \
     || error=1
 fi
 
