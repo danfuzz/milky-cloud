@@ -216,7 +216,7 @@ if (( error )); then
     fi
 
     echo 1>&2 'Deleting subnets...'
-    lib delete-subnets --in="${inRegion}" --vpc="${vpcId}" --all
+    lib delete-subnets --quiet --in="${inRegion}" --vpc="${vpcId}" --all
 
     echo 1>&2 'Deleting VPC...'
     ec2-json delete-vpc \

@@ -150,15 +150,13 @@ allSubnets="$(ec2-json describe-subnets \
 )" \
 || exit "$?"
 
-echo "${allSubnets}"
-
 selectedSubnets="$(
     jval <<<"${allSubnets}" --read-stdin -- "${filterArgs[@]}"
 )" \
 || exit "$?"
 
 subnetIds=($(
-    jval <<<"${selectedSubnets}" --words --slurp-stdin 'map(.SubnetId) | sort'
+    jval <<<"${selectedSubnets}" --words --slurp-stdin 'map(.SubnetId) | sort | .[]'
 )) \
 || exit "$?"
 
@@ -167,12 +165,11 @@ for id in "${subnetIds[@]}"; do
         --in="${inRegion}" \
         id="${id}" \
         '{
-            DryRun: true,
             SubnetId: $id
         }' \
     || exit "$?"
 done
 
 if (( !quiet )); then
-    jarray "${subnetIds[@]}"
+    jarray --strings "${subnetIds[@]}"
 fi
