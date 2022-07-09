@@ -111,7 +111,8 @@ if (( showHelp || argError )); then
     echo ''
     echo "${progName} [<opt> ...]"
     echo '  Adds a set of subnets to a VPC -- one per availability zone -- along'
-    echo '  with an associated routing table.'
+    echo '  with an associated routing table. Upon success, prints a JSON array'
+    echo '  of all the created subnets.'
     echo ''
     echo '  --in=<region-or-zone>'
     echo '    What region to make the security group in. Must be specified. If'
@@ -185,7 +186,8 @@ if [[ ${cidr4} != 'none' ]]; then
 fi
 
 if [[ ${cidr6} != 'none' ]]; then
-    v6Subnets=($(lib cidr-calc make-subnets "${cidr6}" "${azCount}"))
+    # `64` because AWS requires V6 subnet networks to be exactly 64 bits.
+    v6Subnets=($(lib cidr-calc make-subnets "${cidr6}" "${azCount}" 64))
 fi
 
 if [[ ${name} == '' ]]; then
@@ -194,15 +196,13 @@ fi
 
 tagSpec="$(lib name-tag-spec 'subnet' "${name}")"
 
+results=()
+
 for (( n = 0; n < azCount; n++ )); do
     az="${azList[${n}]}"
     v4Subnet="${v4Subnets[${n}]}"
     v6Subnet="${v6Subnets[${n}]}"
-    echo '############'
-    echo "AZ: ${az}"
-    echo "v4: ${v4Subnet}"
-    echo "v6: ${v6Subnet}"
-    ec2-json create-subnet \
+    result="$(ec2-json create-subnet \
         --in="${inRegion}" \
         az="${azList[${n}]}" \
         tagSpec:json="${tagSpec}" \
@@ -227,32 +227,13 @@ for (( n = 0; n < azCount; n++ )); do
             else { Ipv6CidrBlock: $v6Subnet }
         end
         ' \
+        :: --raw '.Subnet.SubnetId' \
+    )" \
     || exit "$?"
+
+    echo "Made subnet: ${result}"
+    results+=("${result}")
 done
-echo '####################'
 
-# TODO: Finish this!
-
-exit 1
-ec2-json "${command}" \
-    --in="${inRegion}" \
-    groupId="${groupId}" \
-    ipPermissions:json="[${ipSpec}]" \
-    tagSpec:json="${tagSpec}" \
-    '
-    $tagSpec +
-    {
-        GroupId: $groupId,
-        IpPermissions: $ipPermissions
-    }' \
-    :: "${filterArg}"
-
-# For reference
-'
-
-#### IPV4: 10.1.0.0/16
-   10.1.
-
-#### IPV6: 2600:1f14:462:3100::/56
-
-'
+jarray --strings "${results[@]}"
+exit 1 # TODO just for testing
