@@ -1,0 +1,112 @@
+#!/bin/bash
+#
+# Copyright 2022 Dan Bornstein.
+# Licensed AS IS and WITHOUT WARRANTY under the Apache License,
+# Version 2.0. Details: <http://www.apache.org/licenses/LICENSE-2.0>
+
+# Set `progName` to the program name, `progDir` to its directory, and `baseDir`
+# to `progDir`'s directory. Follows symlinks.
+function init-prog {
+    local newp p="$0"
+
+    while newp="$(readlink "$p")"; do
+        [[ ${newp} =~ ^/ ]] && p="${newp}" || p="$(dirname "$p")/${newp}"
+    done
+
+    progName="${p##*/}"
+    progDir="$(cd "$(dirname "$p")"; /bin/pwd -P)"
+    baseDir="$(cd "${progDir}/.."; /bin/pwd -P)"
+}
+init-prog
+
+# Set up for library-internal usage.
+. "${progDir}/init" --lib
+
+
+#
+# Argument parsing
+#
+
+# Output option.
+outputOpt=()
+
+# Error during argument processing?
+argError=0
+
+# Need help?
+showHelp=0
+
+# Parse options.
+while (( $# > 0 )); do
+    case "$1" in
+        --compact|--lines|--raw|--words)
+            outputOpt=("$1")
+            ;;
+        -h|--help)
+            showHelp=1
+            break
+            ;;
+        --)
+            # Explicit end of options
+            shift
+            break
+            ;;
+        -?*)
+            echo 1>&2 "Unknown option: $1"
+            argError=1
+            break
+            ;;
+        *)
+            # Non-option argument
+            break
+            ;;
+    esac
+
+    shift
+done
+
+# JSON value.
+value="$1"
+
+# JQ expression.
+expr="$2"
+
+if (( $# < 2 )); then
+    echo 1>&2 'Missing <json-value> and/or <jq-expr> argument.'
+    argError=1
+elif (( $# > 2 )); then
+    echo 1>&2 'Too many arguments!'
+    argError=1
+fi
+
+if (( showHelp || argError )); then
+    echo 'Usage:'
+    echo ''
+    echo "${progName} [<opt> ...] [--] <json-value> <jq-expr>"
+    echo '  Performs an operation on a single JSON value (at least with typical'
+    echo '  usage). More specifically, <json-value> is used as the sole input to'
+    echo '  <jq-expr> which is run as a `jq` program.'
+    echo ''
+    echo '  --compact'
+    echo '    Output in compact form (not multiline JSON).'
+    echo '  --lines'
+    echo '    Output each item as a single line. Similar to `--raw`, except that'
+    echo '    a strings with newlines or CRs in them get treated as non-raw so as'
+    echo '    to maintain the guarantee of item-per-line.'
+    echo '  --raw'
+    echo '    Output raw strings (and other values compactly).'
+    echo '  --words'
+    echo '    Like `--lines`, except that the guarantee is a word per line. As such,'
+    echo '    strings with any whitespace get treated as non-raw.'
+    echo ''
+    echo "${progName} [--help | -h]"
+    echo '  Displays this message.'
+    exit "${argError}"
+fi
+
+
+#
+# Main script
+#
+
+lib json-val <<< "${value}" "${outputOpt[@]}" --read-stdin -- -- "${expr}"
