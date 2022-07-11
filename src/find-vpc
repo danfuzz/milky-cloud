@@ -52,11 +52,9 @@ function do-find {
     )"
 
     local vpcId
-    vpcId="$(jval --raw \
-        idResult:json="${idResult}" \
+    vpcId="$(jget --raw \
+        "${idResult}" \
         '
-        $idResult
-        |
         if length == 0 then "none"
         elif length == 1 then .[0]
         else "ambiguous"
@@ -66,7 +64,7 @@ function do-find {
     case "${vpcId}" in
         ambiguous)
             echo 1>&2 'Ambiguous name or ID matches all of:'
-            jval 1>&2 --raw "${result}" '[] | "  " + .'
+            jget 1>&2 --raw "${idResult}" '.[] | "  " + .'
             return 1
             ;;
         none)
