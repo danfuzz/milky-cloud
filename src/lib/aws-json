@@ -231,11 +231,11 @@ if [[ -x ${specialCaseHandler} ]]; then
     commandParts="$("${specialCaseHandler}" "$(make-command-parts-json)")" \
     || exit 1
 
-    command="$(jval --raw p:json="${commandParts}" '$p.command')"
-    subcommand="$(jval --raw p:json="${commandParts}" '$p.subcommand')"
-    jsonArg="$(jval --compact p:json="${commandParts}" '$p.jsonArg')"
+    command="$(jget --raw "${commandParts}" '.command')"
+    subcommand="$(jget --raw "${commandParts}" '.subcommand')"
+    jsonArg="$(jget --compact "${commandParts}" '.jsonArg')"
 
-    dashArgsLength="$(jval p:json="${commandParts}" '$p.dashArgs | length')"
+    dashArgsLength="$(jget "${commandParts}" '.dashArgs | length')"
     dashArgs=()
     for (( i = 0; i < dashArgsLength; i++ )); do
         dashArgs+=("$(jval --raw p:json="${commandParts}" i:json="${i}" '$p.dashArgs[$i]')")
