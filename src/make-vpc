@@ -208,9 +208,9 @@ inRegion="$(lib region-from-location "${inLocation}")" \
 vpcInfo="$(make-vpc-per-se)" \
 || exit "$?"
 
-vpcId="$(jval --raw vpcInfo:json="${vpcInfo}" '$vpcInfo.VpcId')"
-cidr4="$(jval --raw vpcInfo:json="${vpcInfo}" '$vpcInfo.CidrBlockAssociationSet[0].CidrBlock')"
-cidr6="$(jval --raw vpcInfo:json="${vpcInfo}" '$vpcInfo.Ipv6CidrBlockAssociationSet[0].Ipv6CidrBlock')"
+vpcId="$(jget --raw "${vpcInfo}" '.VpcId')"
+cidr4="$(jget --raw "${vpcInfo}" '.CidrBlockAssociationSet[0].CidrBlock')"
+cidr6="$(jget --raw "${vpcInfo}" '.Ipv6CidrBlockAssociationSet[0].Ipv6CidrBlock')"
 
 echo 'IPV4 network:' "${cidr4}"
 echo 'IPV6 network:' "${cidr6}"

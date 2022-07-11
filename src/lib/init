@@ -29,6 +29,12 @@ function jarray {
     lib json-array "$@"
 }
 
+# Calls `json-get`. This script is used enough to warrant having it be easier to
+# say than `lib json-get ...`.
+function jget {
+    lib json-get "$@"
+}
+
 # Calls `json-val`. This script is used enough to warrant having it be easier to
 # say than `lib json-val ...`.
 function jval {
