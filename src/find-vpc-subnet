@@ -133,7 +133,7 @@ subnetId="$(jval --raw \
 case "${subnetId}" in
     ambiguous)
         echo 1>&2 'Ambiguous specification matches all of:'
-        jval 1>&2 --raw "${result}" '[] | "  " + .'
+        jget 1>&2 --raw "${result}" '.[] | "  " + .'
         exit 1
         ;;
     none)

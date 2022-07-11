@@ -167,8 +167,8 @@ if [[ ${cidr4} == 'many' ]]; then
     exit 1
 fi
 
-cidr6="$(jval --raw vpcInfo:json="${vpcInfo}" '
-    $vpcInfo.Ipv6CidrBlockAssociationSet
+cidr6="$(jget --raw "${vpcInfo}" '
+    .Ipv6CidrBlockAssociationSet
     |
     if length == 0 then "none"
     elif length == 1 then .[0].Ipv6CidrBlock

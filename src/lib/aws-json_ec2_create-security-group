@@ -35,18 +35,15 @@ init-prog
 
 parts="$1"
 
-jval parts:json="${parts}" '
-    $parts
-
-    | .jsonArg.Description as $description
+jget "${parts}" '
+      .jsonArg.Description as $description
     | del(.jsonArg.Description)
     | if $description then
         .dashArgs += ["--description=" + $description]
-    else . end
-
+      else . end
     | .jsonArg.GroupName as $groupName
     | del(.jsonArg.GroupName)
     | if $groupName then
         .dashArgs += ["--group-name=" + $groupName]
-    else . end
+      else . end
 '

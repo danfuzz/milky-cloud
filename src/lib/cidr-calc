@@ -499,7 +499,7 @@ function command_address-length {
     cidr="$(json-from-any "${cidr}")" \
     || return "$?"
 
-    jval cidr:json="${cidr}" '($cidr.address | length) * 16'
+    jget "${cidr}" '(.address | length) * 16'
 }
 
 # Command: Gets the words of the address.
