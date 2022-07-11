@@ -87,7 +87,7 @@ function do-find {
             )" \
             || return "$?"
         fi
-        jval result:json="${result}" '$result.Vpcs[0]'
+        jget "${result}" '.Vpcs[0]'
     else
         echo "${vpcId}"
     fi
