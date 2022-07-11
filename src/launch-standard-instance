@@ -134,13 +134,12 @@ if (( $? != 0 )); then
     exit "$?"
 fi
 
-jval 1>&2 --raw "${amiInfo}" \
-    '| (
-        "Using AMI:",
-        "  desc: " + .Description,
-        "  name: " + .Name,
-        "  id:   " + .ImageId
-    )'
+jget 1>&2 --raw "${amiInfo}" '
+    "Using AMI:",
+    "  desc: " + .Description,
+    "  name: " + .Name,
+    "  id:   " + .ImageId
+'
 
 # Resolve the security group and subnet IDs, if necessary.
 

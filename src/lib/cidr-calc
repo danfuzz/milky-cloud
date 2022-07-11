@@ -180,19 +180,15 @@ function cidr-v4-address {
     local cidr="$1"
     local netmaskBits="$2"
 
-    local address="$(jval --raw \
-        cidr:json="${cidr}" \
-        '$cidr.address as $address
-        |
+    local address="$(jget --raw "${cidr}" '
         [
-            (($address[0] / 256) | floor | tostring),
-            (($address[0] % 256) | tostring),
-            (($address[1] / 256) | floor | tostring),
-            (($address[1] % 256) | tostring)
+            ((.address[0] / 256) | floor | tostring),
+            ((.address[0] % 256) | tostring),
+            ((.address[1] / 256) | floor | tostring),
+            ((.address[1] % 256) | tostring)
         ]
         | join(".")
-        '
-    )"
+    ')"
 
     echo "${address}"
 }
@@ -201,9 +197,8 @@ function cidr-v4-address {
 function cidr-v6-address {
     local cidr="$1"
 
-    local address="$(jval --raw \
-        cidr:json="${cidr}" \
-        '$cidr.address | map(tostring) | join(" ")'
+    local address="$(
+        jget --raw "${cidr}" '.address | map(tostring) | join(" ")'
     )"
 
     # Go from space-separated string to array of elements.

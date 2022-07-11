@@ -121,9 +121,7 @@ result="$(ec2-json describe-subnets \
 )" \
 || exit "$?"
 
-subnetId="$(jval --raw \
-    "${result}" '
-    |
+subnetId="$(jget --raw "${result}" '
     if length == 0 then "none"
     elif length == 1 then .[0]
     else "ambiguous"
