@@ -24,6 +24,103 @@ init-prog
 
 
 #
+# Helper functions
+#
+
+# Creates a VPC, and waits for its state to settle. Prints out the VPC info upon
+# success.
+function make-vpc-per-se {
+    local error=0
+    local vpcId=''
+    local vpcInfo
+    local waitSec
+    local maxTime
+
+    while (( !error )); do
+        if [[ ${vpcId} == '' ]]; then
+            # Create the actual VPC.
+            vpcInfo="$(ec2-json create-vpc \
+                --in="${inRegion}" \
+                tagSpec:json="$(lib name-tag-spec vpc "${name}")" \
+                '
+                    $tagSpec +
+                    {
+                        CidrBlock: "10.1.0.0/16",
+                        AmazonProvidedIpv6CidrBlock: true,
+                        InstanceTenancy: "default"
+                    }
+                ' \
+                :: '.Vpc'
+            )" \
+            || return "$?"
+
+            vpcId="$(jval --raw vpcInfo:json="${vpcInfo}" '$vpcInfo.VpcId')"
+            echo 1>&2 "Made VPC: ${vpcId}"
+        else
+            # Re-fetch the VPC info.
+            vpcInfo="$(ec2-json describe-vpcs \
+                --in="${inRegion}" \
+                vpcId="${vpcId}" \
+                '{ VpcIds: [$vpcId] }' \
+                :: '.Vpcs[0]'
+            )" \
+            || error="$?"
+
+            if (( error )); then
+                break
+            fi
+        fi
+
+        # It _might_ be the case that if the whole VPC's state is `available`,
+        # then it's safe to assume that all network addresses are `associated`.
+        # However, that doesn't seem to be explicitly stated in the AWS docs, so
+        # we test explicitly for the network associations.
+        local ready="$(jval --raw vpcInfo:json="${vpcInfo}" '
+            $vpcInfo
+            | .CidrBlockAssociationSet[0].CidrBlockState as $cidr4
+            | .Ipv6CidrBlockAssociationSet[0].Ipv6CidrBlockState as $cidr6
+            |
+                (.State == "available")
+            and ($cidr4 == null or $cidr4.State == "associated")
+            and ($cidr6 == null or $cidr6.State == "associated")
+            |
+            if . == true then 1 else 0 end
+        ')"
+
+        if (( ready )); then
+            break
+        fi
+
+        if [[ ${maxTime} == '' ]]; then
+            # Retry for no more than 60 seconds total.
+            maxTime=$(($(date '+%s') + 60))
+        elif (( $(date '+%s') > maxTime )); then
+            echo 1>&2 'Timed out while waiting for VPC to become ready.'
+            error=1
+            break
+        fi
+
+        if [[ ${waitSec} == '' ]]; then
+            # First sleep is sub-second. In practice, this appears to be enough
+            # to ensure readiness, at least most of the time.
+            sleep 0.1
+            waitSec=1
+        else
+            echo 1>&2 'Not yet ready...'
+            sleep "${waitSec}"
+            (( waitSec = waitSec * 3 / 2 + 1 ))
+        fi
+    done
+
+    if (( error )); then
+        return "${error}"
+    fi
+
+    echo "${vpcInfo}"
+}
+
+
+#
 # Argument parsing
 #
 
@@ -107,23 +204,20 @@ fi
 inRegion="$(lib region-from-location "${inLocation}")" \
 || exit "$?"
 
-# Create the main VPC result.
-vpcId="$(ec2-json create-vpc \
-    --in="${inRegion}" \
-    tagSpec:json="$(lib name-tag-spec vpc "${name}")" \
-    '
-        $tagSpec +
-        {
-            CidrBlock: "10.1.0.0/16",
-            AmazonProvidedIpv6CidrBlock: true,
-            InstanceTenancy: "default"
-        }
-    ' \
-    :: --raw '.Vpc.VpcId'
-)" \
+# Create the actual VPC.
+vpcInfo="$(make-vpc-per-se)" \
 || exit "$?"
 
-echo 1>&2 "Made VPC: ${vpcId}"
+vpcId="$(jval --raw vpcInfo:json="${vpcInfo}" '$vpcInfo.VpcId')"
+cidr4="$(jval --raw vpcInfo:json="${vpcInfo}" '$vpcInfo.CidrBlockAssociationSet[0].CidrBlock')"
+cidr6="$(jval --raw vpcInfo:json="${vpcInfo}" '$vpcInfo.Ipv6CidrBlockAssociationSet[0].Ipv6CidrBlock')"
+
+echo 'IPV4 network:' "${cidr4}"
+echo 'IPV6 network:' "${cidr6}"
+
+echo 1>&2 '################'
+jval 1>&2 "${vpcInfo}"
+echo 1>&2 '################'
 
 # After this point, in case of error, we try to clean things up by removing the
 # VPC and all its interconnected dependencies.
