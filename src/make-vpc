@@ -54,7 +54,7 @@ function make-vpc-per-se {
             )" \
             || return "$?"
 
-            vpcId="$(jval --raw vpcInfo:json="${vpcInfo}" '$vpcInfo.VpcId')"
+            vpcId="$(jget --raw "${vpcInfo}" '.VpcId')"
             echo 1>&2 "Made VPC: ${vpcId}"
         else
             # Re-fetch the VPC info.
@@ -75,9 +75,8 @@ function make-vpc-per-se {
         # then it's safe to assume that all network addresses are `associated`.
         # However, that doesn't seem to be explicitly stated in the AWS docs, so
         # we test explicitly for the network associations.
-        local ready="$(jval --raw vpcInfo:json="${vpcInfo}" '
-            $vpcInfo
-            | .CidrBlockAssociationSet[0].CidrBlockState as $cidr4
+        local ready="$(jget --raw "${vpcInfo}" '
+              .CidrBlockAssociationSet[0].CidrBlockState as $cidr4
             | .Ipv6CidrBlockAssociationSet[0].Ipv6CidrBlockState as $cidr6
             |
                 (.State == "available")
