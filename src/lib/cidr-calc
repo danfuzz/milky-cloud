@@ -155,8 +155,8 @@ function cidr-address-words-v6 {
 function cidr-from-json {
     local cidr="$1"
 
-    local type="$(jval --raw cidr:json="${cidr}" '$cidr.type')"
-    local netmaskBits="$(jval cidr:json="${cidr}" '$cidr.netmaskBits')"
+    local type="$(jget --raw "${cidr}" '.type')"
+    local netmaskBits="$(jget "${cidr}" '.netmaskBits')"
     local address
 
     case "${type}" in
@@ -446,7 +446,7 @@ function command_add-to-network {
     || return "$?"
 
     local address=($(command_address-words "${cidr}"))
-    local netmaskBits="$(jval cidr:json="${cidr}" '$cidr.netmaskBits')"
+    local netmaskBits="$(jget "${cidr}" '.netmaskBits')"
 
     # Add the amount at the bottom of the network, that is, at the word which
     # has the last bit of the network and shifted appropriately so that lower
@@ -523,7 +523,7 @@ function command_address-words {
     cidr="$(json-from-any "${cidr}")" \
     || return "$?"
 
-    jval --raw cidr:json="${cidr}" '$cidr.address | map(tostring) | join(" ")'
+    jget --raw "${cidr}" '.address | map(tostring) | join(" ")'
 }
 
 # Command: Print a list of subnets.
@@ -552,7 +552,7 @@ function command_make-subnets {
     count="$(parse-number "${count}" 1 65535)" \
     || return "$?"
 
-    local origBits="$(jval cidr:json="${cidr}" '$cidr.netmaskBits')"
+    local origBits="$(jget "${cidr}" '.netmaskBits')"
     local bitsNeeded="$(bits-needed "${count}")"
     local newBits
 
@@ -605,7 +605,7 @@ function command_netmask-length {
     cidr="$(json-from-any "${cidr}")" \
     || return "$?"
 
-    jval cidr:json="${cidr}" '$cidr.netmaskBits'
+    jget "${cidr}" '.netmaskBits'
 }
 
 # Command: Print a CIDR.
@@ -655,7 +655,7 @@ function command_widen-to {
     || return "$?"
 
     totalBits="$(command_address-length "${cidr}")"
-    netmaskBits="$(jval cidr:json="${cidr}" '$cidr.netmaskBits')"
+    netmaskBits="$(jget "${cidr}" '.netmaskBits')"
 
     if (( bits < netmaskBits )); then
         echo 1>&2 "Cannot shrink netmask!: ${netmaskBits} to ${bits}"
@@ -812,10 +812,10 @@ if [[ ${resultType} != 'text' ]]; then
     # output style matters.
     case "${outputStyle}" in
         compact-json)
-            jval --compact result:json="${result}" '$result'
+            jget --compact "${result}" '.'
             ;;
         json)
-            jval result:json="${result}" '$result'
+            jget "${result}" '.'
             ;;
         string)
             if [[ ${resultType} == 'object' ]]; then
@@ -823,7 +823,7 @@ if [[ ${resultType} != 'text' ]]; then
             else
                 # It's an array. Compactly print each element on a line by
                 # itself, then split by lines to convert each object.
-                jval --compact result:json="${result}" '$result[]' \
+                jget --compact "${result}" '.[]' \
                 | while read -r line; do
                     cidr-from-json "${line}"
                 done
