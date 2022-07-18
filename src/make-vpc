@@ -232,34 +232,6 @@ if (( !error )); then
     || error=1
 fi
 
-# Create an internet gateway.
-gatewayId=''
-if (( !error )); then
-    gatewayId="$(ec2-json create-internet-gateway \
-        --in="${inRegion}" \
-        "$(lib name-tag-spec internet-gateway "${name}")" \
-        :: --raw '.InternetGateway.InternetGatewayId'
-    )" \
-    && echo "Made internet gateway: ${gatewayId}" \
-    || error=1
-fi
-
-# Attach the internet gateway to the VPC.
-gatewayAttached=0
-if (( !error )); then
-    ec2-json attach-internet-gateway \
-        --in="${inRegion}" \
-        gatewayId="${gatewayId}" \
-        vpcId="${vpcId}" \
-        '{
-            InternetGatewayId: $gatewayId,
-            VpcId: $vpcId
-        }' \
-    && echo "Attached internet gateway: ${gatewayId}" \
-    && gatewayAttached=1 \
-    || error=1
-fi
-
 # Create a subnet per availability zone.
 if (( !error )); then
     lib add-subnets \
@@ -268,11 +240,14 @@ if (( !error )); then
     || error=1
 fi
 
-# Create a route table.
-
-# TODO: Needs to associate the VPC's CIDR ranges (Ipv4 and Ipv6)
-# with "local" routing, and everything else with the internet gateway.
-# Attach the route table via `associate-route-table`.
+# Create and attach an internet gateway.
+gatewayAdded=0
+gatewayId="$(
+    lib add-internet-gateway \
+        --in="${inRegion}" --vpc="${vpcId}" --name="standard-for-${name}" \
+)" \
+&& gatewayAdded=1 \
+|| error=1
 
 # TODO: Finish this!
 error=1
@@ -282,24 +257,10 @@ error=1
 if (( error )); then
     echo 1>&2 'Error(s) after VPC creation. Attempting cleanup!'
 
-    if (( gatewayAttached )); then
-        echo 1>&2 'Detaching internet gateway...'
-        ec2-json detach-internet-gateway \
-            --in="${inRegion}" \
-            gatewayId="${gatewayId}" \
-            vpcId="${vpcId}" \
-            '{
-                InternetGatewayId: $gatewayId,
-                VpcId: $vpcId
-            }'
-    fi
-
-    if [[ ${gatewayId} != '' ]]; then
+    if (( gatewayAdded )); then
         echo 1>&2 'Deleting internet gateway...'
-        ec2-json delete-internet-gateway \
-            --in="${inRegion}" \
-            gatewayId="${gatewayId}" \
-            '{ InternetGatewayId: $gatewayId }'
+        lib delete-internet-gateway \
+            --in="${inRegion}" --gateway-id="${gatewayId}"
     fi
 
     if [[ ${groupId} != '' ]]; then
