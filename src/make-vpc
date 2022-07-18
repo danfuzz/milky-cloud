@@ -227,15 +227,23 @@ error=0
 # one depends on the other, and AWS will reject an invalid intermediate state.
 if (( !error )); then
     ec2-json modify-vpc-attribute \
-        --in="${inRegion}" --vpc-id="${vpcId}" \
-        '{ EnableDnsSupport: { Value: true }}' \
+        --in="${inRegion}" \
+        vpc-id="${vpcId}" \
+        '{
+            VpcId: $vpcId,
+            EnableDnsSupport: { Value: true }
+        }' \
     || error=1
 fi
 
 if (( !error )); then
     ec2-json modify-vpc-attribute \
-        --in="${inRegion}" --vpc-id="${vpcId}" \
-        '{ EnableDnsHostnames: { Value: true }}' \
+        --in="${inRegion}" \
+        vpc-id="${vpcId}" \
+        '{
+            VpcId: $vpcId,
+            EnableDnsHostnames: { Value: true }
+        }' \
     || error=1
 fi
 
