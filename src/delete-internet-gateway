@@ -115,40 +115,101 @@ gatewayInfo="$(ec2-json describe-internet-gateways \
     --in="${inRegion}" \
     gatewayId="${gatewayId}" \
     '{
-        IntenetGatewayIds: [$gatewayId]
+        InternetGatewayIds: [$gatewayId]
     }' \
     :: '.InternetGateways[0]'
 )" \
 || exit "$?"
 
-vpcId="$(jget "${gatewayInfo}" '.Attachments[0].VpcId')"
+# Find the attached VPC ID if any. And if there is a VPC, figure out what needs
+# to be done to detach it.
+vpcId="$(jget --raw "${gatewayInfo}" '.Attachments[0].VpcId')"
+rtId=
+attached=0
+hasIpv4Route=0
+hasIpv6Route=0
+if [[ ${vpcId} != 'null' ]]; then
+    attached=1
 
-# Find the default route table for the VPC.
-rtInfo="$(ec2-json describe-route-tables \
+    # Find the default route table for the VPC.
+    rtInfo="$(ec2-json describe-route-tables \
+        --in="${inRegion}" \
+        filters:json="$(lib filter-spec vpc-id="${vpcId}" association.main=true)" \
+        '$filters' \
+        :: --raw '.RouteTables[0]'
+    )" \
+    || exit "$?"
+
+    rtId="$(jget --raw "${rtInfo}" '.RouteTableId')"
+
+    hasIpv4Route="$(jget "${rtInfo}" '
+          .Routes
+        | map(select(.DestinationCidrBlock == "0.0.0.0/0"))
+        | if . == [] then 0 else 1 end
+    ')"
+
+    hasIpv6Route="$(jget "${rtInfo}" '
+          .Routes
+        | map(select(.DestinationIpv6CidrBlock == "::/0"))
+        | if . == [] then 0 else 1 end
+    ')"
+
+    echo 1>&2 "############# ${rtId}"
+    echo 1>&2 "############# v4 ${hasIpv4Route}"
+    echo 1>&2 "############# v6 ${hasIpv6Route}"
+fi
+
+# At this point, attempt all the needed detachment / deletion bits, and just
+# keep track of whether to report an error at the end.
+
+error=0
+
+if (( hasIpv4Route )); then
+    echo 1>&2 'Deleting IPv4 route...'
+    ec2-json delete-route \
+        --in="${inRegion}" \
+        rtId="${rtId}" \
+        '{
+            RouteTableId: $rtId,
+            DestinationCidrBlock: "0.0.0.0/0"
+        }' \
+    || error=1
+fi
+
+if (( hasIpv6Route )); then
+    echo 1>&2 'Deleting IPv6 route...'
+    ec2-json delete-route \
+        --in="${inRegion}" \
+        rtId="${rtId}" \
+        '{
+            RouteTableId: $rtId,
+            DestinationIpv6CidrBlock: "::/0"
+        }' \
+    || error=1
+fi
+
+if (( attached )); then
+    echo 1>&2 'Detaching gateway...'
+    ec2-json detach-internet-gateway \
+        --in="${inRegion}" \
+        gatewayId="${gatewayId}" \
+        vpcId="${vpcId}" \
+        '{
+            InternetGatewayId: $gatewayId,
+            VpcId: $vpcId
+        }' \
+    || error=1
+fi
+
+echo 1>&2 'Deleting gateway...'
+ec2-json delete-internet-gateway \
     --in="${inRegion}" \
-    filters:json="$(lib filter-spec vpc-id="${vpcId}" association.main=true)" \
-    '$filters' \
-    :: --raw '.RouteTables[0]'
-)" \
+    gatewayId="${gatewayId}" \
+    '{ InternetGatewayId: $gatewayId }' \
 || error=1
 
-rtId="$(jget "${rtInfo}" '.RouteTableId')"
+if (( error )); then
+    echo 1>&2 'Trouble with gateway deletion. May not be fully deleted. Alas!'
+fi
 
-hasIpv4Route="$(jget "${rtInfo}" '
-      .Routes
-    | map(select(.DestinationCidrBlock == "0.0.0.0/0"))
-    | if . == [] then 0 else 1 end
-')"
-
-hasIpv6Route="$(jget "${rtInfo}" '
-      .Routes
-    | map(select(.DestinationIpv6CidrBlock == "::/0"))
-    | if . == [] then 0 else 1 end
-')"
-
-echo 1>&2 "############# ${rtId}"
-echo 1>&2 "############# v4 ${hasIpv4Route}"
-echo 1>&2 "############# v6 ${hasIpv6Route}"
-
-# TODO
-exit 1
+exit "${error}"
