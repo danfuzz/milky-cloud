@@ -211,8 +211,8 @@ vpcId="$(jget --raw "${vpcInfo}" '.VpcId')"
 cidr4="$(jget --raw "${vpcInfo}" '.CidrBlockAssociationSet[0].CidrBlock')"
 cidr6="$(jget --raw "${vpcInfo}" '.Ipv6CidrBlockAssociationSet[0].Ipv6CidrBlock')"
 
-echo 1>&2 'IPV4 network:' "${cidr4}"
-echo 1>&2 'IPV6 network:' "${cidr6}"
+echo 1>&2 'IPv4 network:' "${cidr4}"
+echo 1>&2 'IPv6 network:' "${cidr6}"
 
 # After this point, in case of error, we try to clean things up by removing the
 # VPC and all its interconnected dependencies.
@@ -226,6 +226,7 @@ if (( !error )); then
     lib make-security-group \
         --in="${inRegion}" --name="standard-for-${name}" --vpc="${vpcId}" \
     )" \
+    && echo 1>&2 'Made security group.' \
     || error=1
 fi
 
@@ -234,7 +235,7 @@ if (( !error )); then
     lib add-subnets \
         --progress --quiet --in="${inRegion}" --vpc="${vpcId}" \
         --name="standard-for-${name}" \
-    && echo 1>&2 'Made subnets.'
+    && echo 1>&2 'Made subnets.' \
     || error=1
 fi
 
@@ -245,7 +246,7 @@ gatewayId="$(
         --in="${inRegion}" --vpc="${vpcId}" --name="standard-for-${name}" \
 )" \
 && gatewayAdded=1 \
-&& echo 1>&2 'Made internet gateway.'
+&& echo 1>&2 'Made internet gateway.' \
 || error=1
 
 # TODO: Finish this!
