@@ -200,6 +200,9 @@ fi
 # Main script
 #
 
+# Name to use for all the sub-resources.
+resourceName="standard-for-${name}"
+
 inRegion="$(lib region-from-location "${inLocation}")" \
 || exit "$?"
 
@@ -224,7 +227,7 @@ groupId=''
 if (( !error )); then
     groupId="$(
     lib make-security-group \
-        --in="${inRegion}" --name="standard-for-${name}" --vpc="${vpcId}" \
+        --in="${inRegion}" --name="${resourceName}" --vpc="${vpcId}" \
     )" \
     && echo 1>&2 'Made security group.' \
     || error=1
@@ -234,7 +237,7 @@ fi
 if (( !error )); then
     lib add-subnets \
         --progress --quiet --in="${inRegion}" --vpc="${vpcId}" \
-        --name="standard-for-${name}" \
+        --name="${resourceName}" \
     && echo 1>&2 'Made subnets.' \
     || error=1
 fi
@@ -243,7 +246,7 @@ fi
 gatewayAdded=0
 gatewayId="$(
     lib add-internet-gateway \
-        --in="${inRegion}" --vpc="${vpcId}" --name="standard-for-${name}" \
+        --in="${inRegion}" --vpc="${vpcId}" --name="${resourceName}" \
 )" \
 && gatewayAdded=1 \
 && echo 1>&2 'Made internet gateway.' \
