@@ -147,13 +147,11 @@ inRegion="$(lib region-from-location "${inLocation}")" \
 vpcInfo="$(lib find-vpc --print-all --in="${inRegion}" "${vpcNameOrId}")" \
 || exit "$?"
 
-echo 1>&2 '########### HMMMMMMM'
 vpcId="$(jget --raw "${vpcInfo}" '.VpcId')"
 usesIpv4="$(jget "${vpcInfo}" \
     'if .CidrBlockAssociationSet == null then 0 else 1 end')"
 usesIpv6="$(jget "${vpcInfo}" \
     'if .Ipv6CidrBlockAssociationSet == null then 0 else 1 end')"
-echo 1>&2 "############## ${vpcId} ${usesIpv4} ${usesIpv6}"
 
 # Figure out the name to use if not passed as an option.
 if [[ ${name} == '' ]]; then

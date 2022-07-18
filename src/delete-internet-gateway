@@ -153,10 +153,6 @@ if [[ ${vpcId} != 'null' ]]; then
         | map(select(.DestinationIpv6CidrBlock == "::/0"))
         | if . == [] then 0 else 1 end
     ')"
-
-    echo 1>&2 "############# ${rtId}"
-    echo 1>&2 "############# v4 ${hasIpv4Route}"
-    echo 1>&2 "############# v6 ${hasIpv6Route}"
 fi
 
 # At this point, attempt all the needed detachment / deletion bits, and just
