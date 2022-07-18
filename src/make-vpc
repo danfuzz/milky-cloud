@@ -260,7 +260,7 @@ if (( error )); then
     if (( gatewayAdded )); then
         echo 1>&2 'Deleting internet gateway...'
         lib delete-internet-gateway \
-            --in="${inRegion}" --gateway-id="${gatewayId}"
+            --in="${inRegion}" --gateway="${gatewayId}"
     fi
 
     if [[ ${groupId} != '' ]]; then
