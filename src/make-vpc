@@ -228,7 +228,7 @@ error=0
 if (( !error )); then
     ec2-json modify-vpc-attribute \
         --in="${inRegion}" \
-        vpc-id="${vpcId}" \
+        vpcId="${vpcId}" \
         '{
             VpcId: $vpcId,
             EnableDnsSupport: { Value: true }
@@ -239,7 +239,7 @@ fi
 if (( !error )); then
     ec2-json modify-vpc-attribute \
         --in="${inRegion}" \
-        vpc-id="${vpcId}" \
+        vpcId="${vpcId}" \
         '{
             VpcId: $vpcId,
             EnableDnsHostnames: { Value: true }
@@ -269,13 +269,15 @@ fi
 
 # Create and attach an internet gateway.
 gatewayAdded=0
-gatewayId="$(
-    lib add-internet-gateway \
-        --in="${inRegion}" --vpc="${vpcId}" --name="${resourceName}" \
-)" \
-&& gatewayAdded=1 \
-&& echo 1>&2 'Made internet gateway.' \
-|| error=1
+if (( !error )); then
+    gatewayId="$(
+        lib add-internet-gateway \
+            --in="${inRegion}" --vpc="${vpcId}" --name="${resourceName}" \
+    )" \
+    && gatewayAdded=1 \
+    && echo 1>&2 'Made internet gateway.' \
+    || error=1
+fi
 
 # Do cleanup if necessary.
 
