@@ -1,0 +1,154 @@
+#!/bin/bash
+#
+# Copyright 2022 Dan Bornstein.
+# Licensed AS IS and WITHOUT WARRANTY under the Apache License,
+# Version 2.0. Details: <http://www.apache.org/licenses/LICENSE-2.0>
+
+# Set `progName` to the program name, `progDir` to its directory, and `baseDir`
+# to `progDir`'s directory. Follows symlinks.
+function init-prog {
+    local newp p="$0"
+
+    while newp="$(readlink "$p")"; do
+        [[ ${newp} =~ ^/ ]] && p="${newp}" || p="$(dirname "$p")/${newp}"
+    done
+
+    progName="${p##*/}"
+    progDir="$(cd "$(dirname "$p")"; /bin/pwd -P)"
+    baseDir="$(cd "${progDir}/.."; /bin/pwd -P)"
+}
+init-prog
+
+# Load the helper library.
+. "${progDir}/lib/init"
+
+
+#
+# Argument parsing
+#
+
+# Error during argument processing?
+argError=0
+
+# Need help?
+showHelp=0
+
+# Location (region or availability zone).
+inLocation=''
+
+# ID of the gateway.
+gatewayId=''
+
+while (( $# > 0 )); do
+    case "$1" in
+        --in=?*)
+            inLocation="${1#*=}"
+            ;;
+        --name=?*)
+            name="${1#*=}"
+            ;;
+        --gateway=?*)
+            gatewayId="${1#*=}"
+            ;;
+        -h|--help)
+            showHelp=1
+            break
+            ;;
+        --)
+            # Explicit end of options
+            shift
+            break
+            ;;
+        -?*)
+            echo 1>&2 "Unknown option: $1"
+            argError=1
+            break
+            ;;
+        *)
+            # Non-option argument
+            break
+            ;;
+    esac
+
+    shift
+done
+
+if (( !argError )); then
+    if [[ ${inLocation} == '' ]]; then
+        echo 1>&2 'Missing option: --in'
+        argError=1
+    fi
+    if [[ ${gatewayId} == '' ]]; then
+        echo 1>&2 'Missing option: --gateway'
+        argError=1
+    fi
+fi
+
+if (( showHelp || argError )); then
+    echo 'Usage:'
+    echo ''
+    echo "${progName} [<opt> ...]"
+    echo '  Detaches and removes an internet gateway, including removing routing'
+    echo '  rules from the default routing table of the formerly-associated VPC.'
+    echo ''
+    echo '  --in=<region-or-zone>'
+    echo '    What region to operate in. Must be specified. If specified as an'
+    echo '    availability zone, only the region portion matters.'
+    echo '  --gateway=<id>'
+    echo '    ID of the gateway to remove. Must be specified.'
+    echo ''
+    echo "${progName} [--help | -h]"
+    echo '  Displays this message.'
+    exit "${argError}"
+fi
+
+
+#
+# Main script
+#
+
+inRegion="$(lib region-from-location "${inLocation}")" \
+|| exit "$?"
+
+# Get info on the gateway (which also validates the ID).
+gatewayInfo="$(ec2-json describe-internet-gateways \
+    --in="${inRegion}" \
+    gatewayId="${gatewayId}" \
+    '{
+        IntenetGatewayIds: [$gatewayId]
+    }' \
+    :: '.InternetGateways[0]'
+)" \
+|| exit "$?"
+
+vpcId="$(jget "${gatewayInfo}" '.Attachments[0].VpcId')"
+
+# Find the default route table for the VPC.
+rtInfo="$(ec2-json describe-route-tables \
+    --in="${inRegion}" \
+    filters:json="$(lib filter-spec vpc-id="${vpcId}" association.main=true)" \
+    '$filters' \
+    :: --raw '.RouteTables[0]'
+)" \
+|| error=1
+
+rtId="$(jget "${rtInfo}" '.RouteTableId')"
+
+hasIpv4Route="$(jget "${rtInfo}" '
+      .Routes
+    | map(select(.DestinationCidrBlock == "0.0.0.0/0"))
+    | if . == [] then 0 else 1 end
+')"
+
+hasIpv6Route="$(jget "${rtInfo}" '
+      .Routes
+    | map(select(.DestinationIpv6CidrBlock == "::/0"))
+    | if . == [] then 0 else 1 end
+')"
+
+echo 1>&2 "############# ${rtId}"
+echo 1>&2 "############# v4 ${hasIpv4Route}"
+echo 1>&2 "############# v6 ${hasIpv6Route}"
+
+# TODO
+exit 1

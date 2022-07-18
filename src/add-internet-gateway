@@ -1,0 +1,285 @@
+#!/bin/bash
+#
+# Copyright 2022 Dan Bornstein.
+# Licensed AS IS and WITHOUT WARRANTY under the Apache License,
+# Version 2.0. Details: <http://www.apache.org/licenses/LICENSE-2.0>
+
+# Set `progName` to the program name, `progDir` to its directory, and `baseDir`
+# to `progDir`'s directory. Follows symlinks.
+function init-prog {
+    local newp p="$0"
+
+    while newp="$(readlink "$p")"; do
+        [[ ${newp} =~ ^/ ]] && p="${newp}" || p="$(dirname "$p")/${newp}"
+    done
+
+    progName="${p##*/}"
+    progDir="$(cd "$(dirname "$p")"; /bin/pwd -P)"
+    baseDir="$(cd "${progDir}/.."; /bin/pwd -P)"
+}
+init-prog
+
+# Load the helper library.
+. "${progDir}/lib/init"
+
+
+#
+# Helper functions
+#
+
+# Figures out a name for the result: If the VPC has a name, use that as a basis.
+# Or, if the VPC doesn't have a name, then just use the VPC ID as the basis.
+function figure-out-name {
+    local filterSpec=
+
+    local name
+    name=$(ec2-json describe-vpcs \
+        --in="${inRegion}" \
+        "$(lib filter-spec vpc-id="${vpcId}")" \
+        :: --raw \
+        '.Vpcs[0].Tags[] | select(.Key == "Name") | .Value'
+    ) \
+    || return "$?"
+
+    if [[ ${name} == '' ]]; then
+        name="for-${vpcId}"
+    fi
+
+    echo "$(lib now-stamp)-${name}"
+}
+
+
+#
+# Argument parsing
+#
+
+# Error during argument processing?
+argError=0
+
+# Need help?
+showHelp=0
+
+# Location (region or availability zone).
+inLocation=''
+
+# Name of the resulting gateway.
+name=''
+
+# Name or ID of the VPC.
+vpcNameOrId=''
+
+while (( $# > 0 )); do
+    case "$1" in
+        --in=?*)
+            inLocation="${1#*=}"
+            ;;
+        --name=?*)
+            name="${1#*=}"
+            ;;
+        --vpc=?*)
+            vpcNameOrId="${1#*=}"
+            ;;
+        -h|--help)
+            showHelp=1
+            break
+            ;;
+        --)
+            # Explicit end of options
+            shift
+            break
+            ;;
+        -?*)
+            echo 1>&2 "Unknown option: $1"
+            argError=1
+            break
+            ;;
+        *)
+            # Non-option argument
+            break
+            ;;
+    esac
+
+    shift
+done
+
+if (( !argError )); then
+    if [[ ${inLocation} == '' ]]; then
+        echo 1>&2 'Missing option: --in'
+        argError=1
+    fi
+    if [[ ${vpcNameOrId} == '' ]]; then
+        echo 1>&2 'Missing option: --vpc'
+        argError=1
+    fi
+fi
+
+if (( showHelp || argError )); then
+    echo 'Usage:'
+    echo ''
+    echo "${progName} [<opt> ...]"
+    echo '  Creates an internet gateway and attaches it to a VPC, including adding'
+    echo '  all necessary routing rules to the default route table for the VPC. On'
+    echo '  success, prints the ID of the created gateway.'
+    echo ''
+    echo '  --in=<region-or-zone>'
+    echo '    What region to make the gateway in. Must be specified. If specified'
+    echo '    as an availability zone, only the region portion matters.'
+    echo '  --name=<name>'
+    echo '    Name to assign to the constructed gateway. If not specified, a'
+    echo '    name is derived from the associated VPC.'
+    echo '  --vpc=<name-or-id>'
+    echo '    Name or ID of the VPC to be associated with. Must be specified.'
+    echo ''
+    echo "${progName} [--help | -h]"
+    echo '  Displays this message.'
+    exit "${argError}"
+fi
+
+
+#
+# Main script
+#
+
+inRegion="$(lib region-from-location "${inLocation}")" \
+|| exit "$?"
+
+# Validate the VPC name/id and get its info, extracting a couple useful bits.
+vpcInfo="$(lib find-vpc --in="${inRegion}" "${vpcNameOrId}")" \
+|| exit "$?"
+
+vpcId="$(jget "${vpcInfo}" '.VpcId')"
+usesIpv4="$(jget "${vpcInfo}" \
+    'if .CidrBlockAssociationSet == null then 0 else 1 end')"
+usesIpv6="$(jget "${vpcInfo}" \
+    'if .Ipv6CidrBlockAssociationSet == null then 0 else 1 end')"
+echo 1>&2 "############## ${vpcId} ${usesIpv4} ${usesIpv6}"
+
+# Figure out the name to use if not passed as an option.
+if [[ ${name} == '' ]]; then
+    name="$(figure-out-name)" \
+    || exit "$?"
+fi
+
+# Make the actual gateway.
+gatewayId="$(ec2-json create-internet-gateway \
+    --in="${inRegion}" \
+    "$(lib name-tag-spec internet-gateway "${name}")" \
+    :: --raw '.InternetGateway.InternetGatewayId'
+)" \
+|| exit "$?"
+
+echo 1>&2 "Made internet gateway: ${gatewayId}"
+
+# Note: Past this point, if there are errors, we attempt to clean up the mess by
+# deleting anything that got successfully added.
+
+error=0
+
+# Find the default route table.
+rtId="$(ec2-json describe-route-tables \
+    --in="${inRegion}" \
+    filters:json="$(lib filter-spec vpc-id="${vpcId}" association.main=true)" \
+    '$filters' \
+    :: --raw '.RouteTables[0].RouteTableId'
+)" \
+&& echo 1>&2 "Default VPC route table: ${rtId}"
+|| error=1
+
+# Attach the internet gateway to the VPC.
+attached=0
+if (( !error )); then
+    ec2-json attach-internet-gateway \
+        --in="${inRegion}" \
+        gatewayId="${gatewayId}" \
+        vpcId="${vpcId}" \
+        '{
+            InternetGatewayId: $gatewayId,
+            VpcId: $vpcId
+        }' \
+    && echo 1>&2 "Attached gateway: ${gatewayId}" \
+    && attached=1 \
+    || error=1
+fi
+
+# TODO: Add all the appropriate routes.
+v4RouteAdded=0
+if (( !error && usesIpv4 )); then
+    ec2-json create-route \
+        --in="${inRegion}" \
+        rtId="${rtId}" \
+        '{
+            RouteTableId: $rtId,
+            DestinationCidrBlock: "0.0.0.0/0"
+        }' \
+        :: --none \
+    && v4RouteAdded=1 \
+    && echo 1>&2 'Added IPv4 route.' \
+    || error=1
+fi
+
+v6RouteAdded=0
+if (( !error && usesIpv6 )); then
+    ec2-json create-route \
+        --in="${inRegion}" \
+        rtId="${rtId}" \
+        '{
+            RouteTableId: $rtId,
+            DestinationIpv6CidrBlock: "::/0"
+        }' \
+        :: --none \
+    && v6RouteAdded=1 \
+    && echo 1>&2 'Added IPv6 route.' \
+    || error=1
+fi
+
+# Do cleanup if necessary.
+
+error=1
+
+if (( error )); then
+    echo 1>&2 'Error(s) after gateway creation. Attempting cleanup!'
+
+    if (( v4RouteAdded )); then
+        echo 1>&2 'Deleting IPv4 route...'
+        ec2-json delete-route \
+            --in="${inRegion}" \
+            rtId="${rtId}" \
+            '{
+                RouteTableId: $rtId,
+                DestinationCidrBlock: "0.0.0.0/0"
+            }'
+    fi
+
+    if (( v6RouteAdded )); then
+        echo 1>&2 'Deleting IPv6 route...'
+        ec2-json delete-route \
+            --in="${inRegion}" \
+            rtId="${rtId}" \
+            '{
+                RouteTableId: $rtId,
+                DestinationIpv6CidrBlock: "::/0"
+            }'
+    fi
+
+    if (( attached )); then
+        echo 1>&2 'Detaching gateway...'
+        ec2-json detach-internet-gateway \
+            --in="${inRegion}" \
+            gatewayId="${gatewayId}" \
+            vpcId="${vpcId}" \
+            '{
+                InternetGatewayId: $gatewayId,
+                VpcId: $vpcId
+            }'
+    fi
+
+    echo 1>&2 'Deleting gateway...'
+    ec2-json delete-internet-gateway \
+        --in="${inRegion}" \
+        gatewayId="${gatewayId}" \
+        '{ InternetGatewayId: $gatewayId }'
+
+    exit "${error}"
+fi
+
+echo "${gatewayId}"
