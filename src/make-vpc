@@ -222,6 +222,23 @@ echo 1>&2 'IPv6 network:' "${cidr6}"
 
 error=0
 
+# Set the attributes on the VPC to let instances have public DNS hostnames.
+# Note: The two attributes have to be turned on in this specific order, because
+# one depends on the other, and AWS will reject an invalid intermediate state.
+if (( !error )); then
+    ec2-json modify-vpc-attribute \
+        --in="${inRegion}" --vpc-id="${vpcId}" \
+        '{ EnableDnsSupport: { Value: true }}' \
+    || error=1
+fi
+
+if (( !error )); then
+    ec2-json modify-vpc-attribute \
+        --in="${inRegion}" --vpc-id="${vpcId}" \
+        '{ EnableDnsHostnames: { Value: true }}' \
+    || error=1
+fi
+
 # Create a security group.
 groupId=''
 if (( !error )); then
