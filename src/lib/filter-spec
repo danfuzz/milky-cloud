@@ -77,7 +77,7 @@ while (( $# > 0 && !argError )); do
         break
     fi
 
-    [[ ${arg} =~ ^([-_:a-zA-Z0-9]+)=(.*)$ ]] \
+    [[ ${arg} =~ ^([-_:.a-zA-Z0-9]+)=(.*)$ ]] \
     || break
 
     filterNames+=("${BASH_REMATCH[1]}")
