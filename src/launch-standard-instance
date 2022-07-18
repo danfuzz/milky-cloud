@@ -106,6 +106,9 @@ if (( showHelp || argError )); then
     echo '    Name (label) for the resulting instance.'
     echo '  --security-group=<name-or-id>'
     echo '    Name or ID of the security group to use for network access control.'
+    echo '    If specified, this is used to derive the VPC to use, and in conjunction'
+    echo '    with the specified availability zone, the specific subnet within the'
+    echo '    VPC.'
     echo ''
     echo "${progName} [--help | -h]"
     echo '  Display this message.'
@@ -169,8 +172,9 @@ echo 1>&2 'Launch command:'
 # However, it's easier just to include it because this script is also meant to
 # work when a security group and subnet aren't specified.
 #
-# Note: Public IP and DNS are de facto (usually?) not set in the output from
-# `ec2 run-instances`.
+# Note: Public IP and DNS are de facto (or at least usually) not set in the
+# output from `ec2 run-instances`, that is, they aren't known at the moment of
+# launch.
 ec2-json run-instances \
     --in="${inRegion}" \
     --print-command-to=/dev/stderr \
