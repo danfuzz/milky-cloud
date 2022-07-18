@@ -209,8 +209,9 @@ fi
 tagSpec="$(lib name-tag-spec 'subnet' "${name}")"
 
 results=()
+error=0
 
-for (( n = 0; n < azCount; n++ )); do
+for (( n = 0; n < azCount && !error; n++ )); do
     az="${azList[${n}]}"
     v4Subnet="${v4Subnets[${n}]}"
     v6Subnet="${v6Subnets[${n}]}"
@@ -241,14 +242,46 @@ for (( n = 0; n < azCount; n++ )); do
         ' \
         :: --raw '.Subnet.SubnetId' \
     )" \
-    || exit "$?"
+    || error=1
+
+    if (( error )); then
+        break
+    fi
 
     if (( progress )); then
         echo 1>&2 "Made subnet: ${result}"
     fi
 
     results+=("${result}")
+
+    # Set the public IP address attribute on the subnet, which means that
+    # instances launched in this subnet will be publicly accessible (unless that
+    # setting is overridden during launch).
+    ec2-json modify-subnet-attribute \
+        --in="${inRegion}" \
+        subnetId="${result}" \
+        '{
+            SubnetId: $subnetId,
+            MapPublicIpOnLaunch: { Value: true }
+        }' \
+    || error=1
+
+    # Set the DNS name policy to name instances in this subnet after their
+    # instance ID (not DNS address).
+    ec2-json modify-subnet-attribute \
+        --in="${inRegion}" \
+        subnetId="${result}" \
+        '{
+            SubnetId: $subnetId,
+            PrivateDnsHostnameTypeOnLaunch: "resource-name"
+        }' \
+    || error=1
+
+    # TODO: Consider explicitly turning on the attributes for A and AAAA record
+    # responses.
 done
+
+# TODO: In case of error, try to delete the subnets that _were_ added.
 
 if (( !quiet )); then
     jarray --strings "${results[@]}"
