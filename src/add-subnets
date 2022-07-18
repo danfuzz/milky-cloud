@@ -248,10 +248,6 @@ for (( n = 0; n < azCount && !error; n++ )); do
         break
     fi
 
-    if (( progress )); then
-        echo 1>&2 "Made subnet: ${result}"
-    fi
-
     results+=("${result}")
 
     # Set the public IP address attribute on the subnet, which means that
@@ -279,9 +275,17 @@ for (( n = 0; n < azCount && !error; n++ )); do
 
     # TODO: Consider explicitly turning on the attributes for A and AAAA record
     # responses.
+
+    if (( progress )); then
+        echo 1>&2 "Made subnet: ${result}"
+    fi
 done
 
 # TODO: In case of error, try to delete the subnets that _were_ added.
+
+if (( error )); then
+    exit 1
+fi
 
 if (( !quiet )); then
     jarray --strings "${results[@]}"
