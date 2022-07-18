@@ -58,6 +58,9 @@ inLocation=''
 # Name for the subnets.
 name=''
 
+# Progress messages?
+progress=0
+
 # Quiet?
 quiet=0
 
@@ -71,6 +74,9 @@ while (( $# > 0 )); do
             ;;
         --name=?*)
             name="${1#*=}"
+            ;;
+        --progress)
+            progress=1
             ;;
         --quiet)
             quiet=1
@@ -126,8 +132,10 @@ if (( showHelp || argError )); then
     echo '  --name=<name>'
     echo '    Name to use for the created subnets. If not specified, a name is'
     echo '    generated programatically.'
+    echo '  --progress'
+    echo '    Print progress messages to stderr.'
     echo '  --quiet'
-    echo '    Suppress non-error output.'
+    echo '    Suppress non-error output to stdout.'
     echo '  --vpc=<name-or-id>'
     echo '    Name or ID of the VPC.'
     echo ''
@@ -180,9 +188,6 @@ if [[ ${cidr6} == 'many' ]]; then
     echo 1>&2 'Sorry, not set up to deal with multiple CIDRs (IPv6).'
     exit 1
 fi
-
-echo '#### IPV4:' "${cidr4}"
-echo '#### IPV6:' "${cidr6}"
 
 azCount="${#azList[@]}"
 v4Subnets=()
@@ -238,7 +243,10 @@ for (( n = 0; n < azCount; n++ )); do
     )" \
     || exit "$?"
 
-    echo "Made subnet: ${result}"
+    if (( progress )); then
+        echo 1>&2 "Made subnet: ${result}"
+    fi
+
     results+=("${result}")
 done
 
