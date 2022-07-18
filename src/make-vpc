@@ -252,9 +252,6 @@ gatewayId="$(
 && echo 1>&2 'Made internet gateway.' \
 || error=1
 
-# TODO: Finish this!
-error=1
-
 # Do cleanup if necessary.
 
 if (( error )); then
