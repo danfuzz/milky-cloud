@@ -287,4 +287,9 @@ if (( error )); then
     exit "${error}"
 fi
 
+if (( !error )); then
+    echo 1>&2 'Done making VPC and accoutrements!'
+    echo 1>&2 "VPC ${vpcId} is ready for action!"
+fi
+
 echo "${vpcId}"
