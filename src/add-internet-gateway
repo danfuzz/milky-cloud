@@ -240,8 +240,6 @@ fi
 
 # Do cleanup if necessary.
 
-error=1
-
 if (( error )); then
     echo 1>&2 'Error(s) after gateway creation. Attempting cleanup!'
     lib delete-internet-gateway --in="${inRegion}" --gateway="${gatewayId}"
