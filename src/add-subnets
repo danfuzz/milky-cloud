@@ -250,7 +250,7 @@ for (( n = 0; n < azCount && !error; n++ )); do
 
     results+=("${result}")
 
-    # Set the public IP address attribute on the subnet, which means that
+    # Set the public-IP-address attribute on the subnet, which means that
     # instances launched in this subnet will be publicly accessible (unless that
     # setting is overridden during launch).
     ec2-json modify-subnet-attribute \
@@ -274,7 +274,7 @@ for (( n = 0; n < azCount && !error; n++ )); do
     || error=1
 
     # TODO: Consider explicitly turning on the attributes for A and AAAA record
-    # responses.
+    # responses. Also for IPv6-on-creation.
 
     if (( progress )); then
         echo 1>&2 "Made subnet: ${result}"
