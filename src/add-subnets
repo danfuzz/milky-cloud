@@ -281,10 +281,34 @@ for (( n = 0; n < azCount && !error; n++ )); do
     fi
 done
 
-# TODO: In case of error, try to delete the subnets that _were_ added.
-
 if (( error )); then
+    # Attempt to delete any subnets that had been added.
+    if (( progress )); then
+        echo 1>&2 'Problem creating subnets; attempting cleanup...'
+    fi
+
+    for id in "${results[@]}"; do
+        if (( progress )); then
+            echo 1>&2 "Removing subnet: ${id}"
+        fi
+
+        ec2-json delete-subnet \
+            --in="${inRegion}" \
+            id="${id}" \
+            '{
+                SubnetId: $id
+            }'
+    done
+
+    if (( progress )); then
+        echo 1>&2 'Done with post-error subnet cleanup.'
+    fi
+
     exit 1
+fi
+
+if (( progress )); then
+    echo 1>&2 "Made and configured ${#results[@]} subnets."
 fi
 
 if (( !quiet )); then
