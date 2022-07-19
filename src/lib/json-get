@@ -65,13 +65,7 @@ while (( $# > 0 )); do
     shift
 done
 
-# JSON value.
-value="$1"
-
-# JQ expression.
-expr="$2"
-
-if (( $# < 2 )); then
+if (( $# < 1 )); then
     echo 1>&2 'Missing <json-value> and/or <jq-expr> argument.'
     argError=1
 elif (( $# > 2 )); then
@@ -79,13 +73,24 @@ elif (( $# > 2 )); then
     argError=1
 fi
 
+# JSON value.
+value="$1"
+
+# JQ expression.
+expr="$2"
+if (( $# < 2 )); then
+    expr='.'
+fi
+
 if (( showHelp || argError )); then
     echo 'Usage:'
     echo ''
-    echo "${progName} [<opt> ...] [--] <json-value> <jq-expr>"
+    echo "${progName} [<opt> ...] [--] <json-value> [<jq-expr>]"
     echo '  Performs an operation on a single JSON value (at least with typical'
     echo '  usage). More specifically, <json-value> is used as the sole input to'
-    echo '  <jq-expr> which is run as a `jq` program.'
+    echo '  <jq-expr> which is run as a `jq` program. If no expression is given,'
+    echo '  it is taken to be `.`, which will end up formatting the value as'
+    echo '  implied/specified by the output options.'
     echo ''
     echo '  --compact'
     echo '    Output in compact form (not multiline JSON).'
