@@ -197,7 +197,8 @@ if (( showHelp || argError )); then
     echo '  emitted as a JSON value including both split-out components and'
     echo '  the actual commandline.'
     echo '--skeleton'
-    echo '  Print out a JSON "skeleton" of parameters.'
+    echo '  Print out a JSON "skeleton" of parameters. This can be filtered just'
+    echo '  like any other result.'
     echo ''
     echo 'Output options:'
     echo ''
@@ -218,16 +219,15 @@ fi
 # Main script
 #
 
-# If doing a skeleton, just do the following bit and then exit.
+dashArgs=(--no-cli-pager --output=json)
+
 if (( skeleton )); then
-    aws "${command}" "${subcommand}" --generate-cli-skeleton | jval --read-stdin
-    exit
+    dashArgs+=(--generate-cli-skeleton)
+else
+    inRegion="$(lib region-from-location "${inLocation}")" \
+    || exit "$?"
+    dashArgs+=(--region="${inRegion}")
 fi
-
-inRegion="$(lib region-from-location "${inLocation}")" \
-|| exit "$?"
-
-dashArgs=(--no-cli-pager --output=json --region="${inRegion}")
 
 jsonArg='{}'
 if (( ${#argConstructor[@]} > 0 )); then
