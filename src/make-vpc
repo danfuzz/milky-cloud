@@ -214,8 +214,9 @@ vpcId="$(jget --raw "${vpcInfo}" '.VpcId')"
 cidr4="$(jget --raw "${vpcInfo}" '.CidrBlockAssociationSet[0].CidrBlock')"
 cidr6="$(jget --raw "${vpcInfo}" '.Ipv6CidrBlockAssociationSet[0].Ipv6CidrBlock')"
 
-echo 1>&2 'IPv4 network:' "${cidr4}"
-echo 1>&2 'IPv6 network:' "${cidr6}"
+echo 1>&2 'Networks:'
+echo 1>&2 "  IPv4: ${cidr4}"
+echo 1>&2 "  IPv6: ${cidr6}"
 
 # After this point, in case of error, we try to clean things up by removing the
 # VPC and all its interconnected dependencies.
