@@ -49,6 +49,13 @@ function figure-out-name {
     echo "$(lib now-stamp)-${name}"
 }
 
+# Prints a progress message, if such messages have been requested.
+function progress-msg {
+    if (( progress )); then
+        echo 1>&2 "$@"
+    fi
+}
+
 
 #
 # Argument parsing
@@ -69,6 +76,9 @@ inLocation=''
 # Name of the security group.
 name=''
 
+# Progress messages?
+progress=0
+
 # Name or ID of the VPC.
 vpcNameOrId=''
 
@@ -82,6 +92,9 @@ while (( $# > 0 )); do
             ;;
         --name=?*)
             name="${1#*=}"
+            ;;
+        --progress)
+            progress=1
             ;;
         --vpc=?*)
             vpcNameOrId="${1#*=}"
@@ -189,7 +202,9 @@ groupId="$(ec2-json create-security-group \
 )" \
 || exit "$?"
 
-echo 1>&2 "Made security group: ${groupId}"
+progress-msg 'Made security group:'
+progress-msg "  id:   ${groupId}"
+progress-msg "  name: ${name}"
 
 # Note: Past this point, if there are errors, we attempt to clean up the
 # partial mess by deleting the security group.
@@ -218,7 +233,7 @@ commonArgs=(--quiet --in="${inRegion}" --security-group="${groupId}"
 if (( !error )); then
     lib add-security-group-rules "${commonArgs[@]}" \
         --egress --all-protocols --all-ports \
-    && echo 1>&2 "Added all-access egress rules." \
+    && progress-msg "Added all-access egress rules." \
     || error="$?"
 fi
 
@@ -227,27 +242,29 @@ fi
 if (( !error )); then
     lib add-security-group-rules "${commonArgs[@]}" \
         --ingress --tcp --port=22 \
-    && echo 1>&2 "Added SSH ingress rules." \
+    && progress-msg "Added SSH ingress rules." \
     || error="$?"
 fi
 
 if (( !error )); then
     lib add-security-group-rules "${commonArgs[@]}" \
         --ingress --tcp --port=443 \
-    && echo 1>&2 "Added HTTPS ingress rules." \
+    && progress-msg "Added HTTPS ingress rules." \
     || error="$?"
 fi
 
 # Do cleanup if necessary.
 
 if (( error )); then
-    echo 1>&2 'Error(s) after group creation. Attempting cleanup!'
+    progress-msg 'Error(s) after group creation. Attempting cleanup!'
     ec2-json delete-security-group \
         --in="${inRegion}" \
         groupId="${groupId}" \
         '{ GroupId: $groupId }' \
-    || echo 1>&2 'Error while deleting group, alas!'
+    || progress-msg 'Error while deleting group, alas!'
     exit "${error}"
 fi
+
+progress-msg 'Made and configured security group.'
 
 echo "${groupId}"

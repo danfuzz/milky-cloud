@@ -252,9 +252,9 @@ groupId=''
 if (( !error )); then
     groupId="$(
     lib make-security-group \
-        --in="${inRegion}" --name="${resourceName}" --vpc="${vpcId}" \
+        --progress --in="${inRegion}" \
+        --name="${resourceName}" --vpc="${vpcId}" \
     )" \
-    && echo 1>&2 'Made security group.' \
     || error=1
 fi
 
