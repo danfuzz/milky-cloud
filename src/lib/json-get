@@ -66,31 +66,30 @@ while (( $# > 0 )); do
 done
 
 if (( $# < 1 )); then
-    echo 1>&2 'Missing <json-value> and/or <jq-expr> argument.'
-    argError=1
-elif (( $# > 2 )); then
-    echo 1>&2 'Too many arguments!'
+    echo 1>&2 'Missing <json-value> argument.'
     argError=1
 fi
 
 # JSON value.
 value="$1"
+shift
 
 # JQ expression.
-expr="$2"
-if (( $# < 2 )); then
-    expr='.'
+exprArgs=("$@")
+if (( $# ==  0 )); then
+    exprArgs=('.')
 fi
 
 if (( showHelp || argError )); then
     echo 'Usage:'
     echo ''
-    echo "${progName} [<opt> ...] [--] <json-value> [<jq-expr>]"
+    echo "${progName} [<opt> ...] [--] <json-value> [<assignment> ...] [--]"
+    echo '[<jq-expression> ...]'
     echo '  Performs an operation on a single JSON value (at least with typical'
     echo '  usage). More specifically, <json-value> is used as the sole input to'
-    echo '  <jq-expr> which is run as a `jq` program. If no expression is given,'
-    echo '  it is taken to be `.`, which will end up formatting the value as'
-    echo '  implied/specified by the output options.'
+    echo '  a `json-val` invocation consisting of the rest of the arguments. If'
+    echo '  no expression is given, it is taken to be `.`, which will end up just'
+    echo '  formatting the input value as implied/specified by the output options.'
     echo ''
     echo '  --compact'
     echo '    Output in compact form (not multiline JSON).'
@@ -114,4 +113,4 @@ fi
 # Main script
 #
 
-lib json-val <<< "${value}" "${outputOpt[@]}" --read-stdin -- -- "${expr}"
+lib json-val <<< "${value}" "${outputOpt[@]}" --read-stdin -- "${exprArgs[@]}"
