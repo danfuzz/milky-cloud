@@ -227,24 +227,10 @@ error=0
 # Note: The two attributes have to be turned on in this specific order, because
 # one depends on the other, and AWS will reject an invalid intermediate state.
 if (( !error )); then
-    ec2-json modify-vpc-attribute \
-        --in="${inRegion}" \
-        vpcId="${vpcId}" \
-        '{
-            VpcId: $vpcId,
-            EnableDnsSupport: { Value: true }
-        }' \
-    || error=1
-fi
-
-if (( !error )); then
-    ec2-json modify-vpc-attribute \
-        --in="${inRegion}" \
-        vpcId="${vpcId}" \
-        '{
-            VpcId: $vpcId,
-            EnableDnsHostnames: { Value: true }
-        }' \
+    lib set-attributes \
+        --progress --in="${inRegion}" --id="${vpcId}" \
+        EnableDnsSupport=true \
+        EnableDnsHostnames=true \
     || error=1
 fi
 
