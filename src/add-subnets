@@ -308,7 +308,7 @@ if (( error )); then
 fi
 
 if (( progress )); then
-    echo 1>&2 "Made and configured ${#results[@]} subnets."
+    echo 1>&2 "Done making and configuring ${#results[@]} subnets."
 fi
 
 if (( !quiet )); then

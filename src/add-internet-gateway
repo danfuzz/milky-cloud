@@ -48,6 +48,13 @@ function figure-out-name {
     echo "$(lib now-stamp)-${name}"
 }
 
+# Prints a progress message, if such messages have been requested.
+function progress-msg {
+    if (( progress )); then
+        echo 1>&2 "$@"
+    fi
+}
+
 
 #
 # Argument parsing
@@ -65,6 +72,9 @@ inLocation=''
 # Name of the resulting gateway.
 name=''
 
+# Progress messages?
+progress=0
+
 # Name or ID of the VPC.
 vpcNameOrId=''
 
@@ -75,6 +85,9 @@ while (( $# > 0 )); do
             ;;
         --name=?*)
             name="${1#*=}"
+            ;;
+        --progress)
+            progress=1
             ;;
         --vpc=?*)
             vpcNameOrId="${1#*=}"
@@ -127,6 +140,8 @@ if (( showHelp || argError )); then
     echo '  --name=<name>'
     echo '    Name to assign to the constructed gateway. If not specified, a'
     echo '    name is derived from the associated VPC.'
+    echo '  --progress'
+    echo '    Print progress messages to stderr.'
     echo '  --vpc=<name-or-id>'
     echo '    Name or ID of the VPC to be associated with. Must be specified.'
     echo ''
@@ -167,7 +182,7 @@ gatewayId="$(ec2-json create-internet-gateway \
 )" \
 || exit "$?"
 
-echo 1>&2 "Made internet gateway: ${gatewayId}"
+progress-msg "Made internet gateway: ${gatewayId}"
 
 # Note: Past this point, if there are errors, we attempt to clean up the mess by
 # deleting anything that got successfully added.
@@ -181,7 +196,7 @@ rtId="$(ec2-json describe-route-tables \
     '$filters' \
     :: --raw '.RouteTables[0].RouteTableId'
 )" \
-&& echo 1>&2 "Default VPC route table: ${rtId}" \
+&& progress-msg "Default VPC route table: ${rtId}" \
 || error=1
 
 # Attach the internet gateway to the VPC.
@@ -195,7 +210,7 @@ if (( !error )); then
             InternetGatewayId: $gatewayId,
             VpcId: $vpcId
         }' \
-    && echo 1>&2 "Attached gateway: ${gatewayId}" \
+    && progress-msg "Attached gateway: ${gatewayId}" \
     && attached=1 \
     || error=1
 fi
@@ -214,7 +229,7 @@ if (( !error && usesIpv4 )); then
         }' \
         :: --none \
     && v4RouteAdded=1 \
-    && echo 1>&2 'Added IPv4 route.' \
+    && progress-msg 'Added IPv4 route.' \
     || error=1
 fi
 
@@ -232,17 +247,19 @@ if (( !error && usesIpv6 )); then
         }' \
         :: --none \
     && v6RouteAdded=1 \
-    && echo 1>&2 'Added IPv6 route.' \
+    && progress-msg 'Added IPv6 route.' \
     || error=1
 fi
 
 # Do cleanup if necessary.
 
 if (( error )); then
-    echo 1>&2 'Error(s) after gateway creation. Attempting cleanup!'
+    progress-msg 'Error(s) after gateway creation. Attempting cleanup!'
     lib delete-internet-gateway --in="${inRegion}" --gateway="${gatewayId}"
-    echo 1>&2 'Done with post-error gateway cleanup.'
+    progress-msg 'Done with post-error gateway cleanup.'
     exit "${error}"
 fi
+
+progress-msg 'Done making and configuring internet gateway.'
 
 echo "${gatewayId}"

@@ -272,10 +272,10 @@ gatewayAdded=0
 if (( !error )); then
     gatewayId="$(
         lib add-internet-gateway \
-            --in="${inRegion}" --vpc="${vpcId}" --name="${resourceName}" \
+            --progress --in="${inRegion}" \
+            --vpc="${vpcId}" --name="${resourceName}" \
     )" \
     && gatewayAdded=1 \
-    && echo 1>&2 'Made internet gateway.' \
     || error=1
 fi
 
@@ -312,7 +312,6 @@ if (( error )); then
 fi
 
 if (( !error )); then
-    echo 1>&2 'Done making VPC and accoutrements!'
     echo 1>&2 "VPC ${vpcId} is ready for action!"
 fi
 
