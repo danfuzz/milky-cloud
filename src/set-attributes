@@ -181,7 +181,6 @@ esac
 # Grab and interpret the "skeleton" of the attribute command as a way to figure
 # out the types of all the attributes. Kinda icky, but it means we don't have to
 # maintain parallel AWS metadata here.
-progress-msg 'Validating command...'
 skeleton="$(
     ec2-json "${command}" --skeleton \
         :: idArg="${idArg}" 'del(.[$idArg])'
@@ -240,12 +239,10 @@ for (( n = 0; n < ${#assignNames[@]}; n++ )); do
         missing)
             echo 1>&2 "No such attribute: ${name}"
             error=1
-            continue
             ;;
         *)
             echo 1>&2 "Unhandled attribute: ${name}"
             error=1
-            continue
             ;;
     esac
 
@@ -254,7 +251,6 @@ for (( n = 0; n < ${#assignNames[@]}; n++ )); do
         error=1
     else
         assignValues[${n}]="${value}"
-        progress-msg "Preflight validated: ${name}"
     fi
 done
 
