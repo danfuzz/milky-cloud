@@ -1,0 +1,285 @@
+#!/bin/bash
+#
+# Copyright 2022 Dan Bornstein.
+# Licensed AS IS and WITHOUT WARRANTY under the Apache License,
+# Version 2.0. Details: <http://www.apache.org/licenses/LICENSE-2.0>
+
+# Set `progName` to the program name, `progDir` to its directory, and `baseDir`
+# to `progDir`'s directory. Follows symlinks.
+function init-prog {
+    local newp p="$0"
+
+    while newp="$(readlink "$p")"; do
+        [[ ${newp} =~ ^/ ]] && p="${newp}" || p="$(dirname "$p")/${newp}"
+    done
+
+    progName="${p##*/}"
+    progDir="$(cd "$(dirname "$p")"; /bin/pwd -P)"
+    baseDir="$(cd "${progDir}/.."; /bin/pwd -P)"
+}
+init-prog
+
+# Load the helper library.
+. "${progDir}/lib/init"
+
+
+#
+# Helper functions
+#
+
+# Prints a progress message, if such messages have been requested.
+function progress-msg {
+    if (( progress )); then
+        echo 1>&2 "$@"
+    fi
+}
+
+
+#
+# Argument parsing
+#
+
+# Error during argument processing?
+argError=0
+
+# Need help?
+showHelp=0
+
+# Names and values of assignments, as parallel arrays.
+assignNames=()
+assignValues=()
+
+# ID of the thing to operate on.
+id=''
+
+# Location (region or availability zone).
+inLocation=''
+
+# Progress messages?
+progress=0
+
+while (( $# > 0 )); do
+    case "$1" in
+        --id=?*)
+            id="${1#*=}"
+            ;;
+        --in=?*)
+            inLocation="${1#*=}"
+            ;;
+        --progress)
+            progress=1
+            ;;
+        -h|--help)
+            showHelp=1
+            break
+            ;;
+        --)
+            # Explicit end of options
+            shift
+            break
+            ;;
+        -?*)
+            echo 1>&2 "Unknown option: $1"
+            argError=1
+            break
+            ;;
+        *)
+            # Non-option argument
+            break
+            ;;
+    esac
+
+    shift
+done
+
+if (( !argError )); then
+    if [[ ${inLocation} == '' ]]; then
+        echo 1>&2 'Missing option: --in'
+        argError=1
+    fi
+    if [[ ${id} == '' ]]; then
+        echo 1>&2 'Missing option: --id'
+        argError=1
+    fi
+fi
+
+# Parse the assignments.
+while (( $# > 0 && !argError )); do
+    arg="$1"
+
+    [[ ${arg} =~ ^([-_:.a-zA-Z0-9]+)=(.*)$ ]] \
+    || break
+
+    assignNames+=("${BASH_REMATCH[1]}")
+    assignValues+=("${BASH_REMATCH[2]}")
+
+    shift
+done
+
+if (( ${#assignNames[@]} == 0 )); then
+    echo 1>&2 'Missing assignment(s).'
+    argError=1
+fi
+
+if (( showHelp || argError )); then
+    echo 'Usage:'
+    echo ''
+    echo "${progName} [<opt> ...] [--] <assignment> ..."
+    echo '  Sets one or more attributes on a thing-that-has-attributes. Supported'
+    echo '  "things" are subnets and VPCs.'
+    echo ''
+    echo '  <assignment>'
+    echo '    <name>=<value> Assign attribute `name` to be the indicated value.'
+    echo ''
+    echo '  --in=<region-or-zone>'
+    echo '    What region to operate in. Must be specified. If specified as an'
+    echo '    availability zone, only the region portion matters.'
+    echo '  --id=<id>'
+    echo '    ID of the thing to operate on.'
+    echo '  --progress'
+    echo '    Print progress messages to stderr.'
+    echo ''
+    echo "${progName} [--help | -h]"
+    echo '  Displays this message.'
+    exit "${argError}"
+fi
+
+
+#
+# Main script
+#
+
+inRegion="$(lib region-from-location "${inLocation}")" \
+|| exit "$?"
+
+if ! [[ ${id} =~ ^([a-z]+)-([a-f0-9]+)$ ]]; then
+    echo 1>&2 "Unparseable ID: ${id}"
+    exit 1
+fi
+
+# The type portion of the ID.
+idType="${BASH_REMATCH[1]}"
+
+# Figure out the appropriate command and ID argument to use.
+command=''
+idArg=''
+case "${idType}" in
+    subnet)
+        command='modify-subnet-attribute'
+        idArg='SubnetId'
+        ;;
+    vpc)
+        command='modify-vpc-attribute'
+        idArg='VpcId'
+        ;;
+    *)
+        echo 1>&2 "Cannot work with type: ${idType}"
+        exit 1
+        ;;
+esac
+
+# Grab and interpret the "skeleton" of the attribute command as a way to figure
+# out the types of all the attributes. Kinda icky, but it means we don't have to
+# maintain parallel AWS metadata here.
+progress-msg 'Validating command...'
+skeleton="$(
+    ec2-json "${command}" --skeleton \
+        :: idArg="${idArg}" 'del(.[$idArg])'
+)" \
+|| exit "$?"
+
+# Reform `idArg` so it can be used to pass the actual ID into the AWS commands.
+idArg="$(jval idArg="${idArg}" id="${id}" '{} | .[$idArg] = $id')" \
+|| exit "$?"
+
+error=0
+
+# Preflight all the attribute names, so we don't try to do any modification
+# unless all names seem to be usable. This loop also converts all the values
+# into the correct JSON form for performing the actual commands.
+for (( n = 0; n < ${#assignNames[@]}; n++ )); do
+    name="${assignNames[${n}]}"
+    value="${assignValues[${n}]}"
+    valueType="$(jget --raw "${skeleton}" \
+        name="${name}" '
+        if (has($name) | not)
+        then
+            "missing"
+        else
+            { skel: .[$name], type: (.[$name] | type) }
+            |
+            if (.type != "object")
+                then .type
+            elif (.skel | keys) == ["Value"]
+                then "value-" + (.skel.Value | type)
+            else "unhandled"
+            end
+        end
+        ')"
+
+    jsonError=0
+    case "${valueType}" in
+        boolean|null|number)
+            # These are okay without alteration, just need to validate JSON
+            # form.
+            value="$(jval 2>/dev/null --compact value:json="${value}" '$value')" \
+            || jsonError=1
+            ;;
+        string)
+            # Quote the string.
+            value="$(jval 2>/dev/null value="${value}" '$value')" \
+            || jsonError=1
+            ;;
+        value-boolean)
+            # Wrap the value.
+            value="$(
+                jval 2>/dev/null --compact value:json="${value}" '{ Value: $value }'
+            )" \
+            || jsonError=1
+            ;;
+        missing)
+            echo 1>&2 "No such attribute: ${name}"
+            error=1
+            continue
+            ;;
+        *)
+            echo 1>&2 "Unhandled attribute: ${name}"
+            error=1
+            continue
+            ;;
+    esac
+
+    if (( jsonError )); then
+        echo 1>&2 "Unparseable value for attribute: ${name}"
+        error=1
+    else
+        assignValues[${n}]="${value}"
+        progress-msg "Preflight validated: ${name}"
+    fi
+done
+
+if (( error )); then
+    exit 1
+fi
+
+# Do all the commands.
+for (( n = 0; n < ${#assignNames[@]} && !error; n++ )); do
+    name="${assignNames[${n}]}"
+    value="${assignValues[${n}]}"
+
+    progress-msg "Setting ${name}..."
+    ec2-json "${command}" \
+        --in="${inRegion}" \
+        idArg:json="${idArg}" \
+        name="${name}" \
+        value:json="${value}" \
+        '$idArg | .[$name] = $value' \
+    || error=1
+done
+
+if (( error )); then
+    echo 1>&2 'Could not set all attributes.'
+    exit 1
+fi
+
+progress-msg 'Done setting attributes.'
