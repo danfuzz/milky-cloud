@@ -48,6 +48,9 @@ name=''
 # Security group to use (name or id), if any.
 securityGroup=''
 
+# Name of file containing user data (first-boot script).
+userDataFile=''
+
 while (( $# > 0 )); do
     case "$1" in
         --in=?*)
@@ -64,6 +67,9 @@ while (( $# > 0 )); do
             ;;
         --security-group=?*)
             securityGroup="${1#*=}"
+            ;;
+        --user-data-file=?*)
+            userDataFile="${1#*=}"
             ;;
         -h|--help)
             showHelp=1
@@ -109,6 +115,9 @@ if (( showHelp || argError )); then
     echo '    If specified, this is used to derive the VPC to use, and in conjunction'
     echo '    with the specified availability zone, the specific subnet within the'
     echo '    VPC.'
+    echo '  --user-data-file=<file>'
+    echo '    Name of a file containing user data for the instance. The user data'
+    echo '    is used as a script to be run on first-boot of the instance.'
     echo ''
     echo "${progName} [--help | -h]"
     echo '  Display this message.'
@@ -185,6 +194,7 @@ ec2-json run-instances \
     securityGroup="${securityGroup}" \
     subnetId="${subnetId}" \
     tagSpec:json="$(lib name-tag-spec instance "${name}")" \
+    userDataFile="${userDataFile}" \
     '
         {
             ImageId:      $amiInfo.ImageId,
@@ -196,6 +206,7 @@ ec2-json run-instances \
         + if $keyName == "" then {} else { KeyName: $keyName } end
         + if $securityGroup == "" then {} else { SecurityGroupIds: [$securityGroup] } end
         + if $subnetId == "" then {} else { SubnetId: $subnetId } end
+        + if $userDataFile == "" then {} else { UserData: "file://" + $userDataFile } end
     ' \
     :: \
     '
