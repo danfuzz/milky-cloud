@@ -208,6 +208,11 @@ fi
 
 tagSpec="$(lib name-tag-spec 'subnet' "${name}")"
 
+progressArg=()
+if (( progress )); then
+    progressArg=(--progress)
+fi
+
 results=()
 error=0
 
@@ -250,33 +255,20 @@ for (( n = 0; n < azCount && !error; n++ )); do
 
     results+=("${result}")
 
-    # Set the public-IP-address attribute on the subnet, which means that
-    # instances launched in this subnet will be publicly accessible (unless that
-    # setting is overridden during launch).
-    ec2-json modify-subnet-attribute \
-        --in="${inRegion}" \
-        subnetId="${result}" \
-        '{
-            SubnetId: $subnetId,
-            MapPublicIpOnLaunch: { Value: true }
-        }' \
-    || error=1
-
-    # Set the DNS name policy to name instances in this subnet after their
-    # instance ID (not DNS address).
-    ec2-json modify-subnet-attribute \
-        --in="${inRegion}" \
-        subnetId="${result}" \
-        '{
-            SubnetId: $subnetId,
-            PrivateDnsHostnameTypeOnLaunch: "resource-name"
-        }' \
-    || error=1
-
+    # Set attributes on the subnet:
+    # * MapPublicIpOnLaunch: Make instances publicly accessible (by default).
+    # * PrivateDnsHostnameTypeOnLaunch: Private DNS name is based on the
+    #   instance ID (not private DNS address).
+    #
     # TODO: Consider explicitly turning on the attributes for A and AAAA record
     # responses. Also for IPv6-on-creation.
+    lib set-attributes \
+        --in="${inRegion}" --id="${result}" "${progressArg[@]}" \
+        MapPublicIpOnLaunch=true \
+        PrivateDnsHostnameTypeOnLaunch=resource-name \
+    || error=1
 
-    if (( progress )); then
+    if (( progress && !error )); then
         echo 1>&2 "Made subnet: ${result}"
     fi
 done
