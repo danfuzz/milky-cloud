@@ -134,7 +134,7 @@ if (( showHelp || argError )); then
     echo '  assignments passed into an expression evaluated by `jq` either with'
     echo '  `--null-input` (by default) or as a usual pipeline over input values.'
     echo '  If no expression is given, it is taken to be `.`, which will end up'
-    echo '  formatting the expression as implied/specified by the output options.'
+    echo '  formatting the input as implied/specified by the output options.'
     echo ''
     echo '  The <jq-expression> arguments are concatenated together (separated by'
     echo '  spaces) to form the final expression to be evaluated.'
