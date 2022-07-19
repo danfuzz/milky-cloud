@@ -263,7 +263,6 @@ if (( !error )); then
     lib add-subnets \
         --progress --quiet --in="${inRegion}" --vpc="${vpcId}" \
         --name="${resourceName}" \
-    && echo 1>&2 'Made subnets.' \
     || error=1
 fi
 
