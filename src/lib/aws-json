@@ -83,6 +83,9 @@ argConstructor=()
 # postprocessing.
 resultConstructor=()
 
+# Just print argument "skeleton" ?
+skeleton=0
+
 while (( $# > 0 )); do
     case "$1" in
         --in=?*)
@@ -90,6 +93,9 @@ while (( $# > 0 )); do
             ;;
         --print-command-to=?*)
             printCommandTo="${1#*=}"
+            ;;
+        --skeleton)
+            skeleton=1
             ;;
         -h|--help)
             showHelp=1
@@ -115,7 +121,7 @@ while (( $# > 0 )); do
 done
 
 if (( !argError )); then
-    if [[ ${inLocation} == '' ]]; then
+    if [[ ${inLocation} == '' ]] && (( !skeleton )); then
         echo 1>&2 'Missing option: --in'
         argError=1
     fi
@@ -189,7 +195,9 @@ if (( showHelp || argError )); then
     echo '--print-command-to=<file>'
     echo '  Name of a file to print the fully-constructed command to. It is'
     echo '  emitted as a JSON value including both split-out components and'
-    echp '  the actual commandline.'
+    echo '  the actual commandline.'
+    echo '--skeleton'
+    echo '  Print out a JSON "skeleton" of parameters.'
     echo ''
     echo 'Output options:'
     echo ''
@@ -209,6 +217,12 @@ fi
 #
 # Main script
 #
+
+# If doing a skeleton, just do the following bit and then exit.
+if (( skeleton )); then
+    aws "${command}" "${subcommand}" --generate-cli-skeleton | jval --read-stdin
+    exit
+fi
 
 inRegion="$(lib region-from-location "${inLocation}")" \
 || exit "$?"
