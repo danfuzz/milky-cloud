@@ -119,11 +119,9 @@ while (( $# > 0 && !argError )); do
     shift
 done
 
-# Construct value expression from remaining arguments
-
+# Construct the value expression from the remaining arguments.
 if (( $# == 0 )); then
-    echo 1>&2 'No value construction expression specified.'
-    argError=1
+    valueExpression='.'
 else
     valueExpression="$*"
 fi
@@ -131,10 +129,12 @@ fi
 if (( showHelp || argError )); then
     echo 'Usage:'
     echo ''
-    echo "${progName} [<opt> ...] [--] [<assignment> ...] [--] <jq-expression> ..."
+    echo "${progName} [<opt> ...] [--] [<assignment> ...] [--] [<jq-expression> ...]"
     echo '  Constructs and prints one or more JSON values from variable'
     echo '  assignments passed into an expression evaluated by `jq` either with'
-    echo ' `--null-input` (by default) or as a usual pipeline over input values.'
+    echo '  `--null-input` (by default) or as a usual pipeline over input values.'
+    echo '  If no expression is given, it is taken to be `.`, which will end up'
+    echo '  formatting the expression as implied/specified by the output options.'
     echo ''
     echo '  The <jq-expression> arguments are concatenated together (separated by'
     echo '  spaces) to form the final expression to be evaluated.'
