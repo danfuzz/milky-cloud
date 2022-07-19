@@ -256,14 +256,18 @@ for (( n = 0; n < azCount && !error; n++ )); do
     results+=("${result}")
 
     # Set attributes on the subnet:
+    # * AssignIpv6AddressOnCreation: Make instances have an IPv6 address.
+    # * EnableResourceNameDnsARecordOnLaunch: Make DNS report an IPv4 address.
+    # * EnableResourceNameDnsAAAARecordOnLaunch: Make DNS report an IPv6 address
+    #   (it can legitimately report both).
     # * MapPublicIpOnLaunch: Make instances publicly accessible (by default).
     # * PrivateDnsHostnameTypeOnLaunch: Private DNS name is based on the
     #   instance ID (not private DNS address).
-    #
-    # TODO: Consider explicitly turning on the attributes for A and AAAA record
-    # responses. Also for IPv6-on-creation.
     lib set-attributes \
         --in="${inRegion}" --id="${result}" "${progressArg[@]}" \
+        AssignIpv6AddressOnCreation=true \
+        EnableResourceNameDnsARecordOnLaunch=true \
+        EnableResourceNameDnsAAAARecordOnLaunch=true \
         MapPublicIpOnLaunch=true \
         PrivateDnsHostnameTypeOnLaunch=resource-name \
     || error=1
