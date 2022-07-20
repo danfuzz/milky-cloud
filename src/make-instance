@@ -48,7 +48,10 @@ name=''
 # Security group to use (name or id), if any.
 securityGroup=''
 
-# Name of file containing user data (first-boot script).
+# Actual user data (first-boot script).
+userData=''
+
+# Name of file containing user data.
 userDataFile=''
 
 while (( $# > 0 )); do
@@ -67,6 +70,9 @@ while (( $# > 0 )); do
             ;;
         --security-group=?*)
             securityGroup="${1#*=}"
+            ;;
+        --user-data=?*)
+            userData="${1#*=}"
             ;;
         --user-data-file=?*)
             userDataFile="${1#*=}"
@@ -94,6 +100,11 @@ while (( $# > 0 )); do
     shift
 done
 
+if (( !argError )) && [[ (${userData} != '') && (${userDataFile} != '') ]]; then
+    echo 1>&2 'Cannot specify both --user-data and --user-data-file.'
+    argError=1
+fi
+
 if (( showHelp || argError )); then
     echo 'Usage:'
     echo ''
@@ -115,9 +126,13 @@ if (( showHelp || argError )); then
     echo '    If specified, this is used to derive the VPC to use, and in conjunction'
     echo '    with the specified availability zone, the specific subnet within the'
     echo '    VPC.'
+    echo '  --user-data=<UserData>'
+    echo '    User data for the instance, which is taken to be a script to run on'
+    echo '    first-boot of the instance. It is invalid to specify both this and'
+    echo '    the --user-data-file option.'
     echo '  --user-data-file=<file>'
-    echo '    Name of a file containing user data for the instance. The user data'
-    echo '    is used as a script to be run on first-boot of the instance.'
+    echo '    Name of a file containing user data for the instance. It is invalid'
+    echo '    to specify both this and the --user-data option.'
     echo ''
     echo "${progName} [--help | -h]"
     echo '  Display this message.'
@@ -128,6 +143,14 @@ fi
 #
 # Main script
 #
+
+# Slurp the user data, if there is user data to be slurped.
+if [[ ${userDataFile} != '' ]]; then
+    userData="$(cat "${userDataFile}")" \
+    || exit 1
+fi
+
+# Figure out the region.
 
 inRegion="$(lib region-from-zone "${inLocation}")" \
 || exit "$?"
@@ -194,7 +217,7 @@ ec2-json run-instances \
     securityGroup="${securityGroup}" \
     subnetId="${subnetId}" \
     tagSpec:json="$(lib name-tag-spec instance "${name}")" \
-    userDataFile="${userDataFile}" \
+    userData="${userData}" \
     '
         {
             ImageId:      $amiInfo.ImageId,
@@ -206,7 +229,7 @@ ec2-json run-instances \
         + if $keyName == "" then {} else { KeyName: $keyName } end
         + if $securityGroup == "" then {} else { SecurityGroupIds: [$securityGroup] } end
         + if $subnetId == "" then {} else { SubnetId: $subnetId } end
-        + if $userDataFile == "" then {} else { UserData: "file://" + $userDataFile } end
+        + if $userData == "" then {} else { UserData: $userData } end
     ' \
     :: \
     '
