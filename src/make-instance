@@ -54,6 +54,9 @@ userData=''
 # Name of file containing user data.
 userDataFile=''
 
+# Name or ID of VPC to use, if any.
+vpcNameOrId=''
+
 while (( $# > 0 )); do
     case "$1" in
         --in=?*)
@@ -76,6 +79,9 @@ while (( $# > 0 )); do
             ;;
         --user-data-file=?*)
             userDataFile="${1#*=}"
+            ;;
+        --vpc=?*)
+            vpcNameOrId="${1#*=}"
             ;;
         -h|--help)
             showHelp=1
@@ -105,6 +111,11 @@ if (( !argError )) && [[ (${userData} != '') && (${userDataFile} != '') ]]; then
     argError=1
 fi
 
+if (( !argError )) && [[ (${securityGroup} != '') && (${vpc} != '') ]]; then
+    echo 1>&2 'Cannot specify both --security-group and --vpc.'
+    argError=1
+fi
+
 if (( showHelp || argError )); then
     echo 'Usage:'
     echo ''
@@ -125,8 +136,7 @@ if (( showHelp || argError )); then
     echo '    Name or ID of the security group to use for network access control.'
     echo '    If specified, this is used to derive the VPC to use, and in conjunction'
     echo '    with the specified availability zone, the specific subnet within the'
-    echo '    VPC. Can also be a VPC ID, to indicate the default security group for'
-    echo '    that VPC.'
+    echo '    VPC. It is not valid to specify both this option and --vpc.'
     echo '  --user-data=<UserData>'
     echo '    User data for the instance, which is taken to be a script to run on'
     echo '    first-boot of the instance. It is invalid to specify both this and'
@@ -134,6 +144,10 @@ if (( showHelp || argError )); then
     echo '  --user-data-file=<file>'
     echo '    Name of a file containing user data for the instance. It is invalid'
     echo '    to specify both this and the --user-data option.'
+    echo '  --vpc=<name-or-id>'
+    echo '    Name or ID of the VPC to launch into. If specified, then the instance'
+    echo '    will be in the default security group of the indicated VPC. It is not'
+    echo '    valid to specify both this option and --security-group.'
     echo ''
     echo "${progName} [--help | -h]"
     echo '  Display this message.'
