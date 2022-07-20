@@ -45,10 +45,9 @@ function do-find {
     || return "$?"
 
     local idResult
-    idResult="$(jval \
-        result:json="${result}" \
+    idResult="$(jget "${result}" \
         topKey="${topKey}" \
-        '$result[$topKey] | map(.VpcId) | unique'
+        '.[$topKey] | map(.VpcId) | unique'
     )"
 
     local vpcId
