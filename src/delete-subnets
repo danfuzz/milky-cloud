@@ -123,8 +123,8 @@ if (( showHelp || argError )); then
     echo '    specified as an availability zone, only the region portion matters.'
     echo '  --quiet'
     echo '    Suppress non-error output.'
-    echo '  --security-group=<name-or-id>'
-    echo '    Name or ID of the security group to add to.'
+    echo '  --vpc=<name-or-id>'
+    echo '    Name or ID of the VPC to operate on.'
     echo ''
     echo "${progName} [--help | -h]"
     echo '  Displays this message.'
