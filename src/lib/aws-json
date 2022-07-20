@@ -307,7 +307,7 @@ result="$("${fullCommand[@]}")" \
     exit 1
 }
 
-# Note: Even if there's no result filter, we use `jval` to automatically get
+# Note: Even if there's no result filter, we use `jget` to automatically get
 # color output when appropriate and to do "raw" output when requested.
 
 if (( ${#resultConstructor[@]} == 0 )); then
@@ -315,18 +315,17 @@ if (( ${#resultConstructor[@]} == 0 )); then
 fi
 
 if [[ ${outputStyle} != 'none' ]]; then
-    jvalOpts=()
+    jgetOpts=()
     case "${outputStyle}" in
         compact)
-            jvalOpts+=('--compact')
+            jgetOpts+=('--compact')
             ;;
         raw)
-            jvalOpts+=('--raw')
+            jgetOpts+=('--raw')
             ;;
     esac
 
-    jval --read-stdin "${jvalOpts[@]}" -- \
-        "${resultConstructor[@]}" <<<"${result}" \
+    jget "${jgetOpts[@]}" -- "${result}" "${resultConstructor[@]}" \
     || {
         echo 1>&2 'Trouble filtering result.'
         exit 1
