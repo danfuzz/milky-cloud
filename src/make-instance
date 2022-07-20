@@ -33,6 +33,9 @@ argError=0
 # Need help?
 showHelp=0
 
+# Security group to use (name or id), if any.
+groupNameOrId=''
+
 # Location (availability zone).
 inLocation='us-west-2a'
 
@@ -44,9 +47,6 @@ keyName=''
 
 # Name for the resulting instance.
 name=''
-
-# Security group to use (name or id), if any.
-securityGroup=''
 
 # Actual user data (first-boot script).
 userData=''
@@ -72,7 +72,7 @@ while (( $# > 0 )); do
             name="${1#*=}"
             ;;
         --security-group=?*)
-            securityGroup="${1#*=}"
+            groupNameOrId="${1#*=}"
             ;;
         --user-data=?*)
             userData="${1#*=}"
@@ -111,7 +111,7 @@ if (( !argError )) && [[ (${userData} != '') && (${userDataFile} != '') ]]; then
     argError=1
 fi
 
-if (( !argError )) && [[ (${securityGroup} != '') && (${vpc} != '') ]]; then
+if (( !argError )) && [[ (${groupNameOrId} != '') && (${vpc} != '') ]]; then
     echo 1>&2 'Cannot specify both --security-group and --vpc.'
     argError=1
 fi
@@ -193,11 +193,12 @@ jget 1>&2 --raw "${amiInfo}" '
 
 # Resolve the security group and subnet IDs, if necessary.
 
+groupId=''
 subnetId=''
-if [[ ${securityGroup} != '' ]]; then
-    securityGroup="$(lib find-security-group --in="${inLocation}" "${securityGroup}")" \
+if [[ ${groupNameOrId} != '' ]]; then
+    groupId="$(lib find-security-group --in="${inLocation}" "${groupNameOrId}")" \
     || exit 1
-    vpcId="$(lib find-vpc --in="${inLocation}" "${securityGroup}")" \
+    vpcId="$(lib find-vpc --in="${inLocation}" "${groupId}")" \
     || exit 1
     subnetId="$(lib find-vpc-subnet --in="${inLocation}" --vpc="${vpcId}")" \
     || exit 1
@@ -229,7 +230,7 @@ ec2-json run-instances \
     inLocation="${inLocation}" \
     instanceType="${instanceType}" \
     keyName="${keyName}" \
-    securityGroup="${securityGroup}" \
+    groupId="${groupId}" \
     subnetId="${subnetId}" \
     tagSpec:json="$(lib name-tag-spec instance "${name}")" \
     userData="${userData}" \
@@ -242,7 +243,7 @@ ec2-json run-instances \
         }
         + $tagSpec
         + if $keyName == "" then {} else { KeyName: $keyName } end
-        + if $securityGroup == "" then {} else { SecurityGroupIds: [$securityGroup] } end
+        + if $groupId == "" then {} else { SecurityGroupIds: [$groupId] } end
         + if $subnetId == "" then {} else { SubnetId: $subnetId } end
         + if $userData == "" then {} else { UserData: $userData } end
     ' \
