@@ -154,14 +154,12 @@ fi
 inRegion="$(lib region-from-location "${inLocation}")" \
 || exit "$?"
 
-echo 1>&2 "################# A ${groupNameOrId}"
 # Validate or find the ID of the security group.
 groupInfo="$(
     lib find-security-group --print-all --in="${inRegion}" "${groupNameOrId}"
 )" \
 || exit "$?"
 
-echo 1>&2 "################# B ${groupNameOrId}"
 groupId="$(jval --raw "${groupInfo}" '.GroupId')"
 name="$(jval --raw "${groupInfo}" '.GroupName')"
 
