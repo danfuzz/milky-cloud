@@ -121,8 +121,11 @@ if (( showHelp || argError )); then
     echo ''
     echo "${progName} [<opt> ...]"
     echo '  Launches a standard-configured instance. On success, prints a JSON'
-    echo '  object with the most-salient values (including notably the'
-    echo '  instance ID).'
+    echo '  object with the most-salient values (including notably the instance'
+    echo '  ID). Note: If neither `--security-group` nor `--vpc` is specified,'
+    echo '  then this command will launch the instance into the default security'
+    echo '  group of the default VPC for the specified availability zone (which,'
+    echo '  TBQH, is probably not what you want).'
     echo ''
     echo '  --in=<availability-zone>'
     echo '    Where to launch.'
@@ -228,10 +231,11 @@ fi
 echo 1>&2 ''
 echo 1>&2 'Launch command:'
 
-# Note: If a subnet ID is provided, then it implies the availability zone, in
-# which case one doesn't also need to specify the availability zone explicitly.
+# Note: If a subnet ID is known, then it implies the availability zone, in which
+# case one doesn't also need to specify the availability zone explicitly.
 # However, it's easier just to include it because this script is also meant to
-# work when a security group and subnet aren't specified.
+# work when a subnet isn't known (which means we're just launching into the
+# default security group of the default VPC for the region).
 #
 # Note: Public IP and DNS are de facto (or at least usually) not set in the
 # output from `ec2 run-instances`, that is, they aren't known at the moment of
