@@ -73,6 +73,9 @@ groupNameOrId=''
 # Location (region or availability zone).
 inLocation=''
 
+# Name tag to add.
+nameTag=''
+
 # Progress messages?
 progress=0
 
@@ -80,6 +83,9 @@ while (( $# > 0 )); do
     case "$1" in
         --in=?*)
             inLocation="${1#*=}"
+            ;;
+        --name-tag=?*)
+            nameTag="${1#*=}"
             ;;
         --progress)
             progress=1
@@ -162,8 +168,8 @@ groupInfo="$(
 )" \
 || exit "$?"
 
-groupId="$(jval --raw "${groupInfo}" '.GroupId')"
-name="$(jval --raw "${groupInfo}" '.GroupName')"
+groupId="$(jget --raw "${groupInfo}" '.GroupId')"
+name="$(jget --raw "${groupInfo}" '.GroupName')"
 
 progress-msg "Configuring security group ${groupId}..."
 
@@ -237,6 +243,21 @@ if (( !error )); then
     lib add-ip-security-group-rules "${commonArgs[@]}" \
         --ingress --tcp --port=443 \
     && progress-msg "Added HTTPS ingress rules." \
+    || error="$?"
+fi
+
+if (( !error )) && [[ ${nameTag} != '' ]]; then
+    ec2-json create-tags --in="${inRegion}" \
+        groupId="${groupId}" \
+        value="${nameTag}" \
+        '{
+            Resources: [$groupId],
+            Tags: [{
+                Key: "Name",
+                Value: $value
+            }]
+        }' \
+    && progress-msg "Added name tag." \
     || error="$?"
 fi
 

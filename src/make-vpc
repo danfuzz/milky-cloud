@@ -238,6 +238,7 @@ fi
 if (( !error )); then
     lib configure-security-group \
         --progress --in="${inRegion}" --security-group="${vpcId}" \
+        --name-tag="default-for-${vpcId}" \
     || error=1
 fi
 
