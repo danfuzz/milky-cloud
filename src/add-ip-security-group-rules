@@ -139,9 +139,10 @@ if (( showHelp || argError )); then
     echo 'Usage:'
     echo ''
     echo "${progName} [<opt> ...]"
-    echo '  Adds one or more rules to a given security group. Either `--port` or'
-    echo '  `--all-ports` must be passed. Similarly, one protocol option must be'
-    echo '  passed. Upon success, prints out a JSON array of all added rules.'
+    echo '  Adds one or more rules to a given security group to specify IP-based'
+    echo '  restrictions. Either `--port` or `--all-ports` must be passed. Similarly,'
+    echo '  one protocol option must be passed. Upon success, prints out a JSON'
+    echo '  array of all added rules.'
     echo ''
     echo '  Note: Even though this command only nominally lets you specify one'
     echo '  rule, AWS splits out multiple rules when the specified rule applies'

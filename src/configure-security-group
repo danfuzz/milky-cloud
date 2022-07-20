@@ -130,7 +130,9 @@ if (( showHelp || argError )); then
     echo '  needed.'
     echo ''
     echo '  On success, the security group allows incoming TCP traffic to the SSH'
-    echo '  and HTTPS ports, and allows outgoing traffic to anywhere.'
+    echo '  and HTTPS ports, and allows outgoing traffic to anywhere. It also allows'
+    echo '  incoming traffic on all ports, from sources that are within the same'
+    echo '  security group.'
     echo ''
     echo '  --in=<region-or-zone>'
     echo '    What region to make the security group in. Must be specified. If'
@@ -183,14 +185,14 @@ if (( !error )); then
     || error="$?"
 fi
 
-# Common args for all calls to `add-security-group-rules`.
+# Common args for all calls to `add-ip-security-group-rules`.
 commonArgs=(--quiet --in="${inRegion}" --security-group="${groupId}"
     --name="${name}")
 
 # Add egress rules.
 
 if (( !error )); then
-    lib add-security-group-rules "${commonArgs[@]}" \
+    lib add-ip-security-group-rules "${commonArgs[@]}" \
         --egress --all-protocols --all-ports \
     && progress-msg "Added all-access egress rules." \
     || error="$?"
@@ -199,14 +201,14 @@ fi
 # Add ingress rules.
 
 if (( !error )); then
-    lib add-security-group-rules "${commonArgs[@]}" \
+    lib add-ip-security-group-rules "${commonArgs[@]}" \
         --ingress --tcp --port=22 \
     && progress-msg "Added SSH ingress rules." \
     || error="$?"
 fi
 
 if (( !error )); then
-    lib add-security-group-rules "${commonArgs[@]}" \
+    lib add-ip-security-group-rules "${commonArgs[@]}" \
         --ingress --tcp --port=443 \
     && progress-msg "Added HTTPS ingress rules." \
     || error="$?"
