@@ -201,6 +201,32 @@ fi
 # Add ingress rules.
 
 if (( !error )); then
+    tagSpec='{}'
+    if [[ ${name} != '' ]]; then
+        tagSpec="$(lib name-tag-spec 'security-group-rule' "${name}")"
+    fi
+
+    ec2-json authorize-security-group-ingress \
+        --in="${inRegion}" \
+        groupId="${groupId}" \
+        tagSpec:json="${tagSpec}" \
+        '
+        $tagSpec +
+        {
+            GroupId: $groupId,
+            IpPermissions: [{
+                IpProtocol: "-1",
+                UserIdGroupPairs: [{
+                    GroupId: $groupId
+                }]
+            }]
+        }' \
+        :: --none \
+    && progress-msg "Added within-group rule." \
+    || error="$?"
+fi
+
+if (( !error )); then
     lib add-ip-security-group-rules "${commonArgs[@]}" \
         --ingress --tcp --port=22 \
     && progress-msg "Added SSH ingress rules." \
