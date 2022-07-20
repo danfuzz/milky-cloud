@@ -234,14 +234,10 @@ if (( !error )); then
     || error=1
 fi
 
-# Create a security group.
-groupId=''
+# Configure the default security group.
 if (( !error )); then
-    groupId="$(
-    lib make-security-group \
-        --progress --in="${inRegion}" \
-        --name="${resourceName}" --vpc="${vpcId}" \
-    )" \
+    lib configure-security-group \
+        --progress --in="${inRegion}" --security-group="${vpcId}" \
     || error=1
 fi
 
@@ -274,14 +270,6 @@ if (( error )); then
         echo 1>&2 'Deleting internet gateway...'
         lib delete-internet-gateway \
             --in="${inRegion}" --gateway="${gatewayId}"
-    fi
-
-    if [[ ${groupId} != '' ]]; then
-        echo 1>&2 'Deleting security group...'
-        ec2-json delete-security-group \
-            --in="${inRegion}" \
-            groupId="${groupId}" \
-            '{ GroupId: $groupId }'
     fi
 
     echo 1>&2 'Deleting subnets...'
