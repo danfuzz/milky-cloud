@@ -221,7 +221,7 @@ for (( n = 0; n < ${#assignNames[@]}; n++ )); do
         boolean|null|number)
             # These are okay without alteration, just need to validate JSON
             # form.
-            value="$(jval 2>/dev/null --compact value:json="${value}" '$value')" \
+            value="$(jget 2>/dev/null --compact "${value}" '.')" \
             || jsonError=1
             ;;
         string)
@@ -232,7 +232,7 @@ for (( n = 0; n < ${#assignNames[@]}; n++ )); do
         value-boolean)
             # Wrap the value.
             value="$(
-                jval 2>/dev/null --compact value:json="${value}" '{ Value: $value }'
+                jget 2>/dev/null --compact "${value}" '{ Value: . }'
             )" \
             || jsonError=1
             ;;
