@@ -36,6 +36,9 @@ showHelp=0
 # Location (region or availability zone).
 inLocation=''
 
+# Print full object?
+printAll=0
+
 while (( $# > 0 )); do
     case "$1" in
         --in=?*)
@@ -44,6 +47,9 @@ while (( $# > 0 )); do
         -h|--help)
             showHelp=1
             break
+            ;;
+        --print-all)
+            printAll=1
             ;;
         --)
             # Explicit end of options
@@ -89,6 +95,8 @@ if (( showHelp || argError )); then
     echo '  --in=<region-or-zone>'
     echo '    Where to look. Must be specified. If specified as an availability'
     echo '    zone, only the region portion matters.'
+    echo '  --print-all'
+    echo '    Print the full info object, not just the ID.'
     echo ''
     echo "${progName} [--help | -h]"
     echo '  Displays this message.'
@@ -117,12 +125,12 @@ ec2-json describe-security-groups \
     "$(lib filter-spec "${filterName}=${nameOrId}")" \
     :: \
     '
-        .SecurityGroups | map({ id: .GroupId, name: .GroupName })
+        .SecurityGroups
         |
         {
             count: (. | length),
-            id:    (.[0].id // "none"),
-            all:   map(.id + " " + (.name | tojson))
+            group: .[0],
+            all:   map(.GroupId + " " + (.GroupName | tojson))
         }
     '
 )" \
@@ -140,4 +148,8 @@ elif (( count != 1 )); then
     exit 1
 fi
 
-echo "${id}"
+if (( printAll )); then
+    jget "${result}" '.group'
+else
+    jget --raw "${result}" '.group.GroupId'
+fi
