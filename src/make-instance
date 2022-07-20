@@ -229,9 +229,7 @@ fi
 
 # Form the main command, and do it!
 
-# Label for the command, which get spit out immediately below.
-echo 1>&2 ''
-echo 1>&2 'Launch command:'
+echo 1>&2 'Launching...'
 
 # Note: If a subnet ID is known, then it implies the availability zone, in which
 # case one doesn't also need to specify the availability zone explicitly.
@@ -242,9 +240,8 @@ echo 1>&2 'Launch command:'
 # Note: Public IP and DNS are de facto (or at least usually) not set in the
 # output from `ec2 run-instances`, that is, they aren't known at the moment of
 # launch.
-ec2-json run-instances \
+result="$(ec2-json run-instances \
     --in="${inRegion}" \
-    --print-command-to=/dev/stderr \
     amiInfo:json="${amiInfo}" \
     inLocation="${inLocation}" \
     instanceType="${instanceType}" \
@@ -276,3 +273,9 @@ ec2-json run-instances \
             PrivateIpAddress: .PrivateIpAddress
         }
     '
+)" \
+|| exit "$?"
+
+echo 1>&2 'Launched!'
+
+jget "${result}" '.'
