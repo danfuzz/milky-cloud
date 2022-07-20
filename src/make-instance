@@ -191,15 +191,26 @@ jget 1>&2 --raw "${amiInfo}" '
     "  id:   " + .ImageId
 '
 
-# Resolve the security group and subnet IDs, if necessary.
+# Resolve the VPC, security group, and subnet IDs, if necessary.
 
+vpcId=''
 groupId=''
 subnetId=''
 if [[ ${groupNameOrId} != '' ]]; then
+    # Resolve the security group ID, and then use it to find the VPC ID.
     groupId="$(lib find-security-group --in="${inLocation}" "${groupNameOrId}")" \
     || exit 1
     vpcId="$(lib find-vpc --in="${inLocation}" "${groupId}")" \
     || exit 1
+elif [[ ${vpcNameOrId} != '' ]]; then
+    # Resolve the VPC ID, and then use it to find the security group ID.
+    vpcId="$(lib find-vpc --in="${inLocation}" "${vpcNameOrId}")" \
+    || exit 1
+    groupId="$(lib find-security-group --in="${inLocation}" "${vpcId}")" \
+    || exit 1
+fi
+
+if [[ ${vpcId} != '' ]]; then
     subnetId="$(lib find-vpc-subnet --in="${inLocation}" --vpc="${vpcId}")" \
     || exit 1
 fi
