@@ -67,37 +67,25 @@ argError=0
 # Need help?
 showHelp=0
 
-# Description of the security group.
-description=''
+# Name or ID of the security group.
+groupNameOrId=''
 
 # Location (region or availability zone).
 inLocation=''
 
-# Name of the security group.
-name=''
-
 # Progress messages?
 progress=0
 
-# Name or ID of the VPC.
-vpcNameOrId=''
-
 while (( $# > 0 )); do
     case "$1" in
-        --description=?*)
-            description="${1#*=}"
-            ;;
         --in=?*)
             inLocation="${1#*=}"
-            ;;
-        --name=?*)
-            name="${1#*=}"
             ;;
         --progress)
             progress=1
             ;;
-        --vpc=?*)
-            vpcNameOrId="${1#*=}"
+        --security-group=?*)
+            groupNameOrId="${1#*=}"
             ;;
         -h|--help)
             showHelp=1
@@ -127,8 +115,8 @@ if (( !argError )); then
         echo 1>&2 'Missing option: --in'
         argError=1
     fi
-    if [[ ${vpcNameOrId} == '' ]]; then
-        echo 1>&2 'Missing option: --vpc'
+    if [[ ${groupNameOrId} == '' ]]; then
+        echo 1>&2 'Missing option: --security-group'
         argError=1
     fi
 fi
@@ -137,24 +125,21 @@ if (( showHelp || argError )); then
     echo 'Usage:'
     echo ''
     echo "${progName} [<opt> ...]"
-    echo '  Makes a new security group, configured in a standard way. On success,'
-    echo '  prints the ID of the created security group. See `configure-security-group`'
-    echo '  for details about the resulting configuration.'
+    echo '  Configures a security group in a standard way. This involves removing'
+    echo '  all pre-existing rules from the group and then adding exactly what is'
+    echo '  needed.'
     echo ''
-    echo '  --description=<description>'
-    echo '    Brief description of the security group. If not specified, fairly'
-    echo '    generic and content-free text is used (because it does need to be'
-    echo '    defined on the result).'
+    echo '  On success, the security group allows incoming TCP traffic to the SSH'
+    echo '  and HTTPS ports, and allows outgoing traffic to anywhere.'
+    echo ''
     echo '  --in=<region-or-zone>'
     echo '    What region to make the security group in. Must be specified. If'
     echo '    specified as an availability zone, only the region portion matters.'
-    echo '  --name=<name>'
-    echo '    Name to assign to the constructed security group. If not specified,'
-    echo '    a name is derived from the associated VPC.'
+    echo '  --security-group=<name-or-id>'
+    echo '    Name or ID of the security group to modify. Can also be a VPC ID,'
+    echo '    to indicate the default security group for that VPC.'
     echo '  --progress'
     echo '    Print progress messages to stderr.'
-    echo '  --vpc=<name-or-id>'
-    echo '    Name or ID of the VPC to be associated with. Must be specified.'
     echo ''
     echo "${progName} [--help | -h]"
     echo '  Displays this message.'
@@ -166,69 +151,72 @@ fi
 # Main script
 #
 
-progressArg=()
-if (( progress )); then
-    progressArg=(--progress)
-fi
-
 inRegion="$(lib region-from-location "${inLocation}")" \
 || exit "$?"
 
-# Validate or find the ID of the VPC.
-vpcId="$(lib find-vpc --in="${inRegion}" "${vpcNameOrId}")" \
-|| exit "$?"
-
-# Figure out the name if not passed as an option.
-if [[ ${name} == '' ]]; then
-    name="$(figure-out-name)" \
-    || exit "$?"
-fi
-
-# Make up a description if not passed as an option.
-if [[ ${description} == '' ]]; then
-    description="$(lib now-stamp via-script)"
-fi
-
-groupId="$(ec2-json create-security-group \
-    --in="${inRegion}" \
-    description="${description}" \
-    name="${name}" \
-    tagSpec:json="$(lib name-tag-spec 'security-group' "${name}")" \
-    vpcId="${vpcId}" \
-    '
-        $tagSpec +
-        {
-            Description: $description,
-            GroupName: $name,
-            VpcId: $vpcId
-        }
-    ' \
-    :: --raw '.GroupId'
+echo 1>&2 "################# A ${groupNameOrId}"
+# Validate or find the ID of the security group.
+groupInfo="$(
+    lib find-security-group --print-all --in="${inRegion}" "${groupNameOrId}"
 )" \
 || exit "$?"
 
-progress-msg 'Made security group:'
-progress-msg "  id:   ${groupId}"
-progress-msg "  name: ${name}"
+echo 1>&2 "################# B ${groupNameOrId}"
+groupId="$(jval --raw "${groupInfo}" '.GroupId')"
+name="$(jval --raw "${groupInfo}" '.GroupName')"
+
+progress-msg "Configuring security group ${groupId}..."
 
 # Note: Past this point, if there are errors, we attempt to clean up the
 # partial mess by deleting the security group.
 
 error=0
 
-lib configure-security-group \
-    "${progressArg[@]}" \
-    --in="${inRegion}" --security-group="${groupId}" \
-|| error="$?"
+# Start with a blank slate of rules by deleting any that are already associated
+# with the new security group.
+#
+# Context: Newly-created security groups (including the default security group
+# of a VPC) come with one or more rules, but relying on those details is
+# arguably not a wise idea.
+if (( !error )); then
+    lib delete-security-group-rules --quiet --in="${inRegion}" \
+        --security-group="${groupId}" --all \
+    && progress-msg 'Removed old rules (if any).' \
+    || error="$?"
+fi
+
+# Common args for all calls to `add-security-group-rules`.
+commonArgs=(--quiet --in="${inRegion}" --security-group="${groupId}"
+    --name="${name}")
+
+# Add egress rules.
+
+if (( !error )); then
+    lib add-security-group-rules "${commonArgs[@]}" \
+        --egress --all-protocols --all-ports \
+    && progress-msg "Added all-access egress rules." \
+    || error="$?"
+fi
+
+# Add ingress rules.
+
+if (( !error )); then
+    lib add-security-group-rules "${commonArgs[@]}" \
+        --ingress --tcp --port=22 \
+    && progress-msg "Added SSH ingress rules." \
+    || error="$?"
+fi
+
+if (( !error )); then
+    lib add-security-group-rules "${commonArgs[@]}" \
+        --ingress --tcp --port=443 \
+    && progress-msg "Added HTTPS ingress rules." \
+    || error="$?"
+fi
 
 if (( error )); then
-    progress-msg 'Error(s) after group creation. Attempting cleanup!'
-    ec2-json delete-security-group \
-        --in="${inRegion}" \
-        groupId="${groupId}" \
-        '{ GroupId: $groupId }' \
-    || progress-msg 'Error while deleting group, alas!'
+    progress-msg 'Error(s) during rule configuration. Alas!'
     exit "${error}"
 fi
 
-echo "${groupId}"
+progress-msg 'Done configuring security group.'
