@@ -90,7 +90,7 @@ while (( $# > 0 )); do
             protocol='udp'
             ;;
         -h|--help)
-            showHelp=1
+            argError=-1 # `-1` suppresses error exit after displaying usage.
             break
             ;;
         --)

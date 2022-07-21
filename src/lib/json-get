@@ -43,7 +43,7 @@ while (( $# > 0 )); do
             outputOpt=("$1")
             ;;
         -h|--help)
-            showHelp=1
+            argError=-1 # `-1` suppresses error exit after displaying usage.
             break
             ;;
         --)
