@@ -42,9 +42,6 @@ function progress-msg {
 # Error during argument processing?
 argError=0
 
-# Need help?
-showHelp=0
-
 # Names and values of assignments, as parallel arrays.
 assignNames=()
 assignValues=()

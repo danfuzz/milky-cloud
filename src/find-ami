@@ -39,9 +39,6 @@ amiNamePattern='amzn2-ami-kernel-5.10-hvm-*-gp2'
 # Error during argument processing?
 argError=0
 
-# Need help?
-showHelp=0
-
 # Instance type.
 instanceType=''
 

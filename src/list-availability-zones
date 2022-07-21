@@ -33,9 +33,6 @@ outputStyle=strings
 # Error during argument processing?
 argError=0
 
-# Need help?
-showHelp=0
-
 # Location (availability zone).
 inLocation=''
 

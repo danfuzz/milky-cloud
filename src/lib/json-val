@@ -44,9 +44,6 @@ valueExpression=''
 # Error during argument processing?
 argError=0
 
-# Need help?
-showHelp=0
-
 # Parse options.
 while (( $# > 0 )); do
     case "$1" in

@@ -30,9 +30,6 @@ init-prog
 # Error during argument processing?
 argError=0
 
-# Need help?
-showHelp=0
-
 # Rule direction (`ingress` or `egress`).
 direction=''
 

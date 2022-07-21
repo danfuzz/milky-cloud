@@ -126,9 +126,6 @@ function make-vpc-per-se {
 # Error during argument processing?
 argError=0
 
-# Need help?
-showHelp=0
-
 # Location (region or availability zone).
 inLocation=''
 

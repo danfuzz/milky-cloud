@@ -30,9 +30,6 @@ init-prog
 # Error during argument processing?
 argError=0
 
-# Need help?
-showHelp=0
-
 # Security group to use (name or id), if any.
 groupNameOrId=''
 

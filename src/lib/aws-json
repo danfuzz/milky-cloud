@@ -53,9 +53,6 @@ function make-command-parts-json {
 # Error during argument processing?
 argError=0
 
-# Need help?
-showHelp=0
-
 # AWS command and subcommand. These are expected before any dashed options.
 if ! ( (( $# >= 2 )) && [[ $1 =~ ^[a-z] ]] && [[ $2 =~ ^[a-z] ]] ); then
     echo 1>&2 'Missing AWS command and/or subcommand.'
