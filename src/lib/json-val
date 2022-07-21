@@ -126,7 +126,7 @@ else
     valueExpression="$*"
 fi
 
-if (( showHelp || argError )); then
+if (( argError )); then
     echo 'Usage:'
     echo ''
     echo "${progName} [<opt> ...] [--] [<assignment> ...] [--] [<jq-expression> ...]"

@@ -91,7 +91,7 @@ if (( $# != 0 )); then
     argError=1
 fi
 
-if (( showHelp || argError )); then
+if (( argError )); then
     echo 'Usage:'
     echo ''
     echo "${progName} [<opt> ...] [--] [<filter-spec> ...]"

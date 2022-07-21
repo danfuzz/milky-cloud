@@ -92,7 +92,7 @@ else
     fi
 fi
 
-if (( showHelp || argError )); then
+if (( argError )); then
     echo 'Usage:'
     echo ''
     echo "${progName} [<opt> ...] <protocol> <port>"
