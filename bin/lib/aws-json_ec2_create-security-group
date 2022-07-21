@@ -10,20 +10,10 @@
 # as an example of how the special handler mechanism works, just in case it's
 # needed for some other reason.
 
-# Set `progName` to the program name, `progDir` to its directory, and `baseDir`
-# to `progDir`'s directory. Follows symlinks.
-function init-prog {
-    local newp p="$0"
-
-    while newp="$(readlink "$p")"; do
-        [[ ${newp} =~ ^/ ]] && p="${newp}" || p="$(dirname "$p")/${newp}"
-    done
-
-    progName="${p##*/}"
-    progDir="$(cd "$(dirname "$p")"; /bin/pwd -P)"
-    baseDir="$(cd "${progDir}/.."; /bin/pwd -P)"
-}
-init-prog
+# Figure out the symlink-resolved program name and directory.
+progName="$(readlink -f "$0")" || exit "$?"
+progDir="${progName%/*}"
+progName="${progName##*/}"
 
 # Set up for library-internal usage.
 . "${progDir}/init" --lib
