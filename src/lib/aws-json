@@ -53,9 +53,6 @@ function make-command-parts-json {
 # Error during argument processing?
 argError=0
 
-# Need help?
-showHelp=0
-
 # AWS command and subcommand. These are expected before any dashed options.
 if ! ( (( $# >= 2 )) && [[ $1 =~ ^[a-z] ]] && [[ $2 =~ ^[a-z] ]] ); then
     echo 1>&2 'Missing AWS command and/or subcommand.'
@@ -98,11 +95,11 @@ while (( $# > 0 )); do
             skeleton=1
             ;;
         -h|--help)
-            showHelp=1
+            argError=-1 # `-1` suppresses error exit after displaying usage.
             break
             ;;
         --)
-            # Explicit end of options
+            # Explicit end of options.
             shift
             break
             ;;
@@ -112,7 +109,7 @@ while (( $# > 0 )); do
             break
             ;;
         *)
-            # Non-option argument
+            # Explicit end of options.
             break
             ;;
     esac
@@ -153,7 +150,7 @@ while (( $# > 0 && !argError )); do
             outputStyle=raw
             ;;
         --)
-            # Explicit end of options
+            # Explicit end of options.
             shift
             break
             ;;
@@ -163,7 +160,7 @@ while (( $# > 0 && !argError )); do
             break
             ;;
         *)
-            # Non-option argument
+            # Explicit end of options.
             break
             ;;
     esac
@@ -173,7 +170,7 @@ done
 
 resultConstructor=("$@")
 
-if (( showHelp || argError )); then
+if (( argError )); then
     echo 'Usage:'
     echo ''
     echo "${progName} <cmd> <subcommand> [<opt> ...] [--] [<assignment> ...]"
@@ -211,7 +208,7 @@ if (( showHelp || argError )); then
     echo ''
     echo "${progName} [--help | -h]"
     echo '  Displays this message.'
-    exit "${argError}"
+    exit $(( argError < 0 ? 0 : argError ))
 fi
 
 

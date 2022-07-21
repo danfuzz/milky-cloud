@@ -113,9 +113,6 @@ function find-via-describe-security-groups {
 # Error during argument processing?
 argError=0
 
-# Need help?
-showHelp=0
-
 # Location (region or availability zone).
 inLocation=''
 
@@ -131,11 +128,11 @@ while (( $# > 0 )); do
             printAll=1
             ;;
         -h|--help)
-            showHelp=1
+            argError=-1 # `-1` suppresses error exit after displaying usage.
             break
             ;;
         --)
-            # Explicit end of options
+            # Explicit end of options.
             shift
             break
             ;;
@@ -145,7 +142,7 @@ while (( $# > 0 )); do
             break
             ;;
         *)
-            # Non-option argument
+            # Non-option argument.
             break
             ;;
     esac
@@ -168,7 +165,7 @@ if (( !argError )); then
     fi
 fi
 
-if (( showHelp || argError )); then
+if (( argError )); then
     echo 'Usage:'
     echo ''
     echo "${progName} [<opt> ...] <name-or-id>"
@@ -184,7 +181,7 @@ if (( showHelp || argError )); then
     echo ''
     echo "${progName} [--help | -h]"
     echo '  Displays this message.'
-    exit "${argError}"
+    exit $(( argError < 0 ? 0 : argError ))
 fi
 
 
