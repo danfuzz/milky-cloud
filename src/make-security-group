@@ -101,7 +101,7 @@ while (( $# > 0 )); do
             break
             ;;
         --)
-            # Explicit end of options
+            # Explicit end of options.
             shift
             break
             ;;
@@ -111,7 +111,7 @@ while (( $# > 0 )); do
             break
             ;;
         *)
-            # Non-option argument
+            # Non-option argument.
             break
             ;;
     esac

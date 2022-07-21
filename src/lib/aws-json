@@ -99,7 +99,7 @@ while (( $# > 0 )); do
             break
             ;;
         --)
-            # Explicit end of options
+            # Explicit end of options.
             shift
             break
             ;;
@@ -109,7 +109,7 @@ while (( $# > 0 )); do
             break
             ;;
         *)
-            # Non-option argument
+            # Explicit end of options.
             break
             ;;
     esac
@@ -150,7 +150,7 @@ while (( $# > 0 && !argError )); do
             outputStyle=raw
             ;;
         --)
-            # Explicit end of options
+            # Explicit end of options.
             shift
             break
             ;;
@@ -160,7 +160,7 @@ while (( $# > 0 && !argError )); do
             break
             ;;
         *)
-            # Non-option argument
+            # Explicit end of options.
             break
             ;;
     esac
