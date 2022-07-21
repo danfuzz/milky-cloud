@@ -1,0 +1,220 @@
+#!/bin/bash
+#
+# Copyright 2022 Dan Bornstein.
+# Licensed AS IS and WITHOUT WARRANTY under the Apache License,
+# Version 2.0. Details: <http://www.apache.org/licenses/LICENSE-2.0>
+
+#
+# Library for reasonably okay argument / option processing.
+#
+
+# Processes all of the given arguments, according to the configured handlers.
+# Returns non-zero if there is trouble parsing options or if any handler returns
+# non-zero.
+#
+# Note: In addition to handlers defined by `opt-switch`, and `opt-value`, the
+# handler `arg-rest`, if defined, is called with all arguments that remain after
+# option processing. If not defined, it is considered an error to pass any
+# non-option arguments.
+function process-args {
+    local argError=0
+    local arg handler name value
+
+    while (( $# > 0 )); do
+        arg="$1"
+
+        if [[ ${arg} == '--' ]]; then
+            # Explicit end of options.
+            shift
+            break
+        elif [[ ${arg} == '-' || ${arg} =~ ^[^-] ]]; then
+            # Non-option argument.
+            break
+        elif [[ ${arg} =~ ^--([-a-zA-Z0-9]+)(=.*)?$ ]]; then
+            # Long-form argument.
+            name="${BASH_REMATCH[1]}"
+            value="${BASH_REMATCH[2]}"
+            handler="_opt-handle-${name}"
+            if ! declare -F "${handler}" >/dev/null; then
+                echo 1>&2 "Unknown option: --${name}"
+                argError=1
+            elif [[ ${value} == '' ]]; then
+                "${handler}" || argError=1
+            else
+                # `:1` to drop the `=` from the start of `value`
+                "${handler}" "${value:1}" || argError=1
+            fi
+        elif [[ $arg =~ ^-([a-zA-Z0-9]+)$ ]]; then
+            # Short-form argument.
+            arg="${BASH_REMATCH[1]}"
+            while [[ ${arg} =~ ^(.)(.*)$ ]]; do
+                name="${BASH_REMATCH[1]}"
+                arg="${BASH_REMATCH[2]}"
+                handler="_opt-shortcut-${name}"
+                if ! declare -F "${handler}" >/dev/null; then
+                    echo 1>&2 "Unknown option: -${name}"
+                    argError=1
+                    # Break, to avoid spewing a ton of errors in case of a
+                    # pilot error along the lines of `-longOptionName`.
+                    break
+                else
+                    "${handler}" || argError=1
+                fi
+            done
+        else
+            # Something weird and invalid, e.g. `--=`.
+            echo 1>&2 "Invalid option: ${arg}"
+            argError=1
+        fi
+
+        shift
+    done
+
+    if declare -F arg-rest >/dev/null; then
+        arg-rest "$@" || argError=1
+    elif (( $# > 0 )); then
+        echo 1>&2 'Non-option arguments are not allowed.'
+        argError=1
+    fi
+
+    return "${argError}"
+}
+
+# Declares a "switch" option, which can be turned on with `--<name>` or off with
+# `--no-<name>`. Client code needs to define a function `arg-opt-<name>`, which
+# will get called during argument processing with either `0` (off) or `1` (on).
+# An optional second argument to this declaration indicates a single character
+# shortcut to turn the switch on.
+function opt-switch {
+    local name="$1"
+    local shortcut="$2"
+
+    if [[ ${shortcut} != '' ]]; then
+        if ! [[ ${shortcut} =~ ^[a-zA-Z0-9]$ ]]; then
+            echo 1>&2 "Invalid shortcut specification: ${shortcut}"
+            return 1
+        fi
+
+        eval 'function _opt-shortcut-'"${shortcut}"' {
+            _process-args_handle-switch '"${name}"' 1 "$@"
+        }'
+    fi
+
+    eval 'function _opt-handle-'"${name}"' {
+        _process-args_handle-switch '"${name}"' 1 "$@"
+    }'
+
+    eval 'function _opt-handle-no-'"${name}"' {
+        _process-args_handle-switch '"${name}"' 0 "$@"
+    }'
+}
+
+# Declares a "value" option, which takes a value via the form `--<name>=<value`.
+# Client code needs to define a function `arg-opt-<name>`, which will get called
+# during argument processing with the passed value, assuming it matches the
+# given `match` expression (a regular expression which is matched against the
+# entire value). If `match` is not passed, then no value validation is done.
+function opt-value {
+    local name="$1"
+    local match="$2"
+
+    # Quote `match` so it is a literal string in the function definition below.
+    match="$(printf '%q' "${match}")"
+
+    eval 'function _opt-handle-'"${name}"' {
+        _process-args_handle-value '"${name}"' '"${match}"' "$@"
+    }'
+}
+
+
+#
+# Library-internal functions
+#
+
+# Called by generated switch option handlers to do most of the work.
+function _process-args_handle-switch {
+    local name="$1"
+    local value="$2"
+
+    if (( $# > 2 )); then
+        echo 1>&2 "Value not allowed for option: --${name}"
+        return 1
+    fi
+
+    "arg-opt-${name}" "${value}"
+}
+
+# Called by generated value option handlers to do most of the work.
+function _process-args_handle-value {
+    local name="$1"
+    local match="$2"
+    local value="$3"
+
+    if (( $# < 3 )); then
+        echo 1>&2 "Value required for option: --${name}"
+        return 1
+    elif ! [[ ${value} =~ ^(${match})$ ]]; then
+        echo 1>&2 "Invalid value for option: --${name}"
+        echo 1>&2 "Value: ${value}"
+        return 1
+    fi
+
+    "arg-opt-${name}" "${value}"
+}
+
+
+
+#
+# TEST
+#
+
+
+opt-switch progress
+progress=0
+function arg-opt-progress {
+    progress="$1"
+}
+
+opt-value in '[a-z][-a-z0-9]*'
+inLocation=''
+function arg-opt-in {
+    inLocation="$1"
+}
+
+opt-value name '.*'
+name=''
+function arg-opt-name {
+    name="$1"
+}
+
+opt-switch help h
+function arg-opt-help {
+    echo 1>&2 '>>> THIS IS YOUR HELP! <<<'
+    exit
+}
+
+args=()
+function arg-rest {
+    echo "#### rest $#"
+    if (( $# > 0 )); then
+        printf $'>>%q<<\n' "$@"
+    fi
+}
+
+echo 1>&2 '########## A'
+process-args "$@"
+error="$?"
+echo 1>&2 "##### error? ${error}"
+echo 1>&2 '########## B'
+
+echo 1>&2 "#### progress ${progress}"
+echo 1>&2 "#### in ${inLocation}"
+echo 1>&2 "#### name ${name}"
+
+if (( error )); then
+    exit "${error}"
+fi
+
+if [[ ${inLocation} == '' ]]; then
+    echo 1>&2 'Missing required option: --in'
+fi
