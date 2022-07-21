@@ -175,7 +175,7 @@ skeleton="$(
 || exit "$?"
 
 # Reform `idArg` so it can be used to pass the actual ID into the AWS commands.
-idArg="$(jval idArg="${idArg}" id="${id}" '{} | .[$idArg] = $id')" \
+idArg="$(jval idArg="${idArg}" id="${id}" '{ ($idArg): $id }')" \
 || exit "$?"
 
 error=0
