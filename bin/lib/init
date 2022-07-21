@@ -17,6 +17,7 @@ else
     libDir="${progDir}/lib"
 fi
 
+
 #
 # Library functions
 #
