@@ -58,7 +58,7 @@ function opt-action {
     fi
 
     name="${BASH_REMATCH[1]}"
-    local shortcut="${BASH_REMATCH[2]}"
+    local abbrev="${BASH_REMATCH[2]}"
 
     if [[ ${callFunc} == '' && ${setVar} == '' ]]; then
         echo 1>&2 "Must use at least one of --call or --var for option: ${name}."
@@ -86,9 +86,9 @@ function opt-action {
         '"${setVar}"'
     }'
 
-    if (( ${#shortcut} == 2 )); then
+    if (( ${#abbrev} == 2 )); then
         # `:1` to drop the slash.
-        eval 'function _argproc:shortcut-'"${shortcut:1}"' {
+        eval 'function _argproc:abbrev-'"${abbrev:1}"' {
             _argproc:long-'"${name}"' "$@"
         }'
     fi
@@ -162,7 +162,7 @@ function opt-choice {
         fi
 
         local name="${BASH_REMATCH[1]}"
-        local shortcut="${BASH_REMATCH[2]:1}" # `:1` to drop the slash.
+        local abbrev="${BASH_REMATCH[2]:1}" # `:1` to drop the slash.
         local value="${BASH_REMATCH[3]:1}"    # Likewise.
 
         if [[ ${value} == '' ]]; then
@@ -182,8 +182,8 @@ function opt-choice {
             '"${setVar}"'
         }'
 
-        if [[ ${shortcut} != '' ]]; then
-            eval 'function _argproc:shortcut-'"${shortcut}"' {
+        if [[ ${abbrev} != '' ]]; then
+            eval 'function _argproc:abbrev-'"${abbrev}"' {
                 _argproc:long-'"${name}"' "$@"
             }'
         fi
@@ -229,8 +229,8 @@ function opt-toggle {
     fi
 
     name="${BASH_REMATCH[1]}"
-    local shortcutOn="${BASH_REMATCH[2]}"
-    local shortcutOff="${BASH_REMATCH[3]}"
+    local abbrevOn="${BASH_REMATCH[2]}"
+    local abbrevOff="${BASH_REMATCH[3]}"
 
     if [[ ${callFunc} == '' && ${setVar} == '' ]]; then
         echo 1>&2 "Must use at least one of --call or --var for option: ${name}."
@@ -268,16 +268,16 @@ function opt-toggle {
         }
     '
 
-    if (( ${#shortcutOn} == 2 )); then
+    if (( ${#abbrevOn} == 2 )); then
         # `:1` to drop the slash.
-        eval 'function _argproc:shortcut-'"${shortcutOn:1}"' {
+        eval 'function _argproc:abbrev-'"${abbrevOn:1}"' {
             _argproc:toggle-handler-'"${name}"' 1
         }'
     fi
 
-    if (( ${#shortcutOff} == 2 )); then
+    if (( ${#abbrevOff} == 2 )); then
         # `:1` to drop the slash.
-        eval 'function _argproc:shortcut-'"${shortcutOff:1}"' {
+        eval 'function _argproc:abbrev-'"${abbrevOff:1}"' {
             _argproc:toggle-handler-'"${name}"' 0
         }'
     fi
@@ -499,7 +499,7 @@ function _argproc:statements-from-args {
             while [[ ${arg} =~ ^(.)(.*)$ ]]; do
                 name="${BASH_REMATCH[1]}"
                 arg="${BASH_REMATCH[2]}"
-                handler="_argproc:shortcut-${name}"
+                handler="_argproc:abbrev-${name}"
                 if ! declare -F "${handler}" >/dev/null; then
                     echo 1>&2 "Unknown option: -${name}"
                     argError=1
