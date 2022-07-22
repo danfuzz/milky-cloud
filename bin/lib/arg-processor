@@ -58,7 +58,7 @@ function opt-action {
     fi
 
     name="${BASH_REMATCH[1]}"
-    local abbrev="${BASH_REMATCH[2]}"
+    local abbrev="${BASH_REMATCH[2]:1}" # `:1` to drop the slash.
 
     if [[ ${callFunc} == '' && ${setVar} == '' ]]; then
         echo 1>&2 "Must use at least one of --call or --var for option: ${name}."
@@ -86,9 +86,8 @@ function opt-action {
         '"${setVar}"'
     }'
 
-    if (( ${#abbrev} == 2 )); then
-        # `:1` to drop the slash.
-        eval 'function _argproc:abbrev-'"${abbrev:1}"' {
+    if [[ ${abbrev} != '' ]]; then
+        eval 'function _argproc:abbrev-'"${abbrev}"' {
             _argproc:long-'"${name}"' "$@"
         }'
     fi
@@ -163,7 +162,7 @@ function opt-choice {
 
         local name="${BASH_REMATCH[1]}"
         local abbrev="${BASH_REMATCH[2]:1}" # `:1` to drop the slash.
-        local value="${BASH_REMATCH[3]:1}"    # Likewise.
+        local value="${BASH_REMATCH[3]:1}"  # Likewise.
 
         if [[ ${value} == '' ]]; then
             value="${name}"
@@ -229,8 +228,8 @@ function opt-toggle {
     fi
 
     name="${BASH_REMATCH[1]}"
-    local abbrevOn="${BASH_REMATCH[2]}"
-    local abbrevOff="${BASH_REMATCH[3]}"
+    local abbrevOn="${BASH_REMATCH[2]:1}"  # `:1` to drop the slash.
+    local abbrevOff="${BASH_REMATCH[3]:1}" # Likewise.
 
     if [[ ${callFunc} == '' && ${setVar} == '' ]]; then
         echo 1>&2 "Must use at least one of --call or --var for option: ${name}."
@@ -268,23 +267,21 @@ function opt-toggle {
         }
     '
 
-    if (( ${#abbrevOn} == 2 )); then
-        # `:1` to drop the slash.
-        eval 'function _argproc:abbrev-'"${abbrevOn:1}"' {
+    if [[ ${abbrevOn} != '' ]]; then
+        eval 'function _argproc:abbrev-'"${abbrevOn}"' {
             _argproc:toggle-handler-'"${name}"' 1
         }'
     fi
 
-    if (( ${#abbrevOff} == 2 )); then
-        # `:1` to drop the slash.
-        eval 'function _argproc:abbrev-'"${abbrevOff:1}"' {
+    if [[ ${abbrevOff} != '' ]]; then
+        eval 'function _argproc:abbrev-'"${abbrevOff}"' {
             _argproc:toggle-handler-'"${name}"' 0
         }'
     fi
 }
 
-# Declares a "value" option, specified as `<name>/<abbrev>`, with `/<abbrev>`
-# optional. When parsed value options require a value, passed in the form
+# Declares a "value" option, specified as just `<name>` (no `<abbrev>` allowed
+# for these). When parsed value options require a value, passed in the form
 # `--<name>=<value>`. At least one of `--call` or `--var` must be used to define
 # the option.
 #
@@ -566,7 +563,6 @@ opt-value --var=name --default=$'no name' name
 opt-action --call=usage --var=wantHelp help/h
 function usage {
     echo 1>&2 '>>> THIS IS YOUR HELP! <<<' "${wantHelp}"
-    exit
 }
 
 opt-choice --call=did-net --var=net tcp/t=floop-tcp udp/u zorp
@@ -596,6 +592,7 @@ echo 1>&2 "#### progress ${progress}"
 echo 1>&2 "#### in ${inLocation}"
 echo 1>&2 "#### name >>>${name}<<<"
 echo 1>&2 "#### net >>>${net}<<<"
+echo 1>&2 "#### wantHelp >>>${wantHelp}<<<"
 
 if (( ${#args[@]} > 0 )); then
     printf $'arg >>%q<<\n' "${args[@]}"
