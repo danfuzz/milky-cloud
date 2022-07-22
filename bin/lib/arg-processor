@@ -49,7 +49,8 @@ function process-args {
 # least one of the two options must be specified.
 #
 # --call=<name> -- Calls the function with the given name. If `--var` is also
-#   used, the variable is set before the call is made.
+#   used, the call is made first, and then the variable is set only if the call
+#   returned successfully.
 # --var=<name> -- Sets the global `<name>` to `1`, and causes it to be
 #   defaulted to `0` at the start of argument processing.
 function opt-action {
@@ -87,6 +88,11 @@ function opt-action {
         return 1
     fi
 
+    if [[ ${callFunc} != '' ]]; then
+        # Re-form as the caller code.
+        callFunc="${callFunc}"' || return "$?"'
+    fi
+
     if [[ ${setVar} != '' ]]; then
         # Set up the default, and then re-form as the setter code.
         _argproc_defaults+=("${setVar}=0")
@@ -99,8 +105,8 @@ function opt-action {
             return 1
         fi
 
-        '"${setVar}"'
         '"${callFunc}"'
+        '"${setVar}"'
     }'
 
     if (( ${#shortcut} == 2 )); then
@@ -118,7 +124,8 @@ function opt-action {
 # of the two options must be specified.
 #
 # --call=<name> -- Calls the function with the given name, passing it `1` or
-#   `0`. If `--var` is also used, the variable is set before the call is made.
+#   `0`. If `--var` is also used, the call is made first, and then the variable
+#   is set only if the call returned successfully.
 # --var=<name> -- Sets the global `<name>` to `1` or `0`, and causes it to be
 #   defauled to `0` at the start of argument processing.
 function opt-toggle {
@@ -157,15 +164,15 @@ function opt-toggle {
         return 1
     fi
 
+    if [[ ${callFunc} != '' ]]; then
+        # Re-form as the caller code.
+        callFunc="${callFunc}"' "${value}" || return "$?"'
+    fi
+
     if [[ ${setVar} != '' ]]; then
         # Set up the default, and then re-form as the setter code.
         _argproc_defaults+=("${setVar}=0")
         setVar="${setVar}"'="${value}"'
-    fi
-
-    if [[ ${callFunc} != '' ]]; then
-        # Re-form as the caller code.
-        callFunc="${callFunc}"' "${value}"'
     fi
 
     eval '
@@ -177,8 +184,8 @@ function opt-toggle {
                 return 1
             fi
 
-            '"${setVar}"'
             '"${callFunc}"'
+            '"${setVar}"'
         }
 
         function _argproc:long-'"${name}"' {
@@ -210,8 +217,8 @@ function opt-toggle {
 # be specified. Others are optional.
 #
 # --call=<name> -- Calls the function with the given name, passing it the option
-#   value parsed from the argument. If `--var` is also used, the variable is set
-#   before the call is made.
+#   value parsed from the argument. If `--var` is also used, the call is made
+#   first, and then the variable is set only if the call returned successfully.
 # --default=<value> -- The default value for the variable.
 # --match=<regex> -- Regular expression matched against the entire argument
 #   value. If the value does not match, then the option gets rejected.
@@ -258,15 +265,15 @@ function opt-value {
         return 1
     fi
 
+    if [[ ${callFunc} != '' ]]; then
+        # Re-form as the caller code.
+        callFunc="${callFunc}"' "${value}" || return "$?"'
+    fi
+
     if [[ ${setVar} != '' ]]; then
         # Set up the default, and then re-form as the setter code.
         _argproc_defaults+=("${setVar}=$(_argproc:quote "${defaultValue}")")
         setVar="${setVar}"'="${value}"'
-    fi
-
-    if [[ ${callFunc} != '' ]]; then
-        # Re-form as the caller code.
-        callFunc="${callFunc}"' "${value}"'
     fi
 
     if [[ ${match} != '' ]]; then
@@ -287,8 +294,8 @@ function opt-value {
         '"${match}"'
         fi
 
-        '"${setVar}"'
         '"${callFunc}"'
+        '"${setVar}"'
     }'
 }
 
@@ -298,8 +305,8 @@ function opt-value {
 # specified.
 #
 # --call=<name> -- Calls the function with the given name, passing it all the
-#   non-option arguments. If `--var` is also used, the variable is set before
-#   the call is made.
+#   non-option arguments. If `--var` is also used, the call is made first, and
+#   then the variable is set only if the call returned successfully.
 # --var=<name> -- Sets the global `<name>` to an array of all the non-option
 #   arguments. This also causes the variable to be initialized to an empty
 #   array at the start of argument processing.
@@ -328,20 +335,20 @@ function rest-arg {
         return 1
     fi
 
+    if [[ ${callFunc} != '' ]]; then
+        # Re-form as the caller code.
+        callFunc="${callFunc}"' "$@" || return "$?"'
+    fi
+
     if [[ ${setVar} != '' ]]; then
         # Set up the default, and then re-form as the setter code.
         _argproc_defaults+=("${setVar}=()")
         setVar="${setVar}"'=("$@")'
     fi
 
-    if [[ ${callFunc} != '' ]]; then
-        # Re-form as the caller code.
-        callFunc="${callFunc}"' "$@"'
-    fi
-
     eval 'function _argproc:rest {
-        '"${setVar}"'
         '"${callFunc}"'
+        '"${setVar}"'
     }'
 }
 
@@ -468,6 +475,10 @@ function got-some-rest {
     if (( $# > 0 )); then
         printf $'>>%q<<\n' "$@"
     fi
+    if (( $# == 4 )); then
+        echo 1>&2 'REST ERROR!!!'
+        return 1
+    fi
 }
 
 echo 1>&2 '########## A'
@@ -479,6 +490,10 @@ echo 1>&2 '########## B'
 echo 1>&2 "#### progress ${progress}"
 echo 1>&2 "#### in ${inLocation}"
 echo 1>&2 "#### name >>>${name}<<<"
+
+if (( ${#args[@]} > 0 )); then
+    printf $'arg >>%q<<\n' "${args[@]}"
+fi
 
 if (( error )); then
     exit "${error}"
