@@ -34,7 +34,7 @@ function process-args {
             # Long-form argument.
             name="${BASH_REMATCH[1]}"
             value="${BASH_REMATCH[2]}"
-            handler="_opt-handle-${name}"
+            handler="_opt-long-${name}"
             if ! declare -F "${handler}" >/dev/null; then
                 echo 1>&2 "Unknown option: --${name}"
                 argError=1
@@ -80,33 +80,72 @@ function process-args {
     return "${argError}"
 }
 
-# Declares a "switch" option, which can be turned on with `--<name>` or off with
+# Declares an "action" option. Client code needs to define a function
+# `arg-opt-<name>`, which will get called during argument processing with no
+# arguments. If a slash and single character are appended to the option name,
+# that is taken to be a shortcut to activate the option.
+function opt-action {
+    local name="$1"
+
+    if ! [[ ${name} =~ ^([a-zA-Z0-9][-a-zA-Z0-9]*)(/[a-zA-Z0-9])?$ ]]; then
+        echo 1>&2 "Invalid action specification: ${toggle}"
+        return 1
+    fi
+
+    name="${BASH_REMATCH[1]}"
+    local shortcut="${BASH_REMATCH[2]}"
+
+    eval 'function _opt-long-'"${name}"' {
+        _process-args_handle-action '"${name}"' "$@"
+    }'
+
+    if (( ${#shortcut} == 2 )); then
+        # `:1` to drop the slash.
+        eval 'function _opt-shortcut-'"${shortcut:1}"' {
+            _process-args_handle-action '"${name}"'
+        }'
+    fi
+}
+
+# Declares a "toggle" option, which can be turned on with `--<name>` or off with
 # `--no-<name>`. Client code needs to define a function `arg-opt-<name>`, which
 # will get called during argument processing with either `0` (off) or `1` (on).
-# An optional second argument to this declaration indicates a single character
-# shortcut to turn the switch on.
-function opt-switch {
+# If a slash and single character are appended to the option name, that is taken
+# to be a shortcut to turn the toggle on. Likewise, a second slash and character
+# indicate a shortcut to turn the toggle off.
+function opt-toggle {
     local name="$1"
-    local shortcut="$2"
 
-    if [[ ${shortcut} != '' ]]; then
-        if ! [[ ${shortcut} =~ ^[a-zA-Z0-9]$ ]]; then
-            echo 1>&2 "Invalid shortcut specification: ${shortcut}"
-            return 1
-        fi
+    if ! [[ ${name} =~ ^([a-zA-Z0-9][-a-zA-Z0-9]*)(/[a-zA-Z0-9]?)?(/[a-zA-Z0-9])?$ ]]; then
+        echo 1>&2 "Invalid toggle specification: ${toggle}"
+        return 1
+    fi
 
-        eval 'function _opt-shortcut-'"${shortcut}"' {
-            _process-args_handle-switch '"${name}"' 1 "$@"
+    name="${BASH_REMATCH[1]}"
+    local shortcutOn="${BASH_REMATCH[2]}"
+    local shortcutOff="${BASH_REMATCH[3]}"
+
+    eval 'function _opt-long-'"${name}"' {
+        _process-args_handle-toggle '"${name}"' 1 "$@"
+    }'
+
+    eval 'function _opt-long-no-'"${name}"' {
+        _process-args_handle-toggle '"${name}"' 0 "$@"
+    }'
+
+    if (( ${#shortcutOn} == 2 )); then
+        # `:1` to drop the slash.
+        eval 'function _opt-shortcut-'"${shortcutOn:1}"' {
+            _process-args_handle-toggle '"${name}"' 1
         }'
     fi
 
-    eval 'function _opt-handle-'"${name}"' {
-        _process-args_handle-switch '"${name}"' 1 "$@"
-    }'
-
-    eval 'function _opt-handle-no-'"${name}"' {
-        _process-args_handle-switch '"${name}"' 0 "$@"
-    }'
+    if (( ${#shortcutOff} == 2 )); then
+        # `:1` to drop the slash.
+        eval 'function _opt-shortcut-'"${shortcutOff:1}"' {
+            _process-args_handle-toggle '"${name}"' 0
+        }'
+    fi
 }
 
 # Declares a "value" option, which takes a value via the form `--<name>=<value`.
@@ -121,7 +160,7 @@ function opt-value {
     # Quote `match` so it is a literal string in the function definition below.
     match="$(printf '%q' "${match}")"
 
-    eval 'function _opt-handle-'"${name}"' {
+    eval 'function _opt-long-'"${name}"' {
         _process-args_handle-value '"${name}"' '"${match}"' "$@"
     }'
 }
@@ -131,8 +170,20 @@ function opt-value {
 # Library-internal functions
 #
 
-# Called by generated switch option handlers to do most of the work.
-function _process-args_handle-switch {
+# Called by generated action option handlers to do most of the work.
+function _process-args_handle-action {
+    local name="$1"
+
+    if (( $# > 1 )); then
+        echo 1>&2 "Value not allowed for option: --${name}"
+        return 1
+    fi
+
+    "arg-opt-${name}"
+}
+
+# Called by generated toggle option handlers to do most of the work.
+function _process-args_handle-toggle {
     local name="$1"
     local value="$2"
 
@@ -169,7 +220,7 @@ function _process-args_handle-value {
 #
 
 
-opt-switch progress
+opt-toggle progress/p/P
 progress=0
 function arg-opt-progress {
     progress="$1"
@@ -187,7 +238,7 @@ function arg-opt-name {
     name="$1"
 }
 
-opt-switch help h
+opt-action help/h
 function arg-opt-help {
     echo 1>&2 '>>> THIS IS YOUR HELP! <<<'
     exit
