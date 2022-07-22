@@ -87,7 +87,7 @@ function process-args {
 # --call=<name> -- Calls the function with the given name. If `--var` is also
 #   used, the variable is set before the call is made.
 # --var=<name> -- Sets the global `<name>` to `1`, and causes it to be
-#   immediately initialized to `0`.
+#   defaulted to `0` at the start of argument processing.
 function opt-action {
     local callFunc=''
     local setVar=''
@@ -111,7 +111,7 @@ function opt-action {
     local name="$1"
 
     if ! [[ ${name} =~ ^([a-zA-Z0-9][-a-zA-Z0-9]*)(/[a-zA-Z0-9])?$ ]]; then
-        echo 1>&2 "Invalid action specification: ${name}"
+        echo 1>&2 "Invalid action-option name: ${name}"
         return 1
     fi
 
@@ -119,7 +119,7 @@ function opt-action {
     local shortcut="${BASH_REMATCH[2]}"
 
     if [[ ${callFunc} == '' && ${setVar} == '' ]]; then
-        echo 1>&2 "Must use at least one of --call or --var for action: ${name}."
+        echo 1>&2 "Must use at least one of --call or --var for option: ${name}."
         return 1
     fi
 
@@ -156,7 +156,7 @@ function opt-action {
 # --call=<name> -- Calls the function with the given name, passing it `1` or
 #   `0`. If `--var` is also used, the variable is set before the call is made.
 # --var=<name> -- Sets the global `<name>` to `1` or `0`, and causes it to be
-#   immediately initialized to `0`.
+#   defauled to `0` at the start of argument processing.
 function opt-toggle {
     local callFunc=''
     local setVar=''
@@ -180,7 +180,7 @@ function opt-toggle {
     local name="$1"
 
     if ! [[ ${name} =~ ^([a-zA-Z0-9][-a-zA-Z0-9]*)(/[a-zA-Z0-9]?)?(/[a-zA-Z0-9])?$ ]]; then
-        echo 1>&2 "Invalid toggle specification: ${name}"
+        echo 1>&2 "Invalid toggle-option name: ${name}"
         return 1
     fi
 
@@ -189,7 +189,7 @@ function opt-toggle {
     local shortcutOff="${BASH_REMATCH[3]}"
 
     if [[ ${callFunc} == '' && ${setVar} == '' ]]; then
-        echo 1>&2 "Must use at least one of --call or --var for toggle: ${name}."
+        echo 1>&2 "Must use at least one of --call or --var for option: ${name}."
         return 1
     fi
 
@@ -241,20 +241,91 @@ function opt-toggle {
     fi
 }
 
-# Declares a "value" option, which takes a value via the form `--<name>=<value`.
-# Client code needs to define a function `arg-opt-<name>`, which will get called
-# during argument processing with the passed value, assuming it matches the
-# given `match` expression (a regular expression which is matched against the
-# entire value). If `match` is not passed, then no value validation is done.
+# Declares a "value" option, which takes a value via the form
+# `--<name>=<value>`. At least one of the two options `--call` or `--var` must
+# be specified. Others are optional.
+#
+# --call=<name> -- Calls the function with the given name, passing it the option
+#   value parsed from the argument. If `--var` is also used, the variable is set
+#   before the call is made.
+# --default=<value> -- The default value for the variable.
+# --match=<regex> -- Regular expression matched against the entire argument
+#   value. If the value does not match, then the option gets rejected.
+# --var=<name> -- Sets the global `<name>` to the value parsed from the
+#   argument. This also causes the variable to be initialized (to `''` by
+#   default) at the start of argument processing.
 function opt-value {
-    local name="$1"
-    local match="$2"
+    local callFunc=''
+    local defaultValue=''
+    local match=''
+    local setVar=''
 
-    # Quote `match` so it is a literal string in the function definition below.
-    match="$(printf '%q' "${match}")"
+    while (( $# > 0 )); do
+        case "$1" in
+            --call=?*)
+                callFunc="${1#*=}"
+                ;;
+            --default=?*)
+                defaultValue="${1#*=}"
+                ;;
+            --match=?*)
+                match="${1#*=}"
+                ;;
+            --var=?*)
+                setVar="${1#*=}"
+                ;;
+            *)
+                # End of options / unrecognized option.
+                break
+                ;;
+        esac
+        shift
+    done
+
+    local name="$1"
+
+    if ! [[ ${name} =~ ^[a-zA-Z0-9][-a-zA-Z0-9]*$ ]]; then
+        echo 1>&2 "Invalid value-option name: ${name}"
+        return 1
+    fi
+
+    if [[ ${callFunc} == '' && ${setVar} == '' ]]; then
+        echo 1>&2 "Must use at least one of --call or --var for option: ${name}."
+        return 1
+    fi
+
+    if [[ ${setVar} != '' ]]; then
+        # Re-form these as the defaulter and setter code (respectively).
+        defaultVar="${setVar}=$(printf '%q' "${defaultValue}")"
+        setVar="${setVar}"'="${value}"'
+        eval "${defaultVar}"
+    fi
+
+    if [[ ${callFunc} != '' ]]; then
+        # Re-form as the caller code.
+        callFunc="${callFunc}"' "${value}"'
+    fi
+
+    if [[ ${match} != '' ]]; then
+        # Re-form as the clause to insert to perform the check.
+        match='
+            elif ! [[ ${value} =~ ^('"${match}"')$ ]]; then
+                echo 1>&2 "Invalid value for option: --${name}"
+                echo 1>&2 "Value: ${value}"
+                return 1'
+    fi
 
     eval 'function _opt-long-'"${name}"' {
-        _process-args_handle-value '"${name}"' '"${match}"' "$@"
+        local value="$1"
+
+        if (( $# < 1 )); then
+            echo 1>&2 "Value required for option: --'"${name}"'"
+            return 1
+        '"${match}"'
+        fi
+
+        '"${setVar}"'
+        '"${callFunc}"'
     }'
 }
 
@@ -263,57 +334,21 @@ function opt-value {
 # Library-internal functions
 #
 
-# Called by generated toggle option handlers to do most of the work.
-function _process-args_handle-toggle {
-    local name="$1"
-    local value="$2"
-
-    if (( $# > 2 )); then
-        echo 1>&2 "Value not allowed for option: --${name}"
-        return 1
-    fi
-
-    "arg-opt-${name}" "${value}"
-}
-
-# Called by generated value option handlers to do most of the work.
-function _process-args_handle-value {
-    local name="$1"
-    local match="$2"
-    local value="$3"
-
-    if (( $# < 3 )); then
-        echo 1>&2 "Value required for option: --${name}"
-        return 1
-    elif ! [[ ${value} =~ ^(${match})$ ]]; then
-        echo 1>&2 "Invalid value for option: --${name}"
-        echo 1>&2 "Value: ${value}"
-        return 1
-    fi
-
-    "arg-opt-${name}" "${value}"
-}
-
-
 
 #
 # TEST
 #
 
-
 opt-toggle --var=progress progress/p/P
 
-opt-value in '[a-z][-a-z0-9]*'
-inLocation=''
-function arg-opt-in {
-    inLocation="$1"
+opt-value --match='[a-z][-a-z0-9]*' --var=inLocation --call=set-location in
+function set-location {
+    echo 1>&2 ">>> SET LOCATION <<< ${inLocation} $1"
 }
+echo 1>&2 "#### LOCATION START ${inLocation}"
 
-opt-value name '.*'
-name=''
-function arg-opt-name {
-    name="$1"
-}
+opt-value --var=namex --default='no name' name
+echo 1>&2 "#### NAME START ${namex}"
 
 opt-action --call=usage --var=wantHelp help/h
 function usage {
@@ -337,7 +372,7 @@ echo 1>&2 '########## B'
 
 echo 1>&2 "#### progress ${progress}"
 echo 1>&2 "#### in ${inLocation}"
-echo 1>&2 "#### name ${name}"
+echo 1>&2 "#### name ${namex}"
 
 if (( error )); then
     exit "${error}"
