@@ -15,35 +15,6 @@
 # List of default variable assignment statements.
 _argproc_defaults=()
 
-# Processes all of the given arguments, according to the configured handlers.
-# Returns non-zero if there is trouble parsing options or if any handler returns
-# non-zero.
-#
-# Note: In addition to handlers defined by `opt-switch`, and `opt-value`, the
-# handler `arg-rest`, if defined, is called with all arguments that remain after
-# option processing. If not defined, it is considered an error to pass any
-# non-option arguments.
-function process-args {
-    # Set all the defaults.
-    local _argproc_d
-    for _argproc_d in "${_argproc_defaults[@]}"; do
-        eval "${_argproc_d}"
-    done
-
-    # Build up the statements to evaluate.
-    local _argproc_statements=()
-    _argproc:statements-from-args "$@"
-
-    # Evaluate them!
-    local _argproc_error=0
-    local _argproc_s
-    for _argproc_s in "${_argproc_statements[@]}"; do
-        eval "${_argproc_s}" || _argproc_error="$?"
-    done
-
-    return "${_argproc_error}"
-}
-
 # Declares an "action" option. If a slash and single character are appended to
 # the option name, that is taken to be a shortcut to activate the option. At
 # least one of the two options must be specified.
@@ -297,6 +268,35 @@ function opt-value {
         '"${callFunc}"'
         '"${setVar}"'
     }'
+}
+
+# Processes all of the given arguments, according to the configured handlers.
+# Returns non-zero if there is trouble parsing options or if any handler returns
+# non-zero.
+#
+# Note: In addition to handlers defined by `opt-switch`, and `opt-value`, the
+# handler `arg-rest`, if defined, is called with all arguments that remain after
+# option processing. If not defined, it is considered an error to pass any
+# non-option arguments.
+function process-args {
+    # Set all the defaults.
+    local _argproc_d
+    for _argproc_d in "${_argproc_defaults[@]}"; do
+        eval "${_argproc_d}"
+    done
+
+    # Build up the statements to evaluate.
+    local _argproc_statements=()
+    _argproc:statements-from-args "$@"
+
+    # Evaluate them!
+    local _argproc_error=0
+    local _argproc_s
+    for _argproc_s in "${_argproc_statements[@]}"; do
+        eval "${_argproc_s}" || _argproc_error="$?"
+    done
+
+    return "${_argproc_error}"
 }
 
 # Declares a "rest" argument, which gets all the non-option arguments during
