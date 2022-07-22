@@ -248,7 +248,7 @@ function opt-value {
     if [[ ${match} != '' ]]; then
         # Re-form as the clause to insert to perform the check.
         match='
-        elif ! [[ $1 =~ ^('"${match}"')$ ]]; then
+            elif ! [[ $1 =~ ^('"${match}"')$ ]]; then
                 echo 1>&2 "Invalid value for option: --'"${name}"'"
                 echo 1>&2 "Value: $1"
                 return 1'
