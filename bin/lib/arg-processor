@@ -323,7 +323,7 @@ function opt-value {
 
     if [[ ${setVar} != '' ]]; then
         # Set up the default, and then re-form as the setter code.
-        _argproc_defaults+=("${setVar}=$(printf '%q' "${defaultValue}")")
+        _argproc_defaults+=("${setVar}=$(_argproc:quote "${defaultValue}")")
         setVar="${setVar}"'="${value}"'
     fi
 
@@ -430,7 +430,7 @@ function set-location {
     echo 1>&2 ">>> SET LOCATION <<< ${inLocation} $1"
 }
 
-opt-value --var=namex --default='no name' name
+opt-value --var=namex --default=$'no\nname\n' name
 
 opt-action --call=usage --var=wantHelp help/h
 function usage {
@@ -454,7 +454,7 @@ echo 1>&2 '########## B'
 
 echo 1>&2 "#### progress ${progress}"
 echo 1>&2 "#### in ${inLocation}"
-echo 1>&2 "#### name ${namex}"
+echo 1>&2 "#### name >>>${namex}<<<"
 
 if (( error )); then
     exit "${error}"
