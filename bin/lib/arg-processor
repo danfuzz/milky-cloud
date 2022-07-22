@@ -32,6 +32,7 @@ function process-args {
 
     # Main processing loop.
 
+    local _argproc_statements=()
     local argError=0
     local arg handler name value
 
@@ -54,10 +55,10 @@ function process-args {
                 echo 1>&2 "Unknown option: --${name}"
                 argError=1
             elif [[ ${value} == '' ]]; then
-                "${handler}" || argError=1
+                _argproc_statements+=("${handler}")
             else
                 # `:1` to drop the `=` from the start of `value`
-                "${handler}" "${value:1}" || argError=1
+                _argproc_statements+=("${handler} $(_argproc:quote "${value:1}")")
             fi
         elif [[ $arg =~ ^-([a-zA-Z0-9]+)$ ]]; then
             # Short-form argument.
@@ -73,7 +74,7 @@ function process-args {
                     # pilot error along the lines of `-longOptionName`.
                     break
                 else
-                    "${handler}" || argError=1
+                    _argproc_statements+=("${handler}")
                 fi
             done
         else
@@ -85,14 +86,23 @@ function process-args {
         shift
     done
 
-    # Handle the non-option arguments.
-
     if declare -F _argproc:rest >/dev/null; then
-        _argproc:rest "$@" || argError=1
+        _argproc_statements+=('_argproc:rest "$@"')
     elif (( $# > 0 )); then
         echo 1>&2 'Non-option arguments are not allowed.'
         argError=1
     fi
+
+    if (( argError != 0 )); then
+        return "${argError}"
+    fi
+
+    # Evaluate all the handler call statements.
+
+    local _argproc_s
+    for _argproc_s in "${_argproc_statements[@]}"; do
+        eval "${_argproc_s}" || argError="$?"
+    done
 
     return "${argError}"
 }
@@ -402,6 +412,11 @@ function rest-arg {
 #
 # Library-internal functions
 #
+
+# Quotes a literal string, so it can be safely used in evaluated code.
+function _argproc:quote {
+    printf '%q' "$1"
+}
 
 
 #
