@@ -52,7 +52,7 @@ function opt-action {
     local name="$1"
 
     if ! [[ ${name} =~ ^([a-zA-Z0-9][-a-zA-Z0-9]*)(/[a-zA-Z0-9])?$ ]]; then
-        echo 1>&2 "Invalid option name: ${name}"
+        echo 1>&2 "Invalid option spec: ${name}"
         return 1
     fi
 
@@ -93,6 +93,103 @@ function opt-action {
     fi
 }
 
+# Declares a set of "choice" options, which allows a single option locus for an
+# enumerated set of possible values, each represented by a different option
+# name. Each argument is in the form `<name>/<shortcut>=<value>`, with the name
+# required and the other two items optional. `<name>` is the full option name.
+# `<value>` is its value (which defaults to the full name), and `<shortcut>` is
+# a shortcut option character. At least one of the two options `--call` or
+# `--var` must be specified. Others are optional.
+#
+# --call=<name> -- Calls the function with the given name, passing it the
+#   option value. If `--var` is also used, the call is made first, and then the
+#   variable is set only if the call returned successfully.
+# --default=<value> -- The default value for the variable. If not specified, the
+#   default value is `''` (the empty string).
+# --var=<name> -- Sets the global `<name>` to the option value, and causes it to
+#   be defaulted at the start of argument processing.
+function opt-choice {
+    local callFunc=''
+    local defaultValue=''
+    local setVar=''
+
+    while (( $# > 0 )); do
+        case "$1" in
+            --call=?*)
+                callFunc="${1#*=}"
+                ;;
+            --default=?*)
+                defaultValue="${1#*=}"
+                ;;
+            --var=?*)
+                setVar="${1#*=}"
+                ;;
+            *)
+                # End of options / unrecognized option.
+                break
+                ;;
+        esac
+        shift
+    done
+
+    local specs=("$@")
+    if (( ${#specs[@]} == 0 )); then
+        echo 1>&2 'Missing option specs.'
+        return 1
+    fi
+
+    if [[ ${callFunc} == '' && ${setVar} == '' ]]; then
+        echo 1>&2 "Must use at least one of --call or --var for option: ${name}."
+        return 1
+    fi
+
+    if [[ ${callFunc} != '' ]]; then
+        # Re-form as the caller code.
+        callFunc="${callFunc}"' "${_approc_value}" || return "$?"'
+    fi
+
+    if [[ ${setVar} != '' ]]; then
+        # Set up the default, and then re-form as the setter code.
+        _argproc_defaults+=("${setVar}=$(_argproc:quote "${defaultValue}")")
+        setVar="${setVar}"'="${_argproc_value}"'
+    fi
+
+    local s
+    for s in "${specs[@]}"; do
+        if ! [[ ${s} =~ ^([a-zA-Z0-9][-a-zA-Z0-9]*)(/[a-zA-Z0-9])?(=(.*))?$ ]]; then
+            echo 1>&2 "Invalid option spec: ${s}"
+            return 1
+        fi
+
+        local name="${BASH_REMATCH[1]}"
+        local shortcut="${BASH_REMATCH[2]:1}" # `:1` to drop the slash.
+        local value="${BASH_REMATCH[3]:1}"    # Likewise.
+
+        if [[ ${value} == '' ]]; then
+            value="${name}"
+        else
+            value="$(_argproc:quote "${value}")"
+        fi
+
+        eval 'function _argproc:long-'"${name}"' {
+            if (( $# > 0 )); then
+                echo 1>&2 "Value not allowed for option: --'"${name}"'"
+                return 1
+            fi
+
+            local _argproc_value='"${value}"'
+            '"${callFunc}"'
+            '"${setVar}"'
+        }'
+
+        if [[ ${shortcut} != '' ]]; then
+            eval 'function _argproc:shortcut-'"${shortcut}"' {
+                _argproc:long-'"${name}"' "$@"
+            }'
+        fi
+    done
+}
+
 # Declares a "toggle" option, which can be turned on with `--<name>` or off with
 # `--no-<name>`. If a slash and single character are appended to the option
 # name, that is taken to be a shortcut to turn the toggle on. Likewise, a second
@@ -127,7 +224,7 @@ function opt-toggle {
     local name="$1"
 
     if ! [[ ${name} =~ ^([a-zA-Z0-9][-a-zA-Z0-9]*)(/[a-zA-Z0-9]?)?(/[a-zA-Z0-9])?$ ]]; then
-        echo 1>&2 "Invalid option name: ${name}"
+        echo 1>&2 "Invalid option spec: ${name}"
         return 1
     fi
 
@@ -193,12 +290,13 @@ function opt-toggle {
 # --call=<name> -- Calls the function with the given name, passing it the option
 #   value parsed from the argument. If `--var` is also used, the call is made
 #   first, and then the variable is set only if the call returned successfully.
-# --default=<value> -- The default value for the variable.
+# --default=<value> -- The default value for the variable. If not specified, the
+#   default value is `''` (the empty string).
 # --match=<regex> -- Regular expression matched against the entire argument
 #   value. If the value does not match, then the option gets rejected.
 # --var=<name> -- Sets the global `<name>` to the value parsed from the
-#   argument. This also causes the variable to be initialized (to `''` by
-#   default) at the start of argument processing.
+#   argument. This also causes the variable to be initialized at the start of
+#   argument processing.
 function opt-value {
     local callFunc=''
     local defaultValue=''
@@ -230,7 +328,7 @@ function opt-value {
     local name="$1"
 
     if ! [[ ${name} =~ ^[a-zA-Z0-9][-a-zA-Z0-9]*$ ]]; then
-        echo 1>&2 "Invalid option name: ${name}"
+        echo 1>&2 "Invalid option spec: ${name}"
         return 1
     fi
 
@@ -470,6 +568,11 @@ function usage {
     exit
 }
 
+opt-choice --call=did-net --var=net tcp/t=floop-tcp udp/u zorp
+function did-net {
+    echo 1>&2 "####### GOT NET $1"
+}
+
 rest-arg --var=args --call=got-some-rest
 function got-some-rest {
     echo "#### rest $#"
@@ -491,6 +594,7 @@ echo 1>&2 '########## B'
 echo 1>&2 "#### progress ${progress}"
 echo 1>&2 "#### in ${inLocation}"
 echo 1>&2 "#### name >>>${name}<<<"
+echo 1>&2 "#### net >>>${net}<<<"
 
 if (( ${#args[@]} > 0 )); then
     printf $'arg >>%q<<\n' "${args[@]}"
