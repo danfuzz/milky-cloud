@@ -34,7 +34,7 @@ function process-args {
             # Long-form argument.
             name="${BASH_REMATCH[1]}"
             value="${BASH_REMATCH[2]}"
-            handler="_opt-long-${name}"
+            handler="_argproc:long-${name}"
             if ! declare -F "${handler}" >/dev/null; then
                 echo 1>&2 "Unknown option: --${name}"
                 argError=1
@@ -50,7 +50,7 @@ function process-args {
             while [[ ${arg} =~ ^(.)(.*)$ ]]; do
                 name="${BASH_REMATCH[1]}"
                 arg="${BASH_REMATCH[2]}"
-                handler="_opt-shortcut-${name}"
+                handler="_argproc:shortcut-${name}"
                 if ! declare -F "${handler}" >/dev/null; then
                     echo 1>&2 "Unknown option: -${name}"
                     argError=1
@@ -70,8 +70,8 @@ function process-args {
         shift
     done
 
-    if declare -F _opt-rest >/dev/null; then
-        _opt-rest "$@" || argError=1
+    if declare -F _argproc:rest >/dev/null; then
+        _argproc:rest "$@" || argError=1
     elif (( $# > 0 )); then
         echo 1>&2 'Non-option arguments are not allowed.'
         argError=1
@@ -129,7 +129,7 @@ function opt-action {
         setVar="${setVar}=1"
     fi
 
-    eval 'function _opt-long-'"${name}"' {
+    eval 'function _argproc:long-'"${name}"' {
         if (( $# > 0 )); then
             echo 1>&2 "Value not allowed for option: --'"${name}"'"
             return 1
@@ -141,8 +141,8 @@ function opt-action {
 
     if (( ${#shortcut} == 2 )); then
         # `:1` to drop the slash.
-        eval 'function _opt-shortcut-'"${shortcut:1}"' {
-            _opt-long-'"${name}"' "$@"
+        eval 'function _argproc:shortcut-'"${shortcut:1}"' {
+            _argproc:long-'"${name}"' "$@"
         }'
     fi
 }
@@ -205,7 +205,7 @@ function opt-toggle {
     fi
 
     eval '
-        function _opt-toggle-handler-'"${name}"' {
+        function _argproc:toggle-handler-'"${name}"' {
             local value="$1"
 
             if (( $# > 1 )); then
@@ -217,26 +217,26 @@ function opt-toggle {
             '"${callFunc}"'
         }
 
-        function _opt-long-'"${name}"' {
-            _opt-toggle-handler-'"${name}"' 1 "$@"
+        function _argproc:long-'"${name}"' {
+            _argproc:toggle-handler-'"${name}"' 1 "$@"
         }
 
-        function _opt-long-no-'"${name}"' {
-            _opt-toggle-handler-'"${name}"' 0 "$@"
+        function _argproc:long-no-'"${name}"' {
+            _argproc:toggle-handler-'"${name}"' 0 "$@"
         }
     '
 
     if (( ${#shortcutOn} == 2 )); then
         # `:1` to drop the slash.
-        eval 'function _opt-shortcut-'"${shortcutOn:1}"' {
-            _opt-toggle-handler-'"${name}"' 1
+        eval 'function _argproc:shortcut-'"${shortcutOn:1}"' {
+            _argproc:toggle-handler-'"${name}"' 1
         }'
     fi
 
     if (( ${#shortcutOff} == 2 )); then
         # `:1` to drop the slash.
-        eval 'function _opt-shortcut-'"${shortcutOff:1}"' {
-            _opt-toggle-handler-'"${name}"' 0
+        eval 'function _argproc:shortcut-'"${shortcutOff:1}"' {
+            _argproc:toggle-handler-'"${name}"' 0
         }'
     fi
 }
@@ -315,7 +315,7 @@ function opt-value {
                 return 1'
     fi
 
-    eval 'function _opt-long-'"${name}"' {
+    eval 'function _argproc:long-'"${name}"' {
         local value="$1"
 
         if (( $# < 1 )); then
@@ -376,7 +376,7 @@ function rest-arg {
         callFunc="${callFunc}"' "$@"'
     fi
 
-    eval 'function _opt-rest {
+    eval 'function _argproc:rest {
         '"${setVar}"'
         '"${callFunc}"'
     }'
