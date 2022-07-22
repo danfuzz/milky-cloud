@@ -8,7 +8,7 @@
 # Library for reasonably okay argument / option processing.
 #
 # Note: In places where this code expects to set global variables and call back
-# to client code, care is taken to only define local variables with name that
+# to client code, care is taken to only define local variables with names that
 # are unlikely to shadow globals. ("Hooray" for dynamic scoping!)
 #
 
