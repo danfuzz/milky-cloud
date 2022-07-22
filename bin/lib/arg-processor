@@ -7,6 +7,13 @@
 #
 # Library for reasonably okay argument / option processing.
 #
+# Note: In places where this code expects to set global variables and call back
+# to client code, care is taken to only define local variables with name that
+# are unlikely to shadow globals. ("Hooray" for dynamic scoping!)
+#
+
+# List of default variable assignment statements.
+_argproc_defaults=()
 
 # Processes all of the given arguments, according to the configured handlers.
 # Returns non-zero if there is trouble parsing options or if any handler returns
@@ -17,6 +24,14 @@
 # option processing. If not defined, it is considered an error to pass any
 # non-option arguments.
 function process-args {
+    # Set all the defaults.
+    local _argproc_d
+    for _argproc_d in "${_argproc_defaults[@]}"; do
+        eval "${_argproc_d}"
+    done
+
+    # Main processing loop.
+
     local argError=0
     local arg handler name value
 
@@ -69,6 +84,8 @@ function process-args {
 
         shift
     done
+
+    # Handle the non-option arguments.
 
     if declare -F _argproc:rest >/dev/null; then
         _argproc:rest "$@" || argError=1
@@ -124,8 +141,8 @@ function opt-action {
     fi
 
     if [[ ${setVar} != '' ]]; then
-        # Default the variable to `0`, and then re-form as the setter code.
-        eval "${setVar}=0"
+        # Set up the default, and then re-form as the setter code.
+        _argproc_defaults+=("${setVar}=0")
         setVar="${setVar}=1"
     fi
 
@@ -194,8 +211,8 @@ function opt-toggle {
     fi
 
     if [[ ${setVar} != '' ]]; then
-        # Default the variable to `0`, and then re-form as the setter code.
-        eval "${setVar}=0"
+        # Set up the default, and then re-form as the setter code.
+        _argproc_defaults+=("${setVar}=0")
         setVar="${setVar}"'="${value}"'
     fi
 
@@ -295,10 +312,9 @@ function opt-value {
     fi
 
     if [[ ${setVar} != '' ]]; then
-        # Re-form these as the defaulter and setter code (respectively).
-        defaultVar="${setVar}=$(printf '%q' "${defaultValue}")"
+        # Set up the default, and then re-form as the setter code.
+        _argproc_defaults+=("${setVar}=$(printf '%q' "${defaultValue}")")
         setVar="${setVar}"'="${value}"'
-        eval "${defaultVar}"
     fi
 
     if [[ ${callFunc} != '' ]]; then
@@ -366,8 +382,8 @@ function rest-arg {
     fi
 
     if [[ ${setVar} != '' ]]; then
-        # Default the variable to `()`, and then re-form as the setter code.
-        eval "${setVar}=()"
+        # Set up the default, and then re-form as the setter code.
+        _argproc_defaults+=("${setVar}=()")
         setVar="${setVar}"'=("$@")'
     fi
 
@@ -398,10 +414,8 @@ opt-value --match='[a-z][-a-z0-9]*' --var=inLocation --call=set-location in
 function set-location {
     echo 1>&2 ">>> SET LOCATION <<< ${inLocation} $1"
 }
-echo 1>&2 "#### LOCATION START ${inLocation}"
 
 opt-value --var=namex --default='no name' name
-echo 1>&2 "#### NAME START ${namex}"
 
 opt-action --call=usage --var=wantHelp help/h
 function usage {
@@ -410,7 +424,6 @@ function usage {
 }
 
 rest-arg --var=args --call=got-some-rest
-echo 1>&2 "#### ARGS START ${#args[@]}"
 function got-some-rest {
     echo "#### rest $#"
     if (( $# > 0 )); then
