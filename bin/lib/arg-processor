@@ -143,13 +143,11 @@ function opt-toggle {
     if [[ ${setVar} != '' ]]; then
         # Set up the default, and then re-form as the setter code.
         _argproc_defaults+=("${setVar}=0")
-        setVar="${setVar}"'="${value}"'
+        setVar="${setVar}"'="$1"'
     fi
 
     eval '
         function _argproc:toggle-handler-'"${name}"' {
-            local value="$1"
-
             if (( $# > 1 )); then
                 echo 1>&2 "Value not allowed for option: --'"${name}"'"
                 return 1
@@ -244,21 +242,19 @@ function opt-value {
     if [[ ${setVar} != '' ]]; then
         # Set up the default, and then re-form as the setter code.
         _argproc_defaults+=("${setVar}=$(_argproc:quote "${defaultValue}")")
-        setVar="${setVar}"'="${value}"'
+        setVar="${setVar}"'="$1"'
     fi
 
     if [[ ${match} != '' ]]; then
         # Re-form as the clause to insert to perform the check.
         match='
-            elif ! [[ ${value} =~ ^('"${match}"')$ ]]; then
-                echo 1>&2 "Invalid value for option: --${name}"
-                echo 1>&2 "Value: ${value}"
+        elif ! [[ $1 =~ ^('"${match}"')$ ]]; then
+                echo 1>&2 "Invalid value for option: --'"${name}"'"
+                echo 1>&2 "Value: $1"
                 return 1'
     fi
 
     eval 'function _argproc:long-'"${name}"' {
-        local value="$1"
-
         if (( $# < 1 )); then
             echo 1>&2 "Value required for option: --'"${name}"'"
             return 1
