@@ -15,6 +15,11 @@
 # List of default variable assignment statements.
 _argproc_defaults=()
 
+
+#
+# Public functions
+#
+
 # Declares an "action" option. If a slash and single character are appended to
 # the option name, that is taken to be a shortcut to activate the option. At
 # least one of the two options must be specified.
