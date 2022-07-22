@@ -70,8 +70,8 @@ function process-args {
         shift
     done
 
-    if declare -F arg-rest >/dev/null; then
-        arg-rest "$@" || argError=1
+    if declare -F _opt-rest >/dev/null; then
+        _opt-rest "$@" || argError=1
     elif (( $# > 0 )); then
         echo 1>&2 'Non-option arguments are not allowed.'
         argError=1
@@ -329,6 +329,59 @@ function opt-value {
     }'
 }
 
+# Declares a "rest" argument, which gets all the non-option arguments during
+# parsing. If not declared, argument processing will report an error if any
+# non-option arguments are passed. At least one of the two options must be
+# specified.
+#
+# --call=<name> -- Calls the function with the given name, passing it all the
+#   non-option arguments. If `--var` is also used, the variable is set before
+#   the call is made.
+# --var=<name> -- Sets the global `<name>` to an array of all the non-option
+#   arguments. This also causes the variable to be initialized to an empty
+#   array at the start of argument processing.
+function rest-arg {
+    local callFunc=''
+    local setVar=''
+
+    while (( $# > 0 )); do
+        case "$1" in
+            --call=?*)
+                callFunc="${1#*=}"
+                ;;
+            --var=?*)
+                setVar="${1#*=}"
+                ;;
+            *)
+                # End of options / unrecognized option.
+                break
+                ;;
+        esac
+        shift
+    done
+
+    if [[ ${callFunc} == '' && ${setVar} == '' ]]; then
+        echo 1>&2 'Must use at least one of --call or --var for rest argument.'
+        return 1
+    fi
+
+    if [[ ${setVar} != '' ]]; then
+        # Default the variable to `()`, and then re-form as the setter code.
+        eval "${setVar}=()"
+        setVar="${setVar}"'=("$@")'
+    fi
+
+    if [[ ${callFunc} != '' ]]; then
+        # Re-form as the caller code.
+        callFunc="${callFunc}"' "$@"'
+    fi
+
+    eval 'function _opt-rest {
+        '"${setVar}"'
+        '"${callFunc}"'
+    }'
+}
+
 
 #
 # Library-internal functions
@@ -356,8 +409,9 @@ function usage {
     exit
 }
 
-args=()
-function arg-rest {
+rest-arg --var=args --call=got-some-rest
+echo 1>&2 "#### ARGS START ${#args[@]}"
+function got-some-rest {
     echo "#### rest $#"
     if (( $# > 0 )); then
         printf $'>>%q<<\n' "$@"
