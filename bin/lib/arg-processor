@@ -80,29 +80,66 @@ function process-args {
     return "${argError}"
 }
 
-# Declares an "action" option. Client code needs to define a function
-# `arg-opt-<name>`, which will get called during argument processing with no
-# arguments. If a slash and single character are appended to the option name,
-# that is taken to be a shortcut to activate the option.
+# Declares an "action" option. If a slash and single character are appended to
+# the option name, that is taken to be a shortcut to activate the option. Two
+# options define what to do when the action is parsed: `--var=<name>` sets the
+# global `<name>` to `1` (and gets defaulted to `0` by this definition).
+# `--call=<name>` calls the function with the given name.
 function opt-action {
+    local callFunc=''
+    local setVar=''
+
+    while (( $# > 0 )); do
+        case "$1" in
+            --call=?*)
+                callFunc="${1#*=}"
+                ;;
+            --var=?*)
+                setVar="${1#*=}"
+                ;;
+            *)
+                # End of options / unrecognized option.
+                break
+                ;;
+        esac
+        shift
+    done
+
     local name="$1"
 
+    if [[ ${callFunc} == '' && ${setVar} == '' ]]; then
+        echo 1>&2 "Must use at least one of --call or --var for action: ${name}."
+        return 1
+    fi
+
     if ! [[ ${name} =~ ^([a-zA-Z0-9][-a-zA-Z0-9]*)(/[a-zA-Z0-9])?$ ]]; then
-        echo 1>&2 "Invalid action specification: ${toggle}"
+        echo 1>&2 "Invalid action specification: ${name}"
         return 1
     fi
 
     name="${BASH_REMATCH[1]}"
     local shortcut="${BASH_REMATCH[2]}"
 
+    if [[ ${setVar} != '' ]]; then
+        # Default the variable to `0`, and then re-form as the setter code.
+        eval "${setVar}=0"
+        setVar="${setVar}=1"
+    fi
+
     eval 'function _opt-long-'"${name}"' {
-        _process-args_handle-action '"${name}"' "$@"
+        if (( $# > 0 )); then
+            echo 1>&2 "Value not allowed for option: --'"${name}"'"
+            return 1
+        fi
+
+        '"${setVar}"'
+        '"${callFunc}"'
     }'
 
     if (( ${#shortcut} == 2 )); then
         # `:1` to drop the slash.
         eval 'function _opt-shortcut-'"${shortcut:1}"' {
-            _process-args_handle-action '"${name}"'
+            _opt-long-'"${name}"' "$@"
         }'
     fi
 }
@@ -117,7 +154,7 @@ function opt-toggle {
     local name="$1"
 
     if ! [[ ${name} =~ ^([a-zA-Z0-9][-a-zA-Z0-9]*)(/[a-zA-Z0-9]?)?(/[a-zA-Z0-9])?$ ]]; then
-        echo 1>&2 "Invalid toggle specification: ${toggle}"
+        echo 1>&2 "Invalid toggle specification: ${name}"
         return 1
     fi
 
@@ -169,18 +206,6 @@ function opt-value {
 #
 # Library-internal functions
 #
-
-# Called by generated action option handlers to do most of the work.
-function _process-args_handle-action {
-    local name="$1"
-
-    if (( $# > 1 )); then
-        echo 1>&2 "Value not allowed for option: --${name}"
-        return 1
-    fi
-
-    "arg-opt-${name}"
-}
 
 # Called by generated toggle option handlers to do most of the work.
 function _process-args_handle-toggle {
@@ -238,9 +263,9 @@ function arg-opt-name {
     name="$1"
 }
 
-opt-action help/h
-function arg-opt-help {
-    echo 1>&2 '>>> THIS IS YOUR HELP! <<<'
+opt-action --call=usage --var=wantHelp help/h
+function usage {
+    echo 1>&2 '>>> THIS IS YOUR HELP! <<<' "${wantHelp}"
     exit
 }
 
