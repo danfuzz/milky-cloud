@@ -117,7 +117,7 @@ function opt-choice {
             --call=?*)
                 callFunc="${1#*=}"
                 ;;
-            --default=?*)
+            --default=*)
                 defaultValue="${1#*=}"
                 ;;
             --var=?*)
@@ -306,7 +306,7 @@ function opt-value {
             --call=?*)
                 callFunc="${1#*=}"
                 ;;
-            --default=?*)
+            --default=*)
                 defaultValue="${1#*=}"
                 ;;
             --match=?*)
