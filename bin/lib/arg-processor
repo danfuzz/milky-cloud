@@ -12,8 +12,9 @@
 # are unlikely to shadow globals. ("Hooray" for dynamic scoping!)
 #
 
-# List of default variable assignment statements.
-_argproc_defaults=()
+# List of statements to run just before parsing. This includes:
+# * global variable assignment statements
+_argproc_initStatements=()
 
 
 #
@@ -71,8 +72,8 @@ function opt-action {
     fi
 
     if [[ ${setVar} != '' ]]; then
-        # Set up the default, and then re-form as the setter code.
-        _argproc_defaults+=("${setVar}=0")
+        # Set up the default initializer, and then re-form as the setter code.
+        _argproc_initStatements+=("${setVar}=0")
         setVar="${setVar}=1"
     fi
 
@@ -148,8 +149,8 @@ function opt-choice {
     fi
 
     if [[ ${setVar} != '' ]]; then
-        # Set up the default, and then re-form as the setter code.
-        _argproc_defaults+=("${setVar}=$(_argproc:quote "${defaultValue}")")
+        # Set up the default initializer, and then re-form as the setter code.
+        _argproc_initStatements+=("${setVar}=$(_argproc:quote "${defaultValue}")")
         setVar="${setVar}"'="${_argproc_value}"'
     fi
 
@@ -242,8 +243,8 @@ function opt-toggle {
     fi
 
     if [[ ${setVar} != '' ]]; then
-        # Set up the default, and then re-form as the setter code.
-        _argproc_defaults+=("${setVar}=0")
+        # Set up the default initializer, and then re-form as the setter code.
+        _argproc_initStatements+=("${setVar}=0")
         setVar="${setVar}"'="$1"'
     fi
 
@@ -341,8 +342,8 @@ function opt-value {
     fi
 
     if [[ ${setVar} != '' ]]; then
-        # Set up the default, and then re-form as the setter code.
-        _argproc_defaults+=("${setVar}=$(_argproc:quote "${defaultValue}")")
+        # Set up the default initializer, and then re-form as the setter code.
+        _argproc_initStatements+=("${setVar}=$(_argproc:quote "${defaultValue}")")
         setVar="${setVar}"'="$1"'
     fi
 
@@ -376,9 +377,9 @@ function opt-value {
 # option processing. If not defined, it is considered an error to pass any
 # non-option arguments.
 function process-args {
-    # Set all the defaults.
+    # Run all the pre-parse statements.
     local _argproc_d
-    for _argproc_d in "${_argproc_defaults[@]}"; do
+    for _argproc_d in "${_argproc_initStatements[@]}"; do
         eval "${_argproc_d}"
     done
 
@@ -438,8 +439,8 @@ function rest-arg {
     fi
 
     if [[ ${setVar} != '' ]]; then
-        # Set up the default, and then re-form as the setter code.
-        _argproc_defaults+=("${setVar}=()")
+        # Set up the default initializer, and then re-form as the setter code.
+        _argproc_initStatements+=("${setVar}=()")
         setVar="${setVar}"'=("$@")'
     fi
 
