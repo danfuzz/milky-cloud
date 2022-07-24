@@ -13,9 +13,16 @@
 #
 
 # List of statements to run just before parsing. This includes:
+#
 # * global variable assignment statements
+# * required option "got the option" initializers
 _argproc_initStatements=()
 
+# List of statements to run after parsing, to do pre-return validation. This
+# includes:
+#
+# * required option "got the option" checkers
+_argproc_preReturnStatements=()
 
 #
 # Public functions
@@ -106,12 +113,18 @@ function opt-action {
 #   variable is set only if the call returned successfully.
 # --default=<value> -- The default value for the variable. If not specified, the
 #   default value is `''` (the empty string).
+# --required -- Indicates that one of the options defined by this set must be
+#   passed.
 # --var=<name> -- Sets the global `<name>` to the option value, and causes it to
 #   be defaulted at the start of argument processing.
 function opt-choice {
     local callFunc=''
     local defaultValue=''
     local setVar=''
+
+    local requiredName=''
+    local requiredSetter=''
+    local requiredError=''
 
     while (( $# > 0 )); do
         case "$1" in
@@ -120,6 +133,9 @@ function opt-choice {
                 ;;
             --default=*)
                 defaultValue="${1#*=}"
+                ;;
+            --required)
+                requiredName='?' # Gets replaced with a valid long name.
                 ;;
             --var=?*)
                 setVar="${1#*=}"
@@ -133,8 +149,8 @@ function opt-choice {
     done
 
     local specs=("$@")
-    if (( ${#specs[@]} == 0 )); then
-        echo 1>&2 'Missing option specs.'
+    if (( ${#specs[@]} < 2 )); then
+        echo 1>&2 'Need at least two option specs for a choice.'
         return 1
     fi
 
@@ -165,6 +181,20 @@ function opt-choice {
         local abbrev="${BASH_REMATCH[2]:1}" # `:1` to drop the slash.
         local value="${BASH_REMATCH[3]:1}"  # Likewise.
 
+        if [[ ${requiredName} != '' ]]; then
+            if [[ ${requiredName} == '?' ]]; then
+                # Replace `requiredName` with a variable name based on the first
+                # option, and use it to form all the dependant bits.
+                requiredName="_argproc_gotOption_${name/-/_}"
+                requiredSetter="${requiredName}=1"
+                _argproc_initStatements+=("local ${requiredName}=0")
+            fi
+            if [[ ${requiredError} == '' ]]; then
+                requiredError='Missing required option from set:'
+            fi
+            requiredError+=" --${name}"
+        fi
+
         if [[ ${value} == '' ]]; then
             value="${name}"
         else
@@ -180,6 +210,7 @@ function opt-choice {
             local _argproc_value='"${value}"'
             '"${callFunc}"'
             '"${setVar}"'
+            '"${requiredSetter}"'
         }'
 
         if [[ ${abbrev} != '' ]]; then
@@ -188,6 +219,16 @@ function opt-choice {
             }'
         fi
     done
+
+    if [[ ${requiredName} != '' ]]; then
+        # Set up the post-parse check for a required option.
+        requiredError="$(_argproc:quote "${requiredError}")"
+        _argproc_preReturnStatements+=('
+            (( '"${requiredName}"' )) || {
+                echo 1>&2 '"${requiredError}"'
+                false
+            }')
+    fi
 }
 
 # Declares a "toggle" option, specified as `<name>/<abbrev>/<abbrev>`, with the
@@ -377,20 +418,24 @@ function opt-value {
 # option processing. If not defined, it is considered an error to pass any
 # non-option arguments.
 function process-args {
+    local _argproc_error=0
+    local _argproc_s
+
     # Run all the pre-parse statements.
-    local _argproc_d
-    for _argproc_d in "${_argproc_initStatements[@]}"; do
-        eval "${_argproc_d}"
+    for _argproc_s in "${_argproc_initStatements[@]}"; do
+        eval "${_argproc_s}"
     done
 
-    # Build up the statements to evaluate.
+    # Build up the statements to evaluate, and evaluate them.
     local _argproc_statements=()
     _argproc:statements-from-args "$@"
 
-    # Evaluate them!
-    local _argproc_error=0
-    local _argproc_s
     for _argproc_s in "${_argproc_statements[@]}"; do
+        eval "${_argproc_s}" || _argproc_error="$?"
+    done
+
+    # Do any post-parse checks.
+    for _argproc_s in "${_argproc_preReturnStatements[@]}"; do
         eval "${_argproc_s}" || _argproc_error="$?"
     done
 
@@ -566,7 +611,7 @@ function usage {
     echo 1>&2 '>>> THIS IS YOUR HELP! <<<' "${wantHelp}"
 }
 
-opt-choice --call=did-net --var=net tcp/t=floop-tcp udp/u zorp
+opt-choice --required --call=did-net --var=net tcp/t=floop-tcp udp/u zorp
 function did-net {
     echo 1>&2 "####### GOT NET $1"
 }
