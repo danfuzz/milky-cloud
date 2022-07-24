@@ -334,6 +334,7 @@ function opt-toggle {
 #   default value is `''` (the empty string).
 # --match=<regex> -- Regular expression matched against the entire argument
 #   value. If the value does not match, then the option gets rejected.
+# --required -- Indicates that this option must be passed.
 # --var=<name> -- Sets the global `<name>` to the value parsed from the
 #   argument. This also causes the variable to be initialized at the start of
 #   argument processing.
@@ -342,6 +343,8 @@ function opt-value {
     local defaultValue=''
     local match=''
     local setVar=''
+    local required=0
+    local requiredSetter=''
 
     while (( $# > 0 )); do
         case "$1" in
@@ -353,6 +356,9 @@ function opt-value {
                 ;;
             --match=?*)
                 match="${1#*=}"
+                ;;
+            --required)
+                required=1
                 ;;
             --var=?*)
                 setVar="${1#*=}"
@@ -397,6 +403,19 @@ function opt-value {
                 return 1'
     fi
 
+    if (( ${required} )); then
+        # Replace `required` with a variable name based on the first
+        # option, and use it to form all the dependant bits.
+        required="_argproc_gotOption_${name/-/_}"
+        requiredSetter="${required}=1"
+        _argproc_initStatements+=("local ${required}=0")
+        _argproc_preReturnStatements+=('
+            (( '"${required}"' )) || {
+                echo 1>&2 "Missing required option: --'"${name}"'"
+                false
+            }')
+    fi
+
     eval 'function _argproc:long-'"${name}"' {
         if (( $# < 1 )); then
             echo 1>&2 "Value required for option: --'"${name}"'"
@@ -406,6 +425,7 @@ function opt-value {
 
         '"${callFunc}"'
         '"${setVar}"'
+        '"${requiredSetter}"'
     }'
 }
 
@@ -433,6 +453,13 @@ function process-args {
     for _argproc_s in "${_argproc_statements[@]}"; do
         eval "${_argproc_s}" || _argproc_error="$?"
     done
+
+    if (( _argproc_error )); then
+        # Don't continue if there were problems above, because that will lead to
+        # spurious extra errors (e.g. "missing" a required option that was
+        # present but didn't pass a validity check).
+        return "${_argproc_error}"
+    fi
 
     # Do any post-parse checks.
     for _argproc_s in "${_argproc_preReturnStatements[@]}"; do
@@ -599,7 +626,8 @@ function _argproc:quote {
 
 opt-toggle --var=progress progress/p/P
 
-opt-value --match='[a-z][-a-z0-9]*' --var=inLocation --call=set-location in
+opt-value --required --match='[a-z][-a-z0-9]*' \
+    --var=inLocation --call=set-location in
 function set-location {
     echo 1>&2 ">>> SET LOCATION <<< ${inLocation} $1"
 }
@@ -646,8 +674,4 @@ fi
 
 if (( error )); then
     exit "${error}"
-fi
-
-if [[ ${inLocation} == '' ]]; then
-    echo 1>&2 'Missing required option: --in'
 fi
