@@ -22,6 +22,9 @@ fi
 # Library functions
 #
 
+# Load the argument processor library.
+. "${libDir}/arg-processor"
+
 # Calls `aws-json ec2`. This combination is used enough to warrant having it be
 # easier to say than `lib aws-json ec2 ...`.
 function ec2-json {
