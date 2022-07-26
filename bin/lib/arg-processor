@@ -53,10 +53,10 @@ function opt-action {
             --call=?*)
                 callFunc="${1#*=}"
                 ;;
-            --default=?*)
+            --default=*)
                 defaultValue="${1#*=}"
                 ;;
-            --value=?*)
+            --value=*)
                 value="${1#*=}"
                 ;;
             --var=?*)
