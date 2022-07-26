@@ -523,7 +523,8 @@ function process-args {
 
     # Build up the statements to evaluate, and evaluate them.
     local _argproc_statements=()
-    _argproc:statements-from-args "$@"
+    _argproc:statements-from-args "$@" \
+    || _argproc_error="$?"
 
     for _argproc_s in "${_argproc_statements[@]}"; do
         eval "${_argproc_s}" || _argproc_error="$?"
