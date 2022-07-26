@@ -1,0 +1,696 @@
+#!/bin/bash
+#
+# Copyright 2022 Dan Bornstein.
+# Licensed AS IS and WITHOUT WARRANTY under the Apache License,
+# Version 2.0. Details: <http://www.apache.org/licenses/LICENSE-2.0>
+
+#
+# Library for reasonably okay argument / option processing.
+#
+# Note: In places where this code expects to set global variables and call back
+# to client code, care is taken to only define local variables with names that
+# are unlikely to shadow globals. ("Hooray" for dynamic scoping!)
+#
+
+# List of statements to run just before parsing. This includes:
+#
+# * global variable assignment statements
+# * required option "got the option" initializers
+_argproc_initStatements=()
+
+# List of statements to run after parsing, to do pre-return validation. This
+# includes:
+#
+# * required option "got the option" checkers
+_argproc_preReturnStatements=()
+
+#
+# Public functions
+#
+
+# Declares an "action" option, specified as `<name>/<abbrev>`, with `/<abbrev>`
+# optional. `<abbrev>` specifies a single-dash single-character abbreviation for
+# the option. At least one of `--call` or `--var` must be used to define the
+# option.
+#
+# --call=<name> -- Calls the function with the given name, passing it the
+#   configured action value. If `--var` is also used, the call is made first,
+#   and then the variable is set only if the call returned successfully.
+# --default=<value> -- The default value for the variable. If not specified, the
+#   default value is `0` (the empty string).
+# --value=<value> -- The value to use when indicating that the action is taken.
+#   If not specified, the action value is `1`.
+# --var=<name> -- Sets the global `<name>` to the configured action value, and
+#   causes it to be defaulted at the start of argument processing.
+function opt-action {
+    local callFunc=''
+    local defaultValue=0
+    local setVar=''
+    local value='1'
+
+    while (( $# > 0 )); do
+        case "$1" in
+            --call=?*)
+                callFunc="${1#*=}"
+                ;;
+            --default=*)
+                defaultValue="${1#*=}"
+                ;;
+            --value=*)
+                value="${1#*=}"
+                ;;
+            --var=?*)
+                setVar="${1#*=}"
+                ;;
+            *)
+                # End of options / unrecognized option.
+                break
+                ;;
+        esac
+        shift
+    done
+
+    local name="$1"
+
+    if ! [[ ${name} =~ ^([a-zA-Z0-9][-a-zA-Z0-9]*)(/[a-zA-Z0-9])?$ ]]; then
+        echo 1>&2 "Invalid option spec: ${name}"
+        return 1
+    fi
+
+    name="${BASH_REMATCH[1]}"
+    local abbrev="${BASH_REMATCH[2]:1}" # `:1` to drop the slash.
+
+    if [[ ${callFunc} == '' && ${setVar} == '' ]]; then
+        echo 1>&2 "Must use at least one of --call or --var for option: ${name}."
+        return 1
+    fi
+
+    if [[ ${callFunc} != '' ]]; then
+        # Re-form as the caller code.
+        callFunc="${callFunc} $(_argproc:quote "${value}")"' || return "$?"'
+    fi
+
+    if [[ ${setVar} != '' ]]; then
+        # Set up the default initializer, and then re-form as the setter code.
+        _argproc_initStatements+=("${setVar}=$(_argproc:quote "${defaultValue}")")
+        setVar="${setVar}=$(_argproc:quote "${value}")"
+    fi
+
+    eval 'function _argproc:long-'"${name}"' {
+        if (( $# > 0 )); then
+            echo 1>&2 "Value not allowed for option: --'"${name}"'"
+            return 1
+        fi
+
+        '"${callFunc}"'
+        '"${setVar}"'
+    }'
+
+    if [[ ${abbrev} != '' ]]; then
+        eval 'function _argproc:abbrev-'"${abbrev}"' {
+            _argproc:long-'"${name}"' "$@"
+        }'
+    fi
+}
+
+# Declares a "choice" option set, specified as `<name>/<abbrev>=<value>`, with
+# `<name>` required and the other two items optional. `<name>` is the full
+# option name. `<abbrev>` specifies a single-dash single-character abbreviation
+# for the option. `<value>` is the option value (which defaults to the full
+# name). At least one of `--call` or `--var` must be used to define the option
+# set.
+#
+# --call=<name> -- Calls the function with the given name, passing it the
+#   option value. If `--var` is also used, the call is made first, and then the
+#   variable is set only if the call returned successfully.
+# --default=<value> -- The default value for the variable. If not specified, the
+#   default value is `''` (the empty string).
+# --required -- Indicates that one of the options defined by this set must be
+#   passed.
+# --var=<name> -- Sets the global `<name>` to the option value, and causes it to
+#   be defaulted at the start of argument processing.
+function opt-choice {
+    local callFunc=''
+    local defaultValue=''
+    local setVar=''
+
+    local requiredName=''
+    local requiredSetter=''
+    local requiredError=''
+
+    while (( $# > 0 )); do
+        case "$1" in
+            --call=?*)
+                callFunc="${1#*=}"
+                ;;
+            --default=*)
+                defaultValue="${1#*=}"
+                ;;
+            --required)
+                requiredName='?' # Gets replaced with a valid long name.
+                ;;
+            --var=?*)
+                setVar="${1#*=}"
+                ;;
+            *)
+                # End of options / unrecognized option.
+                break
+                ;;
+        esac
+        shift
+    done
+
+    local specs=("$@")
+    if (( ${#specs[@]} < 2 )); then
+        echo 1>&2 'Need at least two option specs for a choice.'
+        return 1
+    fi
+
+    if [[ ${callFunc} == '' && ${setVar} == '' ]]; then
+        echo 1>&2 "Must use at least one of --call or --var for option: ${name}."
+        return 1
+    fi
+
+    if [[ ${callFunc} != '' ]]; then
+        # Re-form as the caller code.
+        callFunc="${callFunc}"' "${_approc_value}" || return "$?"'
+    fi
+
+    if [[ ${setVar} != '' ]]; then
+        # Set up the default initializer, and then re-form as the setter code.
+        _argproc_initStatements+=("${setVar}=$(_argproc:quote "${defaultValue}")")
+        setVar="${setVar}"'="${_argproc_value}"'
+    fi
+
+    local s
+    for s in "${specs[@]}"; do
+        if ! [[ ${s} =~ ^([a-zA-Z0-9][-a-zA-Z0-9]*)(/[a-zA-Z0-9])?(=(.*))?$ ]]; then
+            echo 1>&2 "Invalid option spec: ${s}"
+            return 1
+        fi
+
+        local name="${BASH_REMATCH[1]}"
+        local abbrev="${BASH_REMATCH[2]:1}" # `:1` to drop the slash.
+        local value="${BASH_REMATCH[3]:1}"  # Likewise.
+
+        if [[ ${requiredName} != '' ]]; then
+            if [[ ${requiredName} == '?' ]]; then
+                # Replace `requiredName` with a variable name based on the first
+                # option, and use it to form all the dependant bits.
+                requiredName="_argproc_gotOption_${name/-/_}"
+                requiredSetter="${requiredName}=1"
+                _argproc_initStatements+=("local ${requiredName}=0")
+            fi
+            if [[ ${requiredError} == '' ]]; then
+                requiredError='Missing required option from set:'
+            fi
+            requiredError+=" --${name}"
+        fi
+
+        if [[ ${value} == '' ]]; then
+            value="${name}"
+        else
+            value="$(_argproc:quote "${value}")"
+        fi
+
+        eval 'function _argproc:long-'"${name}"' {
+            if (( $# > 0 )); then
+                echo 1>&2 "Value not allowed for option: --'"${name}"'"
+                return 1
+            fi
+
+            local _argproc_value='"${value}"'
+            '"${callFunc}"'
+            '"${setVar}"'
+            '"${requiredSetter}"'
+        }'
+
+        if [[ ${abbrev} != '' ]]; then
+            eval 'function _argproc:abbrev-'"${abbrev}"' {
+                _argproc:long-'"${name}"' "$@"
+            }'
+        fi
+    done
+
+    if [[ ${requiredName} != '' ]]; then
+        # Set up the post-parse check for a required option.
+        requiredError="$(_argproc:quote "${requiredError}")"
+        _argproc_preReturnStatements+=('
+            (( '"${requiredName}"' )) || {
+                echo 1>&2 '"${requiredError}"'
+                false
+            }')
+    fi
+}
+
+# Declares a "toggle" option, specified as `<name>/<abbrev>/<abbrev>`, with the
+# two `/<abbrev>`s optional. `<abbrev>` specifies a single-dash single-character
+# abbreviation for turning the toggle on (first one) or off (second one). In
+# addition the long form `--no-<name>` gets defined to turn the toggle off. At
+# least one of `--call` or `--var` must be used to define the option.
+#
+# --call=<name> -- Calls the function with the given name, passing it `1` or
+#   `0`. If `--var` is also used, the call is made first, and then the variable
+#   is set only if the call returned successfully.
+# --var=<name> -- Sets the global `<name>` to `1` or `0`, and causes it to be
+#   defauled to `0` at the start of argument processing.
+function opt-toggle {
+    local callFunc=''
+    local setVar=''
+
+    while (( $# > 0 )); do
+        case "$1" in
+            --call=?*)
+                callFunc="${1#*=}"
+                ;;
+            --var=?*)
+                setVar="${1#*=}"
+                ;;
+            *)
+                # End of options / unrecognized option.
+                break
+                ;;
+        esac
+        shift
+    done
+
+    local name="$1"
+
+    if ! [[ ${name} =~ ^([a-zA-Z0-9][-a-zA-Z0-9]*)(/[a-zA-Z0-9]?)?(/[a-zA-Z0-9])?$ ]]; then
+        echo 1>&2 "Invalid option spec: ${name}"
+        return 1
+    fi
+
+    name="${BASH_REMATCH[1]}"
+    local abbrevOn="${BASH_REMATCH[2]:1}"  # `:1` to drop the slash.
+    local abbrevOff="${BASH_REMATCH[3]:1}" # Likewise.
+
+    if [[ ${callFunc} == '' && ${setVar} == '' ]]; then
+        echo 1>&2 "Must use at least one of --call or --var for option: ${name}."
+        return 1
+    fi
+
+    if [[ ${callFunc} != '' ]]; then
+        # Re-form as the caller code.
+        callFunc="${callFunc}"' "${value}" || return "$?"'
+    fi
+
+    if [[ ${setVar} != '' ]]; then
+        # Set up the default initializer, and then re-form as the setter code.
+        _argproc_initStatements+=("${setVar}=0")
+        setVar="${setVar}"'="$1"'
+    fi
+
+    eval '
+        function _argproc:toggle-handler-'"${name}"' {
+            if (( $# > 1 )); then
+                echo 1>&2 "Value not allowed for option: --'"${name}"'"
+                return 1
+            fi
+
+            '"${callFunc}"'
+            '"${setVar}"'
+        }
+
+        function _argproc:long-'"${name}"' {
+            _argproc:toggle-handler-'"${name}"' 1 "$@"
+        }
+
+        function _argproc:long-no-'"${name}"' {
+            _argproc:toggle-handler-'"${name}"' 0 "$@"
+        }
+    '
+
+    if [[ ${abbrevOn} != '' ]]; then
+        eval 'function _argproc:abbrev-'"${abbrevOn}"' {
+            _argproc:toggle-handler-'"${name}"' 1
+        }'
+    fi
+
+    if [[ ${abbrevOff} != '' ]]; then
+        eval 'function _argproc:abbrev-'"${abbrevOff}"' {
+            _argproc:toggle-handler-'"${name}"' 0
+        }'
+    fi
+}
+
+# Declares a "value" option, specified as just `<name>` (no `<abbrev>` allowed
+# for these). When parsed value options require a value, passed in the form
+# `--<name>=<value>`. At least one of `--call` or `--var` must be used to define
+# the option.
+#
+# --call=<name> -- Calls the function with the given name, passing it the option
+#   value parsed from the argument. If `--var` is also used, the call is made
+#   first, and then the variable is set only if the call returned successfully.
+# --default=<value> -- The default value for the variable. If not specified, the
+#   default value is `''` (the empty string).
+# --match=<regex> -- Regular expression matched against the entire argument
+#   value. If the value does not match, then the option gets rejected.
+# --required -- Indicates that this option must be passed.
+# --var=<name> -- Sets the global `<name>` to the value parsed from the
+#   argument. This also causes the variable to be initialized at the start of
+#   argument processing.
+function opt-value {
+    local callFunc=''
+    local defaultValue=''
+    local match=''
+    local setVar=''
+    local required=0
+    local requiredSetter=''
+
+    while (( $# > 0 )); do
+        case "$1" in
+            --call=?*)
+                callFunc="${1#*=}"
+                ;;
+            --default=*)
+                defaultValue="${1#*=}"
+                ;;
+            --match=?*)
+                match="${1#*=}"
+                ;;
+            --required)
+                required=1
+                ;;
+            --var=?*)
+                setVar="${1#*=}"
+                ;;
+            *)
+                # End of options / unrecognized option.
+                break
+                ;;
+        esac
+        shift
+    done
+
+    local name="$1"
+
+    if ! [[ ${name} =~ ^[a-zA-Z0-9][-a-zA-Z0-9]*$ ]]; then
+        echo 1>&2 "Invalid option spec: ${name}"
+        return 1
+    fi
+
+    if [[ ${callFunc} == '' && ${setVar} == '' ]]; then
+        echo 1>&2 "Must use at least one of --call or --var for option: ${name}."
+        return 1
+    fi
+
+    if [[ ${callFunc} != '' ]]; then
+        # Re-form as the caller code.
+        callFunc="${callFunc}"' "${value}" || return "$?"'
+    fi
+
+    if [[ ${setVar} != '' ]]; then
+        # Set up the default initializer, and then re-form as the setter code.
+        _argproc_initStatements+=("${setVar}=$(_argproc:quote "${defaultValue}")")
+        setVar="${setVar}"'="$1"'
+    fi
+
+    if [[ ${match} != '' ]]; then
+        # Re-form as the clause to insert to perform the check.
+        match='
+            elif ! [[ $1 =~ ^('"${match}"')$ ]]; then
+                echo 1>&2 "Invalid value for option: --'"${name}"'"
+                echo 1>&2 "Value: $1"
+                return 1'
+    fi
+
+    if (( ${required} )); then
+        # Replace `required` with a variable name based on the first
+        # option, and use it to form all the dependant bits.
+        required="_argproc_gotOption_${name/-/_}"
+        requiredSetter="${required}=1"
+        _argproc_initStatements+=("local ${required}=0")
+        _argproc_preReturnStatements+=('
+            (( '"${required}"' )) || {
+                echo 1>&2 "Missing required option: --'"${name}"'"
+                false
+            }')
+    fi
+
+    eval 'function _argproc:long-'"${name}"' {
+        if (( $# < 1 )); then
+            echo 1>&2 "Value required for option: --'"${name}"'"
+            return 1
+        '"${match}"'
+        fi
+
+        '"${callFunc}"'
+        '"${setVar}"'
+        '"${requiredSetter}"'
+    }'
+}
+
+# Prints a usage message. This is just a convenient shorthand to do just a few
+# things to a given literal string:
+#
+# * Trim away empty lines at the start and end of the string.
+# * Trim away whitespace from the start of lines, based on the indentation of
+#   the first not-just-whitespace line.
+# * Substitute the name of the program for the variable-like string `${name}`.
+# * Print to `stderr`.
+function print-usage {
+    local msg="$1"
+
+    awk 2>&1 <<<"${msg}" -v name="${progName}" \
+    '
+    BEGIN {
+        atStart = 1;
+        blankCount = 0;
+        indentExpr = ""; # Regex to match indentation to strip.
+    }
+
+    # Count blank lines. They only get emitted if not at the start or end of
+    # the message.
+    /^[ \t]*$/ {
+        blankCount++;
+        next;
+    }
+
+    blankCount != 0 {
+        if (atStart) {
+            # Ignore blank lines at the start of the message.
+            atStart = 0;
+            blankCount = 0;
+        } else {
+            # Emit some blank lines in the middle of the message.
+            while (blankCount-- > 0) print "";
+        }
+    }
+
+    # Determine first-line indentation; convert to regex.
+    indentExpr == "" {
+        match($0, /^[ \t]*/);
+        indentExpr = "^" substr($0, 1, RLENGTH);
+    }
+
+    {
+        sub(indentExpr, "");
+        gsub(/\${name}/, name);
+        print;
+    }
+    '
+
+    return 0
+    # Trim away empty lines (including just newlines) at the start and end of
+    # the message.
+    [[ ${msg} =~ ^([$' \t']*$'\n')*(.*[^$'\n'])$'\n'*$ ]]
+    msg="${BASH_REMATCH[1]}"
+
+    # Determine first-line indentation, and strip it from all lines.
+    [[ ${msg} =~ ^([$' \t']*) ]]
+    local indent="${BASH_REMATCH[1]}"
+
+    awk <<<"${msg}" -v indent="/^${indent}/" 'sub(indent, "")'
+}
+
+# Processes all of the given arguments, according to the configured handlers.
+# Returns non-zero if there is trouble parsing options or if any handler returns
+# non-zero.
+#
+# Note: In addition to handlers defined by `opt-switch`, and `opt-value`, the
+# handler `arg-rest`, if defined, is called with all arguments that remain after
+# option processing. If not defined, it is considered an error to pass any
+# non-option arguments.
+function process-args {
+    local _argproc_error=0
+    local _argproc_s
+
+    # Run all the pre-parse statements.
+    for _argproc_s in "${_argproc_initStatements[@]}"; do
+        eval "${_argproc_s}"
+    done
+
+    # Build up the statements to evaluate, and evaluate them.
+    local _argproc_statements=()
+    _argproc:statements-from-args "$@" \
+    || _argproc_error="$?"
+
+    for _argproc_s in "${_argproc_statements[@]}"; do
+        eval "${_argproc_s}" || _argproc_error="$?"
+    done
+
+    if (( _argproc_error )); then
+        # Don't continue if there were problems above, because that will lead to
+        # spurious extra errors (e.g. "missing" a required option that was
+        # present but didn't pass a validity check).
+        return "${_argproc_error}"
+    fi
+
+    # Do any post-parse checks.
+    for _argproc_s in "${_argproc_preReturnStatements[@]}"; do
+        eval "${_argproc_s}" || _argproc_error="$?"
+    done
+
+    return "${_argproc_error}"
+}
+
+# Declares a "rest" argument, which gets all the non-option arguments during
+# parsing. If not declared, argument processing will report an error if any
+# non-option arguments are passed. At least one of the two options must be
+# specified.
+#
+# --call=<name> -- Calls the function with the given name, passing it all the
+#   non-option arguments. If `--var` is also used, the call is made first, and
+#   then the variable is set only if the call returned successfully.
+# --var=<name> -- Sets the global `<name>` to an array of all the non-option
+#   arguments. This also causes the variable to be initialized to an empty
+#   array at the start of argument processing.
+function rest-arg {
+    local callFunc=''
+    local setVar=''
+
+    while (( $# > 0 )); do
+        case "$1" in
+            --call=?*)
+                callFunc="${1#*=}"
+                ;;
+            --var=?*)
+                setVar="${1#*=}"
+                ;;
+            *)
+                # End of options / unrecognized option.
+                break
+                ;;
+        esac
+        shift
+    done
+
+    if [[ ${callFunc} == '' && ${setVar} == '' ]]; then
+        echo 1>&2 'Must use at least one of --call or --var for rest argument.'
+        return 1
+    fi
+
+    if [[ ${callFunc} != '' ]]; then
+        # Re-form as the caller code.
+        callFunc="${callFunc}"' "$@" || return "$?"'
+    fi
+
+    if [[ ${setVar} != '' ]]; then
+        # Set up the default initializer, and then re-form as the setter code.
+        _argproc_initStatements+=("${setVar}=()")
+        setVar="${setVar}"'=("$@")'
+    fi
+
+    eval 'function _argproc:rest {
+        '"${callFunc}"'
+        '"${setVar}"'
+    }'
+}
+
+
+#
+# Library-internal functions
+#
+
+# Builds up a list of statements to evaluate, based on the given arguments. It
+# is stored in the variable `_argproc_statements`, which is assumed to be
+# declared by its caller.
+#
+# Note: This arrangement, where argument parsing is done in a separate
+# function and as a separate pass from evaluation, makes it possible to use
+# non-mangled local variables in the more tricky code, so it's a bit nicer to
+# read.
+function _argproc:statements-from-args {
+    local argError=0
+    local arg handler name value
+
+    while (( $# > 0 )); do
+        arg="$1"
+
+        if [[ ${arg} == '--' ]]; then
+            # Explicit end of options.
+            shift
+            break
+        elif [[ ${arg} == '-' || ${arg} =~ ^[^-] ]]; then
+            # Non-option argument.
+            break
+        elif [[ ${arg} =~ ^--([-a-zA-Z0-9]+)(=.*)?$ ]]; then
+            # Long-form argument.
+            name="${BASH_REMATCH[1]}"
+            value="${BASH_REMATCH[2]}"
+            handler="_argproc:long-${name}"
+            if ! declare -F "${handler}" >/dev/null; then
+                echo 1>&2 "Unknown option: --${name}"
+                argError=1
+            elif [[ ${value} == '' ]]; then
+                _argproc_statements+=("${handler}")
+            else
+                # `:1` to drop the `=` from the start of `value`
+                _argproc_statements+=("${handler} $(_argproc:quote "${value:1}")")
+            fi
+        elif [[ $arg =~ ^-([a-zA-Z0-9]+)$ ]]; then
+            # Short-form argument.
+            arg="${BASH_REMATCH[1]}"
+            while [[ ${arg} =~ ^(.)(.*)$ ]]; do
+                name="${BASH_REMATCH[1]}"
+                arg="${BASH_REMATCH[2]}"
+                handler="_argproc:abbrev-${name}"
+                if ! declare -F "${handler}" >/dev/null; then
+                    echo 1>&2 "Unknown option: -${name}"
+                    argError=1
+                    # Break, to avoid spewing a ton of errors in case of a pilot
+                    # error along the lines of `-longOptionName`.
+                    break
+                else
+                    _argproc_statements+=("${handler}")
+                fi
+            done
+        else
+            # Something weird and invalid, e.g. `--=`.
+            echo 1>&2 "Invalid option: ${arg}"
+            argError=1
+        fi
+
+        shift
+    done
+
+    if declare -F _argproc:rest >/dev/null; then
+        local statement="_argproc:rest $(_argproc:quote "$@")"
+        _argproc_statements+=("${statement}")
+    elif (( $# > 0 )); then
+        echo 1>&2 'Non-option arguments are not allowed.'
+        argError=1
+    fi
+
+    return "${argError}"
+}
+
+# Quotes one or more literal strings, space separated, so they can be safely
+# used in evaluated code. This (successfully) prints nothing if no arguments are
+# given.
+function _argproc:quote {
+    case "$#" in
+        0)
+            : # Nothing to print.
+            ;;
+        1)
+            printf '%q' "$1"
+            ;;
+        *)
+            printf '%q' "$1"
+            shift
+            printf ' %q' "$@"
+            ;;
+    esac
+}

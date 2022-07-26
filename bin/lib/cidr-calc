@@ -14,6 +14,89 @@ progName="${progName##*/}"
 
 
 #
+# Argument parsing
+#
+
+# Prints the usage message.
+function usage {
+    print-usage $'
+    Usage:
+
+    ${name} [<opt> ...] <command> <arg> ...
+
+    Performs a calculation of some sort on a CIDR address/mask. Input CIDR
+    values can be either standard-form strings or parsed JSON values (such
+    as are produced by the `--json` option of this tool).
+    --compact-json
+      Like `--json`, except produces compact output.
+    --json
+      Produces JSON output representing the parsed components of a CIDR
+      value, instead of a standard-form CIDR string. This only affects
+      commands that output CIDR values.
+    --string
+      Produces strings. This is the default.
+
+    Commands:
+
+    add-to-network <cidr> <amount>
+      Adds the given amount (a positive integer) to the network address, and
+      prints the resulting CIDR. This can be used in conjunction with
+      `widen-to` to enumerate subnet addresses (though `make-subnets` is
+      more convenient for that use case). `<amount>` can be specified either
+      in decimal or hex. Use the suggestive prefix `::` to indicate hex.
+    address-length <cidr>
+      Prints the length (number of bits) of the address (not just the
+      netmask).
+    address-words
+      Prints the words (16-bit components) of the full address, in a
+      shell-friendly space-separated decimal form. Note: Even an IPv4
+      address gets chunked as 16-bit words by this command.
+    make-subnets <cidr> <count> [<bits>]
+      Prints the indicated number of subnets of the given CIDR, created by
+      widening the netmask and filling in the new bits with the sequence of
+      `0` through `<count> - 1`. By default, the netmask is widened by the
+      minimum number of bits needed, but an optional third argument indicates
+      a specific result netmask length in bits.
+    netmask-length <cidr>
+      Prints the length (number of bits) in the netmask.
+    print <cidr>
+      Prints a CIDR value.
+    widen-to <cidr> <bits>
+      Widens the address in a CIDR by adding enough low-order zero bits to
+      result in the indicated length. Prints the resulting CIDR.
+
+    ${name} [--help | -h]
+      Displays this message.
+    '
+
+    exit "$1"
+}
+
+# Output style.
+opt-choice --var=outputStyle --default=string compact-json json string
+
+# Want help?
+opt-action --call=usage --value=0 help/h
+
+# Command and arguments.
+command=
+args=()
+rest-arg --call=parse-command
+function parse-command {
+    if (( $# == 0 )); then
+        echo 1>&2 'Missing command argument.'
+        return 1
+    fi
+
+    command="$1"
+    shift
+    args=("$@")
+}
+
+process-args "$@" || usage "${error}"
+
+
+#
 # Helper functions
 #
 
@@ -662,109 +745,6 @@ function command_widen-to {
 
 
 #
-# Argument parsing
-#
-
-# Error during argument processing?
-argError=0
-
-# Command.
-command=
-
-# Output style.
-outputStyle=string
-
-while (( $# > 0 )); do
-    case "$1" in
-        --compact-json)
-            outputStyle=compact-json
-            ;;
-        --json)
-            outputStyle=json
-            ;;
-        -h|--help)
-            argError=-1 # `-1` suppresses error exit after displaying usage.
-            break
-            ;;
-        --)
-            # Explicit end of options.
-            shift
-            break
-            ;;
-        -?*)
-            echo 1>&2 "Unknown option: $1"
-            argError=1
-            break
-            ;;
-        *)
-            # Explicit end of options.
-            break
-            ;;
-    esac
-
-    shift
-done
-
-if (( $# > 0 )); then
-    command="$1"
-    shift
-else
-    echo 1>&2 'Missing command argument.'
-    argError=1
-fi
-
-if (( argError )); then
-    echo 'Usage:'
-    echo ''
-    echo "${progName} [<opt> ...] <command> <arg> ..."
-    echo ''
-    echo 'Performs a calculation of some sort on a CIDR address/mask. Input CIDR'
-    echo 'values can be either standard-form strings or parsed JSON values (such'
-    echo 'as are produced by the `--json` option of this tool).'
-    echo
-    echo '--compact-json'
-    echo '  Like `--json`, except produces compact output.'
-    echo '--json'
-    echo '  Produces JSON output representing the parsed components of a CIDR'
-    echo '  value, instead of a standard-form CIDR string. This only affects'
-    echo '  commands that output CIDR values.'
-    echo ''
-    echo 'Commands:'
-    echo ''
-    echo 'add-to-network <cidr> <amount>'
-    echo '  Adds the given amount (a positive integer) to the network address, and'
-    echo '  prints the resulting CIDR. This can be used in conjunction with'
-    echo '  `widen-to` to enumerate subnet addresses (though `make-subnets` is'
-    echo '  more convenient for that use case). `<amount>` can be specified either'
-    echo '  in decimal or hex. Use the suggestive prefix `::` to indicate hex.'
-    echo 'address-length <cidr>'
-    echo '  Prints the length (number of bits) of the address (not just the'
-    echo '  netmask).'
-    echo 'address-words'
-    echo '  Prints the words (16-bit components) of the full address, in a'
-    echo '  shell-friendly space-separated decimal form. Note: Even an IPv4'
-    echo '  address gets chunked as 16-bit words by this command.'
-    echo 'make-subnets <cidr> <count> [<bits>]'
-    echo '  Prints the indicated number of subnets of the given CIDR, created by'
-    echo '  widening the netmask and filling in the new bits with the sequence of'
-    echo '  `0` through `<count> - 1`. By default, the netmask is widened by the'
-    echo '  minimum number of bits needed, but an optional third argument indicates'
-    echo '  a specific result netmask length in bits.'
-    echo 'netmask-length <cidr>'
-    echo '  Prints the length (number of bits) in the netmask.'
-    echo 'print <cidr>'
-    echo '  Prints a CIDR value.'
-    echo 'widen-to <cidr> <bits>'
-    echo '  Widens the address in a CIDR by adding enough low-order zero bits to'
-    echo '  result in the indicated length. Prints the resulting CIDR.'
-    echo ''
-    echo "${progName} [--help | -h]"
-    echo '  Displays this message.'
-    exit $(( argError < 0 ? 0 : argError ))
-fi
-
-
-#
 # Main script
 #
 
@@ -774,7 +754,7 @@ if ! declare -F "${commandFunc}" >/dev/null; then
     exit 1
 fi
 
-result="$("${commandFunc}" "$@")" \
+result="$("${commandFunc}" "${args[@]}")" \
 || exit "$?"
 
 case "${result}" in
