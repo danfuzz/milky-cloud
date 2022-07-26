@@ -33,6 +33,8 @@ function usage {
       Produces JSON output representing the parsed components of a CIDR
       value, instead of a standard-form CIDR string. This only affects
       commands that output CIDR values.
+    --string
+      Produces strings. This is the default.
 
     Commands:
 
@@ -91,13 +93,7 @@ function parse-command {
     args=("$@")
 }
 
-error=0
-process-args "$@"
-error="$?"
-
-if (( error )); then
-    usage "${error}"
-fi
+process-args "$@" || usage "${error}"
 
 
 #
