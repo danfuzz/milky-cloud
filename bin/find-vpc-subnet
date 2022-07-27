@@ -17,6 +17,26 @@ progName="${progName##*/}"
 # Argument parsing
 #
 
+function usage {
+    print-usage $'
+    Usage:
+    
+    ${name} [<opt> ...]
+      Finds a VPC subnet that meets the indicated criteria. On success,
+      prints the subnet ID.
+    
+      --in=<availability-zone>
+        What availibility zone to look in. Must be specified.
+      --vpc=<name-or-id>
+        Name or ID of the VPC to look in. Must be specified.
+    
+    ${name} [--help | -h]
+      Displays this message.
+    '
+
+    exit "$1"
+}
+
 # Error during argument processing?
 argError=0
 
@@ -69,20 +89,7 @@ if (( !argError )); then
 fi
 
 if (( argError )); then
-    echo 'Usage:'
-    echo ''
-    echo "${progName} [<opt> ...]"
-    echo '  Finds a VPC subnet that meets the indicated criteria. On success,'
-    echo '  prints the subnet ID.'
-    echo ''
-    echo '  --in=<availability-zone>'
-    echo '    What availibility zone to look in. Must be specified.'
-    echo '  --vpc=<name-or-id>'
-    echo '    Name or ID of the VPC to look in. Must be specified.'
-    echo ''
-    echo "${progName} [--help | -h]"
-    echo '  Displays this message.'
-    exit $(( argError < 0 ? 0 : argError ))
+    usage "${argError}"
 fi
 
 
