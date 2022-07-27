@@ -17,6 +17,27 @@ progName="${progName##*/}"
 # Argument parsing
 #
 
+function usage {
+    print-usage $'
+    Usage:
+    
+    ${name} [<opt> ...] [--] [<value> ...]
+      Constructs and prints a JSON array of values, of all of the value
+      arguments passed to this script, each of which is interpreted as a
+      JSON value (default) or a string (with the appropriate option).
+    
+      --compact
+        Output in compact form (not multiline JSON).
+      --strings
+        Treat arguments as literal strings instead of JSON values.
+    
+    ${name} [--help | -h]
+      Displays this message.
+    '
+
+    exit "$1"
+}
+
 # Compact output?
 compactOutput=0
 
@@ -62,21 +83,7 @@ done
 args=("$@")
 
 if (( argError )); then
-    echo 'Usage:'
-    echo ''
-    echo "${progName} [<opt> ...] [--] [<value> ...]"
-    echo '  Constructs and prints a JSON array of values, of all of the value'
-    echo '  arguments passed to this script, each of which is interpreted as a'
-    echo '  JSON value (default) or a string (with the appropriate option).'
-    echo ''
-    echo '  --compact'
-    echo '    Output in compact form (not multiline JSON).'
-    echo '  --strings'
-    echo '    Treat arguments as literal strings instead of JSON values.'
-    echo ''
-    echo "${progName} [--help | -h]"
-    echo '  Displays this message.'
-    exit $(( argError < 0 ? 0 : argError ))
+    usage "${argError}"
 fi
 
 
