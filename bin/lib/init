@@ -86,7 +86,6 @@ _milky_cloud_progressEnabled=0
 # --print-option -- Prints `--progress` to stdout, if progress messages are
 #   enabled. (This is to make it easy to pass this option down to another
 #   command.)
-# (Hopefully, you never just want to say those as a message!)
 function progress-msg {
     if (( $# == 1 )); then
         case "$1" in
