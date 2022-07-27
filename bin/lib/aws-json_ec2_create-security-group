@@ -15,8 +15,7 @@ progName="$(readlink -f "$0")" || exit "$?"
 progDir="${progName%/*}"
 progName="${progName##*/}"
 
-# Set up for library-internal usage.
-. "${progDir}/init" --lib
+. "${progDir}/init"
 
 
 #
