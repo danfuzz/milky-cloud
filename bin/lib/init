@@ -9,12 +9,14 @@ if [[ ${_milky_cloud_libDir} != '' ]]; then
     return 1
 fi
 
+# Figure out the symlink-resolved directory of this script.
+_milky_cloud_libDir="$(readlink -f "${BASH_SOURCE[0]}")" || exit "$?"
+_milky_cloud_libDir="${_milky_cloud_libDir%/*}"
+
 if [[ "$1" == '--lib' ]]; then
-    _milky_cloud_libDir="${progDir}"
     _milky_cloud_mainDir="$(cd "${progDir}/.."; /bin/pwd)"
 else
     _milky_cloud_mainDir="${progDir}"
-    _milky_cloud_libDir="${progDir}/lib"
 fi
 
 
