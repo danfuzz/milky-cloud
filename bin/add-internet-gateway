@@ -53,9 +53,6 @@ inLocation=''
 # Name of the resulting gateway.
 name=''
 
-# Progress messages?
-progress=0
-
 # Name or ID of the VPC.
 vpcNameOrId=''
 
@@ -68,7 +65,7 @@ while (( $# > 0 )); do
             name="${1#*=}"
             ;;
         --progress)
-            progress=1
+            progress-msg --enable
             ;;
         --vpc=?*)
             vpcNameOrId="${1#*=}"
@@ -133,13 +130,6 @@ function figure-out-name {
     fi
 
     echo "$(lib now-stamp)-${name}"
-}
-
-# Prints a progress message, if such messages have been requested.
-function progress-msg {
-    if (( progress )); then
-        echo 1>&2 "$@"
-    fi
 }
 
 

@@ -55,9 +55,6 @@ inLocation=''
 # Name for the subnets.
 name=''
 
-# Progress messages?
-progress=0
-
 # Quiet?
 quiet=0
 
@@ -73,7 +70,7 @@ while (( $# > 0 )); do
             name="${1#*=}"
             ;;
         --progress)
-            progress=1
+            progress-msg --enable
             ;;
         --quiet)
             quiet=1
@@ -183,10 +180,7 @@ fi
 
 tagSpec="$(lib name-tag-spec 'subnet' "${name}")"
 
-progressArg=()
-if (( progress )); then
-    progressArg=(--progress)
-fi
+progressArg=($(progress-msg --print-option))
 
 results=()
 error=0
@@ -245,23 +239,16 @@ for (( n = 0; n < azCount && !error; n++ )); do
         EnableResourceNameDnsAAAARecordOnLaunch=true \
         MapPublicIpOnLaunch=true \
         PrivateDnsHostnameTypeOnLaunch=resource-name \
+    && progress-msg "Made subnet: ${result}" \
     || error=1
-
-    if (( progress && !error )); then
-        echo 1>&2 "Made subnet: ${result}"
-    fi
 done
 
 if (( error )); then
     # Attempt to delete any subnets that had been added.
-    if (( progress )); then
-        echo 1>&2 'Problem creating subnets; attempting cleanup...'
-    fi
+    progress-msg 'Problem creating subnets; attempting cleanup...'
 
     for id in "${results[@]}"; do
-        if (( progress )); then
-            echo 1>&2 "Removing subnet: ${id}"
-        fi
+        progress-msg "Removing subnet: ${id}"
 
         ec2-json delete-subnet \
             --in="${inRegion}" \
@@ -271,16 +258,12 @@ if (( error )); then
             }'
     done
 
-    if (( progress )); then
-        echo 1>&2 'Done with post-error subnet cleanup.'
-    fi
+    progress-msg 'Done with post-error subnet cleanup.'
 
     exit 1
 fi
 
-if (( progress )); then
-    echo 1>&2 "Done making and configuring ${#results[@]} subnets."
-fi
+progress-msg "Done making and configuring ${#results[@]} subnets."
 
 if (( !quiet )); then
     jarray --strings "${results[@]}"

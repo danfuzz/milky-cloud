@@ -56,9 +56,6 @@ id=''
 # Location (region or availability zone).
 inLocation=''
 
-# Progress messages?
-progress=0
-
 while (( $# > 0 )); do
     case "$1" in
         --id=?*)
@@ -68,7 +65,7 @@ while (( $# > 0 )); do
             inLocation="${1#*=}"
             ;;
         --progress)
-            progress=1
+            progress-msg --enable
             ;;
         -h|--help)
             argError=-1 # `-1` suppresses error exit after displaying usage.
@@ -125,18 +122,6 @@ fi
 if (( argError )); then
     usage "${argError}"
 fi
-
-
-#
-# Helper functions
-#
-
-# Prints a progress message, if such messages have been requested.
-function progress-msg {
-    if (( progress )); then
-        echo 1>&2 "$@"
-    fi
-}
 
 
 #
