@@ -60,9 +60,6 @@ inLocation=''
 # Name of the security group.
 name=''
 
-# Progress messages?
-progress=0
-
 # Name or ID of the VPC.
 vpcNameOrId=''
 
@@ -78,7 +75,7 @@ while (( $# > 0 )); do
             name="${1#*=}"
             ;;
         --progress)
-            progress=1
+            progress-msg --enable
             ;;
         --vpc=?*)
             vpcNameOrId="${1#*=}"
@@ -148,22 +145,10 @@ function figure-out-name {
     echo "$(lib now-stamp)-${name}"
 }
 
-# Prints a progress message, if such messages have been requested.
-function progress-msg {
-    if (( progress )); then
-        echo 1>&2 "$@"
-    fi
-}
-
 
 #
 # Main script
 #
-
-progressArg=()
-if (( progress )); then
-    progressArg=(--progress)
-fi
 
 inRegion="$(lib region-from-location "${inLocation}")" \
 || exit "$?"
@@ -210,6 +195,7 @@ progress-msg "  name: ${name}"
 
 error=0
 
+progressArg=($(progress-msg --print-option))
 lib configure-security-group \
     "${progressArg[@]}" \
     --in="${inRegion}" --security-group="${groupId}" \
