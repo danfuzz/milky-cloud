@@ -17,6 +17,42 @@ progName="${progName##*/}"
 # Argument parsing
 #
 
+function usage {
+    print-usage $'
+    Usage:
+    
+    ${name} [<opt> ...] [<assignment> ...] <jq-expression> ...
+      Removes rules from an existing security group, based on given filter
+      criteria. Simple filters can be specified via options, or if no such
+      option is used, a general filter can be specified via assignment and
+      expression arguments, similar to `aws-json`. This filter is expected
+      to accept `SecurityGroupRule` objects and then re-output the ones to
+      be removed.
+    
+      On success, prints a JSON array of the IDs of all removed rules.
+    
+      --all
+        Remove all rules.
+      --all-egress
+        Remove all egress rules.
+      --all-ingress
+        Remove all ingress rules.
+      --in=<region-or-zone>
+        What region to make the security group in. Must be specified. If
+        specified as an availability zone, only the region portion matters.
+      --quiet
+        Suppress non-error output.
+      --security-group=<name-or-id>
+        Name or ID of the security group to operate on. Can also be a VPC ID,
+        to indicate the default security group for that VPC.
+    
+    ${name} [--help | -h]
+      Displays this message.
+    '
+
+    exit "$1"
+}
+
 # Error during argument processing?
 argError=0
 
@@ -98,36 +134,7 @@ elif (( $# > 0 )); then
 fi
 
 if (( argError )); then
-    echo 'Usage:'
-    echo ''
-    echo "${progName} [<opt> ...] [<assignment> ...] <jq-expression> ..."
-    echo '  Removes rules from an existing security group, based on given filter'
-    echo '  criteria. Simple filters can be specified via options, or if no such'
-    echo '  option is used, a general filter can be specified via assignment and'
-    echo '  expression arguments, similar to `aws-json`. This filter is expected'
-    echo '  to accept `SecurityGroupRule` objects and then re-output the ones to'
-    echo '  be removed.'
-    echo ''
-    echo '  On success, prints a JSON array of the IDs of all removed rules.'
-    echo ''
-    echo '  --all'
-    echo '    Remove all rules.'
-    echo '  --all-egress'
-    echo '    Remove all egress rules.'
-    echo '  --all-ingress'
-    echo '    Remove all ingress rules.'
-    echo '  --in=<region-or-zone>'
-    echo '    What region to make the security group in. Must be specified. If'
-    echo '    specified as an availability zone, only the region portion matters.'
-    echo '  --quiet'
-    echo '    Suppress non-error output.'
-    echo '  --security-group=<name-or-id>'
-    echo '    Name or ID of the security group to operate on. Can also be a VPC ID,'
-    echo '    to indicate the default security group for that VPC.'
-    echo ''
-    echo "${progName} [--help | -h]"
-    echo '  Displays this message.'
-    exit $(( argError < 0 ? 0 : argError ))
+    usage "${argError}"
 fi
 
 

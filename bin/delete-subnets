@@ -17,6 +17,36 @@ progName="${progName##*/}"
 # Argument parsing
 #
 
+function usage {
+    print-usage $'
+    Usage:
+
+    ${name} [<opt> ...] [<assignment> ...] <jq-expression> ...
+      Removes rules from an existing subnet, based on given filter criteria.
+      Simple filters can be specified via options, or if no such option is
+      used, a general filter can be specified via assignment and expression
+      arguments, similar to `aws-json`. This filter is expected to accept
+      to accept `Subnet` objects and then re-output the ones to be removed.
+
+      On success, prints a JSON array of the IDs of all removed subnets.
+
+      --all
+        Remove all subnets.
+      --in=<region-or-zone>
+        What region to make the security group in. Must be specified. If
+        specified as an availability zone, only the region portion matters.
+      --quiet
+        Suppress non-error output.
+      --vpc=<name-or-id>
+        Name or ID of the VPC to operate on.
+
+    ${name} [--help | -h]
+      Displays this message.
+    '
+
+    exit "$1"
+}
+
 # Error during argument processing?
 argError=0
 
@@ -92,30 +122,7 @@ elif (( $# > 0 )); then
 fi
 
 if (( argError )); then
-    echo 'Usage:'
-    echo ''
-    echo "${progName} [<opt> ...] [<assignment> ...] <jq-expression> ..."
-    echo '  Removes rules from an existing subnet, based on given filter criteria.'
-    echo '  Simple filters can be specified via options, or if no such option is'
-    echo '  used, a general filter can be specified via assignment and expression'
-    echo '  arguments, similar to `aws-json`. This filter is expected to accept'
-    echo '  to accept `Subnet` objects and then re-output the ones to be removed.'
-    echo ''
-    echo '  On success, prints a JSON array of the IDs of all removed subnets.'
-    echo ''
-    echo '  --all'
-    echo '    Remove all subnets.'
-    echo '  --in=<region-or-zone>'
-    echo '    What region to make the security group in. Must be specified. If'
-    echo '    specified as an availability zone, only the region portion matters.'
-    echo '  --quiet'
-    echo '    Suppress non-error output.'
-    echo '  --vpc=<name-or-id>'
-    echo '    Name or ID of the VPC to operate on.'
-    echo ''
-    echo "${progName} [--help | -h]"
-    echo '  Displays this message.'
-    exit $(( argError < 0 ? 0 : argError ))
+    usage "${argError}"
 fi
 
 

@@ -17,6 +17,27 @@ progName="${progName##*/}"
 # Argument parsing
 #
 
+function usage {
+    print-usage $'
+    Usage:
+    
+    ${name} [<opt> ...]
+      Detaches and removes an internet gateway, including removing routing
+      rules from the default routing table of the formerly-associated VPC.
+    
+      --in=<region-or-zone>
+        What region to operate in. Must be specified. If specified as an
+        availability zone, only the region portion matters.
+      --gateway=<id>
+        ID of the gateway to remove. Must be specified.
+    
+    ${name} [--help | -h]
+      Displays this message.
+    '
+
+    exit "$1"
+}
+
 # Error during argument processing?
 argError=0
 
@@ -72,21 +93,7 @@ if (( !argError )); then
 fi
 
 if (( argError )); then
-    echo 'Usage:'
-    echo ''
-    echo "${progName} [<opt> ...]"
-    echo '  Detaches and removes an internet gateway, including removing routing'
-    echo '  rules from the default routing table of the formerly-associated VPC.'
-    echo ''
-    echo '  --in=<region-or-zone>'
-    echo '    What region to operate in. Must be specified. If specified as an'
-    echo '    availability zone, only the region portion matters.'
-    echo '  --gateway=<id>'
-    echo '    ID of the gateway to remove. Must be specified.'
-    echo ''
-    echo "${progName} [--help | -h]"
-    echo '  Displays this message.'
-    exit $(( argError < 0 ? 0 : argError ))
+    usage "${argError}"
 fi
 
 
