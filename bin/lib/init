@@ -78,14 +78,23 @@ function lib {
 _milky_cloud_progressEnabled=0
 
 # Prints a "progress" message to stderr, if such are enabled. Or, with just
-# `--enable`, enables them. (Hopefully, you never just want to say that as a
-# message!)
+# `--enable`, `--disable`, or `--set=<0|1>`, enables or disables them.
+# (Hopefully, you never just want to say those as a message!)
 function progress-msg {
-    if (( $# == 1 )) && [[ $1 == '--enable' ]]; then
-        _milky_cloud_progressEnabled=1
-    elif (( _milky_cloud_progressEnabled )); then
-        echo 1>&2 "$@"
+    if (( $# == 1 )); then
+        case "$1" in
+            --enable|--set=1)
+                _milky_cloud_progressEnabled=1
+                return
+                ;;
+            --disable|--set=0)
+                _milky_cloud_progressEnabled=0
+                return
+                ;;
+        esac
     fi
+
+    echo 1>&2 "$@"
 }
 
 
