@@ -14,18 +14,6 @@ progName="${progName##*/}"
 
 
 #
-# Helper functions
-#
-
-# Prints a progress message, if such messages have been requested.
-function progress-msg {
-    if (( progress )); then
-        echo 1>&2 "$@"
-    fi
-}
-
-
-#
 # Argument parsing
 #
 
@@ -125,6 +113,18 @@ fi
 if (( argError )); then
     usage "${argError}"
 fi
+
+
+#
+# Helper functions
+#
+
+# Prints a progress message, if such messages have been requested.
+function progress-msg {
+    if (( progress )); then
+        echo 1>&2 "$@"
+    fi
+}
 
 
 #

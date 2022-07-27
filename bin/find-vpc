@@ -14,89 +14,6 @@ progName="${progName##*/}"
 
 
 #
-# Helper functions
-#
-
-# Performs a `describe-*` call and passes through the JSON output under the
-# indicated top-level object key. Print out the final requested result (either
-# just the ID or the full info), including possibly doing a second call to
-# get the requested info.
-function do-find {
-    local commandName="$1"
-    local topKey="$2"
-    local filterName="$3"
-    local nameOrId="$4"
-
-    local result
-    result="$(ec2-json "${commandName}" \
-        --in="${inRegion}" \
-        "$(lib filter-spec "${filterName}=${nameOrId}")"
-    )" \
-    || return "$?"
-
-    local idResult
-    idResult="$(jget "${result}" \
-        topKey="${topKey}" \
-        '.[$topKey] | map(.VpcId) | unique'
-    )"
-
-    local vpcId
-    vpcId="$(jget --raw \
-        "${idResult}" \
-        '
-        if length == 0 then "none"
-        elif length == 1 then .[0]
-        else "ambiguous"
-        end
-    ')"
-
-    case "${vpcId}" in
-        ambiguous)
-            echo 1>&2 'Ambiguous name or ID matches all of:'
-            jget 1>&2 --raw "${idResult}" '.[] | "  " + .'
-            return 1
-            ;;
-        none)
-            echo 1>&2 'No such VPC.'
-            return 1
-            ;;
-    esac
-
-    if (( printAll )); then
-        if [[ ${topKey} != 'Vpcs' ]]; then
-            # We got the ID out of some other object (e.g. a security group),
-            # and we've been asked for full info. So we need to actually get
-            # that info!
-            result="$(ec2-json describe-vpcs \
-                --in="${inRegion}" \
-                vpcId="${vpcId}" \
-                '{ VpcIds: [$vpcId] }'
-            )" \
-            || return "$?"
-        fi
-        jget "${result}" '.Vpcs[0]'
-    else
-        echo "${vpcId}"
-    fi
-}
-
-# Find a VPC by looking through all the VPCs.
-function find-via-describe-vpcs {
-    local filterName="$1"
-    local nameOrId="$2"
-
-    do-find describe-vpcs Vpcs "${filterName}" "${nameOrId}"
-}
-
-# Find a VPC from an associated security group.
-function find-via-describe-security-groups {
-    local nameOrId="$1"
-
-    do-find describe-security-groups SecurityGroups group-id "${nameOrId}"
-}
-
-
-#
 # Argument parsing
 #
 
@@ -180,6 +97,89 @@ fi
 if (( argError )); then
     usage "${argError}"
 fi
+
+
+#
+# Helper functions
+#
+
+# Performs a `describe-*` call and passes through the JSON output under the
+# indicated top-level object key. Print out the final requested result (either
+# just the ID or the full info), including possibly doing a second call to
+# get the requested info.
+function do-find {
+    local commandName="$1"
+    local topKey="$2"
+    local filterName="$3"
+    local nameOrId="$4"
+
+    local result
+    result="$(ec2-json "${commandName}" \
+        --in="${inRegion}" \
+        "$(lib filter-spec "${filterName}=${nameOrId}")"
+    )" \
+    || return "$?"
+
+    local idResult
+    idResult="$(jget "${result}" \
+        topKey="${topKey}" \
+        '.[$topKey] | map(.VpcId) | unique'
+    )"
+
+    local vpcId
+    vpcId="$(jget --raw \
+        "${idResult}" \
+        '
+        if length == 0 then "none"
+        elif length == 1 then .[0]
+        else "ambiguous"
+        end
+    ')"
+
+    case "${vpcId}" in
+        ambiguous)
+            echo 1>&2 'Ambiguous name or ID matches all of:'
+            jget 1>&2 --raw "${idResult}" '.[] | "  " + .'
+            return 1
+            ;;
+        none)
+            echo 1>&2 'No such VPC.'
+            return 1
+            ;;
+    esac
+
+    if (( printAll )); then
+        if [[ ${topKey} != 'Vpcs' ]]; then
+            # We got the ID out of some other object (e.g. a security group),
+            # and we've been asked for full info. So we need to actually get
+            # that info!
+            result="$(ec2-json describe-vpcs \
+                --in="${inRegion}" \
+                vpcId="${vpcId}" \
+                '{ VpcIds: [$vpcId] }'
+            )" \
+            || return "$?"
+        fi
+        jget "${result}" '.Vpcs[0]'
+    else
+        echo "${vpcId}"
+    fi
+}
+
+# Find a VPC by looking through all the VPCs.
+function find-via-describe-vpcs {
+    local filterName="$1"
+    local nameOrId="$2"
+
+    do-find describe-vpcs Vpcs "${filterName}" "${nameOrId}"
+}
+
+# Find a VPC from an associated security group.
+function find-via-describe-security-groups {
+    local nameOrId="$1"
+
+    do-find describe-security-groups SecurityGroups group-id "${nameOrId}"
+}
 
 
 #

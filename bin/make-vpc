@@ -14,6 +14,87 @@ progName="${progName##*/}"
 
 
 #
+# Argument parsing
+#
+
+function usage {
+    print-usage $'
+    Usage:
+
+    ${name} [<opt> ...]
+      Makes a new VPC, plus associated accouterments. On success, prints
+      the ID of the created VPC.
+
+      --in=<region-or-zone>
+        What region to make the VPC in. Must be specified. If specified as
+        an availability zone, only the region portion matters.
+      --name=<name>
+        Name to assign to the constructed VPC. Must be specified.
+
+    ${name} [--help | -h]
+      Displays this message.
+    '
+
+    exit "$1"
+}
+
+# Error during argument processing?
+argError=0
+
+# Location (region or availability zone).
+inLocation=''
+
+# Name of the VPC.
+name=''
+
+while (( $# > 0 )); do
+    case "$1" in
+        --in=?*)
+            inLocation="${1#*=}"
+            ;;
+        --name=?*)
+            name="${1#*=}"
+            ;;
+        -h|--help)
+            argError=-1 # `-1` suppresses error exit after displaying usage.
+            break
+            ;;
+        --)
+            # Explicit end of options.
+            shift
+            break
+            ;;
+        -?*)
+            echo 1>&2 "Unknown option: $1"
+            argError=1
+            break
+            ;;
+        *)
+            # Explicit end of options.
+            break
+            ;;
+    esac
+
+    shift
+done
+
+if (( !argError )); then
+    if [[ ${inLocation} == '' ]]; then
+        echo 1>&2 'Missing option: --in'
+        argError=1
+    fi
+    if [[ ${name} == '' ]]; then
+        echo 1>&2 'Missing option: --name'
+        argError=1
+    fi
+fi
+
+if (( argError )); then
+    usage "${argError}"
+fi
+
+
+#
 # Helper functions
 #
 
@@ -107,87 +188,6 @@ function make-vpc-per-se {
 
     echo "${vpcInfo}"
 }
-
-
-#
-# Argument parsing
-#
-
-function usage {
-    print-usage $'
-    Usage:
-
-    ${name} [<opt> ...]
-      Makes a new VPC, plus associated accouterments. On success, prints
-      the ID of the created VPC.
-
-      --in=<region-or-zone>
-        What region to make the VPC in. Must be specified. If specified as
-        an availability zone, only the region portion matters.
-      --name=<name>
-        Name to assign to the constructed VPC. Must be specified.
-
-    ${name} [--help | -h]
-      Displays this message.
-    '
-
-    exit "$1"
-}
-
-# Error during argument processing?
-argError=0
-
-# Location (region or availability zone).
-inLocation=''
-
-# Name of the VPC.
-name=''
-
-while (( $# > 0 )); do
-    case "$1" in
-        --in=?*)
-            inLocation="${1#*=}"
-            ;;
-        --name=?*)
-            name="${1#*=}"
-            ;;
-        -h|--help)
-            argError=-1 # `-1` suppresses error exit after displaying usage.
-            break
-            ;;
-        --)
-            # Explicit end of options.
-            shift
-            break
-            ;;
-        -?*)
-            echo 1>&2 "Unknown option: $1"
-            argError=1
-            break
-            ;;
-        *)
-            # Explicit end of options.
-            break
-            ;;
-    esac
-
-    shift
-done
-
-if (( !argError )); then
-    if [[ ${inLocation} == '' ]]; then
-        echo 1>&2 'Missing option: --in'
-        argError=1
-    fi
-    if [[ ${name} == '' ]]; then
-        echo 1>&2 'Missing option: --name'
-        argError=1
-    fi
-fi
-
-if (( argError )); then
-    usage "${argError}"
-fi
 
 
 #
