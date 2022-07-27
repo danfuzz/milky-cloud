@@ -17,6 +17,36 @@ progName="${progName##*/}"
 # Argument parsing
 #
 
+function usage {
+    print-usage $'
+    Usage:
+    
+    ${name} <zone-or-region>
+      Parses a location -- a region or availability zone -- and if
+      valid then optionally prints out one of the components. Note that
+      only one each `--input-` and `--print-` option has any effect (the
+      last specified).
+    
+      --input-zone
+        Require an availibility zone as input.
+      --input-region
+        Require a region as input.
+      --print-region
+        Print the parsed region.
+      --print-zone
+        Print the full zone (which will be the same as the input).
+        Implies `--input-zone`.
+      --print-zone-suffix
+        Print the zone suffix (everything after the region).
+        Implies `--input-zone`.
+    
+    ${name} [--help | -h]
+      Displays this message.
+    '
+
+    exit "$1"
+}
+
 # Error during argument processing?
 argError=0
 
@@ -83,30 +113,7 @@ else
 fi
 
 if (( argError )); then
-    echo 'Usage:'
-    echo ''
-    echo "${progName} <zone-or-region>"
-    echo '  Parses a location -- a region or availability zone -- and if'
-    echo '  valid then optionally prints out one of the components. Note that'
-    echo '  only one each `--input-` and `--print-` option has any effect (the'
-    echo '  last specified).'
-    echo ''
-    echo '  --input-zone'
-    echo '    Require an availibility zone as input.'
-    echo '  --input-region'
-    echo '    Require a region as input.'
-    echo '  --print-region'
-    echo '    Print the parsed region.'
-    echo '  --print-zone'
-    echo '    Print the full zone (which will be the same as the input).'
-    echo '    Implies `--input-zone`.'
-    echo '  --print-zone-suffix'
-    echo '    Print the zone suffix (everything after the region).'
-    echo '    Implies `--input-zone`.'
-    echo ''
-    echo "${progName} [--help | -h]"
-    echo '  Displays this message.'
-    exit $(( argError < 0 ? 0 : argError ))
+    usage "${argError}"
 fi
 
 

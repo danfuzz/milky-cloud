@@ -17,6 +17,23 @@ progName="${progName##*/}"
 # Argument parsing
 #
 
+function usage {
+    print-usage $'
+    Usage:
+    
+    ${name} [<suffix>]
+    
+    Prints a standardized timestamp representing "now" with an optional
+    suffix. This can be used to label things that have nothing more
+    suitable.
+    
+    ${name} [--help | -h]
+      Displays this message.
+    '
+
+    exit "$1"
+}
+
 # Error during argument processing?
 argError=0
 
@@ -53,17 +70,7 @@ if (( $# > 0 )); then
 fi
 
 if (( argError )); then
-    echo 'Usage:'
-    echo ''
-    echo "${progName} [<suffix>]"
-    echo ''
-    echo 'Prints a standardized timestamp representing "now" with an optional'
-    echo 'suffix. This can be used to label things that have nothing more'
-    echo 'suitable.'
-    echo ''
-    echo "${progName} [--help | -h]"
-    echo '  Displays this message.'
-    exit $(( argError < 0 ? 0 : argError ))
+    usage "${argError}"
 fi
 
 
