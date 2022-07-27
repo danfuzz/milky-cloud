@@ -17,28 +17,6 @@ progName="${progName##*/}"
 # Helper functions
 #
 
-# Figures out a name for the security group: If the VPC has a name, use that as
-# a basis. Or, if the VPC doesn't have a name, then just use the VPC ID as the
-# basis.
-function figure-out-name {
-    local filterSpec=
-
-    local name
-    name=$(ec2-json describe-vpcs \
-        --in="${inRegion}" \
-        "$(lib filter-spec vpc-id="${vpcId}")" \
-        :: --raw \
-        '.Vpcs[0].Tags[] | select(.Key == "Name") | .Value'
-    ) \
-    || return "$?"
-
-    if [[ ${name} == '' ]]; then
-        name="for-${vpcId}"
-    fi
-
-    echo "$(lib now-stamp)-${name}"
-}
-
 # Prints a progress message, if such messages have been requested.
 function progress-msg {
     if (( progress )); then
