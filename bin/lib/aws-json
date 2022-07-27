@@ -14,29 +14,6 @@ progName="${progName##*/}"
 
 
 #
-# Helper functions
-#
-
-# Constructs a JSON value to represent all the pieces of a command, based on the
-# globals set up by the main script.
-function make-command-parts-json {
-    local dashArgsJson="$(jarray --strings -- "${dashArgs[@]}")"
-
-    jval \
-        command="${command}" \
-        subcommand="${subcommand}" \
-        jsonArg:json="${jsonArg}" \
-        dashArgs:json="${dashArgsJson}" \
-        '{
-            command:    $command,
-            subcommand: $subcommand,
-            jsonArg:    $jsonArg,
-            dashArgs:   $dashArgs
-        }'
-}
-
-
-#
 # Argument parsing
 #
 
@@ -207,6 +184,29 @@ resultConstructor=("$@")
 if (( argError )); then
     usage "${argError}"
 fi
+
+
+#
+# Helper functions
+#
+
+# Constructs a JSON value to represent all the pieces of a command, based on the
+# globals set up by the main script.
+function make-command-parts-json {
+    local dashArgsJson="$(jarray --strings -- "${dashArgs[@]}")"
+
+    jval \
+        command="${command}" \
+        subcommand="${subcommand}" \
+        jsonArg:json="${jsonArg}" \
+        dashArgs:json="${dashArgsJson}" \
+        '{
+            command:    $command,
+            subcommand: $subcommand,
+            jsonArg:    $jsonArg,
+            dashArgs:   $dashArgs
+        }'
+}
 
 
 #
