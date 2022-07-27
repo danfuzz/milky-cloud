@@ -100,6 +100,28 @@ function find-via-describe-security-groups {
 # Argument parsing
 #
 
+function usage {
+    print-usage $'
+    Usage:
+
+    ${name} [<opt> ...] <name-or-id>
+      Finds a VPC by name or security group ID, or validates the existence
+      of one by ID. On success, prints the VPC ID (by default) or the
+      full VPC info object.
+
+      --print-all
+        Print the full info object, not just the ID.
+      --in=<region-or-zone>
+        Where to look. Must be specified. If specified as an availability
+        zone, only the region portion matters.
+
+    ${name} [--help | -h]
+      Displays this message.
+    '
+
+    exit "$1"
+}
+
 # Error during argument processing?
 argError=0
 
@@ -156,22 +178,7 @@ if (( !argError )); then
 fi
 
 if (( argError )); then
-    echo 'Usage:'
-    echo ''
-    echo "${progName} [<opt> ...] <name-or-id>"
-    echo '  Finds a VPC by name or security group ID, or validates the existence'
-    echo '  of one by ID. On success, prints the VPC ID (by default) or the'
-    echo '  full VPC info object.'
-    echo ''
-    echo '  --print-all'
-    echo '    Print the full info object, not just the ID.'
-    echo '  --in=<region-or-zone>'
-    echo '    Where to look. Must be specified. If specified as an availability'
-    echo '    zone, only the region portion matters.'
-    echo ''
-    echo "${progName} [--help | -h]"
-    echo '  Displays this message.'
-    exit $(( argError < 0 ? 0 : argError ))
+    usage "${argError}"
 fi
 
 

@@ -48,6 +48,33 @@ function progress-msg {
 # Argument parsing
 #
 
+function usage {
+    print-usage $'
+    Usage:
+
+    ${name} [<opt> ...]
+      Creates an internet gateway and attaches it to a VPC, including adding
+      all necessary routing rules to the default route table for the VPC. On
+      success, prints the ID of the created gateway.
+
+      --in=<region-or-zone>
+        What region to make the gateway in. Must be specified. If specified
+        as an availability zone, only the region portion matters.
+      --name=<name>
+        Name to assign to the constructed gateway. If not specified, a
+        name is derived from the associated VPC.
+      --progress
+        Print progress messages to stderr.
+      --vpc=<name-or-id>
+        Name or ID of the VPC to be associated with. Must be specified.
+
+    ${name} [--help | -h]
+      Displays this message.
+    '
+
+    exit "$1"
+}
+
 # Error during argument processing?
 argError=0
 
@@ -112,27 +139,7 @@ if (( !argError )); then
 fi
 
 if (( argError )); then
-    echo 'Usage:'
-    echo ''
-    echo "${progName} [<opt> ...]"
-    echo '  Creates an internet gateway and attaches it to a VPC, including adding'
-    echo '  all necessary routing rules to the default route table for the VPC. On'
-    echo '  success, prints the ID of the created gateway.'
-    echo ''
-    echo '  --in=<region-or-zone>'
-    echo '    What region to make the gateway in. Must be specified. If specified'
-    echo '    as an availability zone, only the region portion matters.'
-    echo '  --name=<name>'
-    echo '    Name to assign to the constructed gateway. If not specified, a'
-    echo '    name is derived from the associated VPC.'
-    echo '  --progress'
-    echo '    Print progress messages to stderr.'
-    echo '  --vpc=<name-or-id>'
-    echo '    Name or ID of the VPC to be associated with. Must be specified.'
-    echo ''
-    echo "${progName} [--help | -h]"
-    echo '  Displays this message.'
-    exit $(( argError < 0 ? 0 : argError ))
+    usage "${argError}"
 fi
 
 

@@ -17,6 +17,30 @@ progName="${progName##*/}"
 # Argument parsing
 #
 
+function usage {
+    print-usage $'
+    Usage:
+
+    ${name} [<opt> ...]
+      Lists all accessible availability zones in a given region. The result
+      is one zone name per line (by default), or a JSON array (given an
+      appropriate option).
+
+      --compact-json
+        Produce compact JSON output.
+      --in=<region-or-zone>
+        What region to look in. Must be specified. If specified as an
+        availability zone, only the region portion matters.
+      --json
+        Produce JSON output.
+
+    ${name} [--help | -h]
+      Displays this message.
+    '
+
+    exit "$1"
+}
+
 # Output style.
 outputStyle=strings
 
@@ -68,24 +92,7 @@ if (( !argError )); then
 fi
 
 if (( argError )); then
-    echo 'Usage:'
-    echo ''
-    echo "${progName} [<opt> ...]"
-    echo '  Lists all accessible availability zones in a given region. The result'
-    echo '  is one zone name per line (by default), or a JSON array (given an'
-    echo '  appropriate option).'
-    echo ''
-    echo '  --compact-json'
-    echo '    Produce compact JSON output.'
-    echo '  --in=<region-or-zone>'
-    echo '    What region to look in. Must be specified. If specified as an'
-    echo '    availability zone, only the region portion matters.'
-    echo '  --json'
-    echo '    Produce JSON output.'
-    echo ''
-    echo "${progName} [--help | -h]"
-    echo '  Displays this message.'
-    exit $(( argError < 0 ? 0 : argError ))
+    usage "${argError}"
 fi
 
 

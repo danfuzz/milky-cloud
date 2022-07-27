@@ -40,6 +40,50 @@ function make-command-parts-json {
 # Argument parsing
 #
 
+function usage {
+    print-usage $'
+    Usage:
+
+    ${name} <cmd> <subcommand> [<opt> ...] [--] [<assignment> ...]
+      [<jq-expression> ...]
+      [:: [<out-opt> ...] [<assignment> ...] <jq-expression> ...]
+
+    Makes an AWS call with a JSON value constructed with `json-val`, and
+    with successful result optionally post-processed through `json-val`.
+    If no argument expression is supplied, the value `{}` (an empty object)
+    is passed to the command. When post-processing, the original result
+    becomes the sole input from stdin.
+
+    <cmd> <subcommand>
+      The AWS command and subcommand to call, e.g. `ec2 run-instances`.
+
+    --in=<region-or-zone>
+      What region to make the call in. Must be specified. If specified as
+      an availability zone, only the region portion matters.
+    --print-command-to=<file>
+      Name of a file to print the fully-constructed command to. It is
+      emitted as a JSON value including both split-out components and
+      the actual commandline.
+    --skeleton
+      Print out a JSON "skeleton" of parameters. This can be filtered just
+      like any other result.
+
+    Output options:
+
+    --compact
+      Output in compact form (not multiline JSON).
+    --none
+      Do not produce (non-error) output.
+    --raw
+      Output raw strings (and other values compactly).
+
+    ${name} [--help | -h]
+      Displays this message.
+    '
+
+    exit "$1"
+}
+
 # Error during argument processing?
 argError=0
 
@@ -161,44 +205,7 @@ done
 resultConstructor=("$@")
 
 if (( argError )); then
-    echo 'Usage:'
-    echo ''
-    echo "${progName} <cmd> <subcommand> [<opt> ...] [--] [<assignment> ...]"
-    echo '  [<jq-expression> ...]'
-    echo '  [:: [<out-opt> ...] [<assignment> ...] <jq-expression> ...]'
-    echo ''
-    echo 'Makes an AWS call with a JSON value constructed with `json-val`, and'
-    echo 'with successful result optionally post-processed through `json-val`.'
-    echo 'If no argument expression is supplied, the value `{}` (an empty object)'
-    echo 'is passed to the command. When post-processing, the original result'
-    echo 'becomes the sole input from stdin.'
-    echo ''
-    echo '<cmd> <subcommand>'
-    echo '  The AWS command and subcommand to call, e.g. `ec2 run-instances`.'
-    echo ''
-    echo '--in=<region-or-zone>'
-    echo '  What region to make the call in. Must be specified. If specified as'
-    echo '  an availability zone, only the region portion matters.'
-    echo '--print-command-to=<file>'
-    echo '  Name of a file to print the fully-constructed command to. It is'
-    echo '  emitted as a JSON value including both split-out components and'
-    echo '  the actual commandline.'
-    echo '--skeleton'
-    echo '  Print out a JSON "skeleton" of parameters. This can be filtered just'
-    echo '  like any other result.'
-    echo ''
-    echo 'Output options:'
-    echo ''
-    echo '--compact'
-    echo '  Output in compact form (not multiline JSON).'
-    echo '--none'
-    echo '  Do not produce (non-error) output.'
-    echo '--raw'
-    echo '  Output raw strings (and other values compactly).'
-    echo ''
-    echo "${progName} [--help | -h]"
-    echo '  Displays this message.'
-    exit $(( argError < 0 ? 0 : argError ))
+    usage "${argError}"
 fi
 
 

@@ -17,6 +17,30 @@ progName="${progName##*/}"
 # Argument parsing
 #
 
+function usage {
+    print-usage $'
+    Usage:
+
+    ${name} [<opt> ...] <name-or-id>
+      Finds a security group by name or validates the existence of one by
+      ID. If passed an ID, it can either be the ID of a security group per
+      se, or it can be an ID of a VPC which is taken to refer to the default
+      security group for the indicated VPC. On success, prints the security
+      group ID (by default) or the entire group info object.
+
+      --in=<region-or-zone>
+        Where to look. Must be specified. If specified as an availability
+        zone, only the region portion matters.
+      --print-all
+        Print the full info object, not just the ID.
+
+    ${name} [--help | -h]
+      Displays this message.
+    '
+
+    exit "$1"
+}
+
 # Error during argument processing?
 argError=0
 
@@ -73,24 +97,7 @@ if (( !argError )); then
 fi
 
 if (( argError )); then
-    echo 'Usage:'
-    echo ''
-    echo "${progName} [<opt> ...] <name-or-id>"
-    echo '  Finds a security group by name or validates the existence of one by'
-    echo '  ID. If passed an ID, it can either be the ID of a security group per'
-    echo '  se, or it can be an ID of a VPC which is taken to refer to the default'
-    echo '  security group for the indicated VPC. On success, prints the security'
-    echo '  group ID (by default) or the entire group info object.'
-    echo ''
-    echo '  --in=<region-or-zone>'
-    echo '    Where to look. Must be specified. If specified as an availability'
-    echo '    zone, only the region portion matters.'
-    echo '  --print-all'
-    echo '    Print the full info object, not just the ID.'
-    echo ''
-    echo "${progName} [--help | -h]"
-    echo '  Displays this message.'
-    exit $(( argError < 0 ? 0 : argError ))
+    usage "${argError}"
 fi
 
 

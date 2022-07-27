@@ -17,6 +17,21 @@ progName="${progName##*/}"
 # Argument parsing
 #
 
+function usage {
+    print-usage $'
+    Usage:
+
+    ${name} <json-value>
+
+    Prints the length of the given JSON value, per the `jq` length rules.
+
+    ${name} [--help | -h]
+      Displays this message.
+    '
+
+    exit "$1"
+}
+
 # Error during argument processing?
 argError=0
 
@@ -56,15 +71,7 @@ else
 fi
 
 if (( argError )); then
-    echo 'Usage:'
-    echo ''
-    echo "${progName} <json-value>"
-    echo ''
-    echo 'Prints the length of the given JSON value, per the `jq` length rules.'
-    echo ''
-    echo "${progName} [--help | -h]"
-    echo '  Displays this message.'
-    exit $(( argError < 0 ? 0 : argError ))
+    usage "${argError}"
 fi
 
 

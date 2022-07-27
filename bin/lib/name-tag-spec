@@ -17,6 +17,28 @@ progName="${progName##*/}"
 # Argument parsing
 #
 
+function usage {
+    print-usage $'
+    Usage:
+
+    ${name} [<opt> ...] <resource-type> <name>
+
+    Constructs and prints a JSON object suitable for use as a
+    `TagSpecifications` argument to an AWS command, to _just_ define a
+    `Name` tag. The result is an object that binds `TagSpecifications`, so
+    it can be used as-is (if that is the only argument) or merged with
+    other arguments.
+
+    --compact
+      Output in compact form (not multiline JSON).
+
+    ${name} [--help | -h]
+      Displays this message.
+    '
+
+    exit "$1"
+}
+
 # Error during argument processing?
 argError=0
 
@@ -66,22 +88,7 @@ resourceType="$1"
 name="$2"
 
 if (( argError )); then
-    echo 'Usage:'
-    echo ''
-    echo "${progName} [<opt> ...] <resource-type> <name>"
-    echo ''
-    echo 'Constructs and prints a JSON object suitable for use as a'
-    echo '`TagSpecifications` argument to an AWS command, to _just_ define a'
-    echo '`Name` tag. The result is an object that binds `TagSpecifications`, so'
-    echo 'it can be used as-is (if that is the only argument) or merged with'
-    echo 'other arguments.'
-    echo ''
-    echo '--compact'
-    echo '  Output in compact form (not multiline JSON).'
-    echo ''
-    echo "${progName} [--help | -h]"
-    echo '  Displays this message.'
-    exit $(( argError < 0 ? 0 : argError ))
+    usage "${argError}"
 fi
 
 

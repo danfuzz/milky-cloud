@@ -17,6 +17,27 @@ progName="${progName##*/}"
 # Argument parsing
 #
 
+function usage {
+    print-usage $'
+    Usage:
+
+    ${name} [<opt> ...] <protocol> <port>
+
+    Constructs and prints a JSON object suitable for use as an
+    `IpPermissions` entry to one of the security group rule addition
+    commands. <protocol> must be one of `all`, `tcp`, or `udp`. The resulting
+    specification contains both IPv4 and IPv6 entries.
+
+    --compact
+      Output in compact form (not multiline JSON).
+
+    ${name} [--help | -h]
+      Displays this message.
+    '
+
+    exit "$1"
+}
+
 # Error during argument processing?
 argError=0
 
@@ -36,7 +57,6 @@ while (( $# > 0 )); do
             ;;
         -h|--help)
             argError=-1 # `-1` suppresses error exit after displaying usage.
-            break
             ;;
         --)
             # Explicit end of options.
@@ -80,21 +100,7 @@ else
 fi
 
 if (( argError )); then
-    echo 'Usage:'
-    echo ''
-    echo "${progName} [<opt> ...] <protocol> <port>"
-    echo ''
-    echo 'Constructs and prints a JSON object suitable for use as an'
-    echo '`IpPermissions` entry to one of the security group rule addition'
-    echo 'commands. <protocol> must be one of `all`, `tcp`, or `udp`. The resulting'
-    echo 'specification contains both IPv4 and IPv6 entries.'
-    echo ''
-    echo '--compact'
-    echo '  Output in compact form (not multiline JSON).'
-    echo ''
-    echo "${progName} [--help | -h]"
-    echo '  Displays this message.'
-    exit $(( argError < 0 ? 0 : argError ))
+    usage "${argError}"
 fi
 
 

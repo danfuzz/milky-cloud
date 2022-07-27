@@ -51,6 +51,36 @@ function progress-msg {
 # Argument parsing
 #
 
+function usage {
+    print-usage $'
+    Usage:
+
+    ${name} [<opt> ...]
+      Configures a security group in a standard way. This involves removing
+      all pre-existing rules from the group and then adding exactly what is
+      needed.
+
+      On success, the security group allows incoming TCP traffic to the SSH
+      and HTTPS ports, and allows outgoing traffic to anywhere. It also allows
+      incoming traffic on all ports, from sources that are within the same
+      security group.
+
+      --in=<region-or-zone>
+        What region to make the security group in. Must be specified. If
+        specified as an availability zone, only the region portion matters.
+      --security-group=<name-or-id>
+        Name or ID of the security group to modify. Can also be a VPC ID,
+        to indicate the default security group for that VPC.
+      --progress
+        Print progress messages to stderr.
+
+    ${name} [--help | -h]
+      Displays this message.
+    '
+
+    exit "$1"
+}
+
 # Error during argument processing?
 argError=0
 
@@ -115,30 +145,7 @@ if (( !argError )); then
 fi
 
 if (( argError )); then
-    echo 'Usage:'
-    echo ''
-    echo "${progName} [<opt> ...]"
-    echo '  Configures a security group in a standard way. This involves removing'
-    echo '  all pre-existing rules from the group and then adding exactly what is'
-    echo '  needed.'
-    echo ''
-    echo '  On success, the security group allows incoming TCP traffic to the SSH'
-    echo '  and HTTPS ports, and allows outgoing traffic to anywhere. It also allows'
-    echo '  incoming traffic on all ports, from sources that are within the same'
-    echo '  security group.'
-    echo ''
-    echo '  --in=<region-or-zone>'
-    echo '    What region to make the security group in. Must be specified. If'
-    echo '    specified as an availability zone, only the region portion matters.'
-    echo '  --security-group=<name-or-id>'
-    echo '    Name or ID of the security group to modify. Can also be a VPC ID,'
-    echo '    to indicate the default security group for that VPC.'
-    echo '  --progress'
-    echo '    Print progress messages to stderr.'
-    echo ''
-    echo "${progName} [--help | -h]"
-    echo '  Displays this message.'
-    exit $(( argError < 0 ? 0 : argError ))
+    usage "${argError}"
 fi
 
 

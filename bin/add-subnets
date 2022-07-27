@@ -36,6 +36,35 @@ function bits-needed {
 # Argument parsing
 #
 
+function usage {
+    print-usage $'
+    Usage:
+
+    ${name} [<opt> ...]
+      Adds a set of subnets to a VPC -- one per availability zone -- along
+      with an associated routing table. Upon success, prints a JSON array
+      of all the created subnets.
+
+      --in=<region-or-zone>
+        What region to make the subnets in. Must be specified. If specified
+        as an availability zone, only the region portion matters.
+      --name=<name>
+        Name to use for the created subnets. If not specified, a name is
+        generated programatically.
+      --progress
+        Print progress messages to stderr.
+      --quiet
+        Suppress non-error output to stdout.
+      --vpc=<name-or-id>
+        Name or ID of the VPC.
+
+    ${name} [--help | -h]
+      Displays this message.
+    '
+
+    exit "$1"
+}
+
 # Error during argument processing?
 argError=0
 
@@ -106,29 +135,7 @@ if (( !argError )); then
 fi
 
 if (( argError )); then
-    echo 'Usage:'
-    echo ''
-    echo "${progName} [<opt> ...]"
-    echo '  Adds a set of subnets to a VPC -- one per availability zone -- along'
-    echo '  with an associated routing table. Upon success, prints a JSON array'
-    echo '  of all the created subnets.'
-    echo ''
-    echo '  --in=<region-or-zone>'
-    echo '    What region to make the subnets in. Must be specified. If specified'
-    echo '    as an availability zone, only the region portion matters.'
-    echo '  --name=<name>'
-    echo '    Name to use for the created subnets. If not specified, a name is'
-    echo '    generated programatically.'
-    echo '  --progress'
-    echo '    Print progress messages to stderr.'
-    echo '  --quiet'
-    echo '    Suppress non-error output to stdout.'
-    echo '  --vpc=<name-or-id>'
-    echo '    Name or ID of the VPC.'
-    echo ''
-    echo "${progName} [--help | -h]"
-    echo '  Displays this message.'
-    exit $(( argError < 0 ? 0 : argError ))
+    usage "${argError}"
 fi
 
 

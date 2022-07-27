@@ -17,6 +17,53 @@ progName="${progName##*/}"
 # Argument parsing
 #
 
+function usage {
+    print-usage $'
+    Usage:
+
+    ${name} [<opt> ...]
+      Adds one or more rules to a given security group to specify IP-based
+      restrictions. Either `--port` or `--all-ports` must be passed. Similarly,
+      one protocol option must be passed. Upon success, prints out a JSON
+      array of all added rules.
+
+      Note: Even though this command only nominally lets you specify one
+      rule, AWS splits out multiple rules when the specified rule applies
+      to multiple IP address ranges (including notably treating "any IPv4"
+      and "any IPv6" as different ranges).
+
+      --all-ports
+        The rule is to apply to all ports.
+      --all-protocols
+        The rule is to apply to all protocols.
+      --egress
+        The rule is to be an egress rule.
+      --in=<region-or-zone>
+        What region to make the security group in. Must be specified. If
+        specified as an availability zone, only the region portion matters.
+      --ingress
+        The rule is to be an ingress rule.
+      --name=<name>
+        Name to attach to the rule, if any.
+      --port=<number>
+        Port for the rule.
+      --quiet
+        Suppress non-error output.
+      --security-group=<name-or-id>
+        Name or ID of the security group to add to. Can also be a VPC ID,
+        to indicate the default security group for that VPC.
+      --tcp
+        The rule is for TCP traffic.
+      --udp
+        The rule is for UDP traffic.
+
+    ${name} [--help | -h]
+      Displays this message.
+    '
+
+    exit "$1"
+}
+
 # Error during argument processing?
 argError=0
 
@@ -123,47 +170,7 @@ if (( !argError )); then
 fi
 
 if (( argError )); then
-    echo 'Usage:'
-    echo ''
-    echo "${progName} [<opt> ...]"
-    echo '  Adds one or more rules to a given security group to specify IP-based'
-    echo '  restrictions. Either `--port` or `--all-ports` must be passed. Similarly,'
-    echo '  one protocol option must be passed. Upon success, prints out a JSON'
-    echo '  array of all added rules.'
-    echo ''
-    echo '  Note: Even though this command only nominally lets you specify one'
-    echo '  rule, AWS splits out multiple rules when the specified rule applies'
-    echo '  to multiple IP address ranges (including notably treating "any IPv4"'
-    echo '  and "any IPv6" as different ranges).'
-    echo ''
-    echo '  --all-ports'
-    echo '    The rule is to apply to all ports.'
-    echo '  --all-protocols'
-    echo '    The rule is to apply to all protocols.'
-    echo '  --egress'
-    echo '    The rule is to be an egress rule.'
-    echo '  --in=<region-or-zone>'
-    echo '    What region to make the security group in. Must be specified. If'
-    echo '    specified as an availability zone, only the region portion matters.'
-    echo '  --ingress'
-    echo '    The rule is to be an ingress rule.'
-    echo '  --name=<name>'
-    echo '    Name to attach to the rule, if any.'
-    echo '  --port=<number>'
-    echo '    Port for the rule.'
-    echo '  --quiet'
-    echo '    Suppress non-error output.'
-    echo '  --security-group=<name-or-id>'
-    echo '    Name or ID of the security group to add to. Can also be a VPC ID,'
-    echo '    to indicate the default security group for that VPC.'
-    echo '  --tcp'
-    echo '    The rule is for TCP traffic.'
-    echo '  --udp'
-    echo '    The rule is for UDP traffic.'
-    echo ''
-    echo "${progName} [--help | -h]"
-    echo '  Displays this message.'
-    exit $(( argError < 0 ? 0 : argError ))
+    usage "${argError}"
 fi
 
 
