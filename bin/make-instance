@@ -17,6 +17,54 @@ progName="${progName##*/}"
 # Argument parsing
 #
 
+function usage {
+    print-usage $'
+    Usage:
+    
+    ${name} [<opt> ...]
+      Launches a standard-configured instance. On success, prints a JSON
+      object with the most-salient values (including notably the instance
+      ID). Note: If neither `--security-group` nor `--vpc` is specified,
+      then this command will launch the instance into the default security
+      group of the default VPC for the specified availability zone (which,
+      TBQH, is probably not what you want).
+    
+      --in=<availability-zone>
+        Where to launch.
+      --instance-type=<type>
+        What type of instance to install.
+      --key-name=<name>
+        Name of the keypair to use for SSH access. If not specified, then
+        something else will have to have set up SSH access (e.g. the user
+        data script, or something baked into the AMI).
+      --name=<name>
+        Name (label) for the resulting instance.
+      --security-group=<name-or-id>
+        Name or ID of the security group to use for network access control.
+        If specified, this is used to derive the VPC to use, and in conjunction
+        with the specified availability zone, the specific subnet within the
+        VPC. It is not valid to specify both this option and --vpc.
+      --user-data=<data>
+        User data for the instance, which is taken to be a script to run on
+        first-boot of the instance. It is invalid to specify both this and
+        the --user-data-file option. Note: On the instance, the user data can
+        be found at `/var/lib/cloud/instance/user-data.txt`, and the log of
+        running it can be found at `/var/log/cloud-init-output.log`.
+      --user-data-file=<file>
+        Name of a file containing user data for the instance. It is invalid
+        to specify both this and the --user-data option.
+      --vpc=<name-or-id>
+        Name or ID of the VPC to launch into. If specified, then the instance
+        will be in the default security group of the indicated VPC. It is not
+        valid to specify both this option and --security-group.
+    
+    ${name} [--help | -h]
+      Display this message.
+    '
+
+    exit "$1"
+}
+
 # Error during argument processing?
 argError=0
 
@@ -104,48 +152,7 @@ if (( !argError )) && [[ (${groupNameOrId} != '') && (${vpc} != '') ]]; then
 fi
 
 if (( argError )); then
-    echo 'Usage:'
-    echo ''
-    echo "${progName} [<opt> ...]"
-    echo '  Launches a standard-configured instance. On success, prints a JSON'
-    echo '  object with the most-salient values (including notably the instance'
-    echo '  ID). Note: If neither `--security-group` nor `--vpc` is specified,'
-    echo '  then this command will launch the instance into the default security'
-    echo '  group of the default VPC for the specified availability zone (which,'
-    echo '  TBQH, is probably not what you want).'
-    echo ''
-    echo '  --in=<availability-zone>'
-    echo '    Where to launch.'
-    echo '  --instance-type=<type>'
-    echo '    What type of instance to install.'
-    echo '  --key-name=<name>'
-    echo '    Name of the keypair to use for SSH access. If not specified, then'
-    echo '    something else will have to have set up SSH access (e.g. the user'
-    echo '    data script, or something baked into the AMI).'
-    echo '  --name=<name>'
-    echo '    Name (label) for the resulting instance.'
-    echo '  --security-group=<name-or-id>'
-    echo '    Name or ID of the security group to use for network access control.'
-    echo '    If specified, this is used to derive the VPC to use, and in conjunction'
-    echo '    with the specified availability zone, the specific subnet within the'
-    echo '    VPC. It is not valid to specify both this option and --vpc.'
-    echo '  --user-data=<data>'
-    echo '    User data for the instance, which is taken to be a script to run on'
-    echo '    first-boot of the instance. It is invalid to specify both this and'
-    echo '    the --user-data-file option. Note: On the instance, the user data can'
-    echo '    be found at `/var/lib/cloud/instance/user-data.txt`, and the log of'
-    echo '    running it can be found at `/var/log/cloud-init-output.log`.'
-    echo '  --user-data-file=<file>'
-    echo '    Name of a file containing user data for the instance. It is invalid'
-    echo '    to specify both this and the --user-data option.'
-    echo '  --vpc=<name-or-id>'
-    echo '    Name or ID of the VPC to launch into. If specified, then the instance'
-    echo '    will be in the default security group of the indicated VPC. It is not'
-    echo '    valid to specify both this option and --security-group.'
-    echo ''
-    echo "${progName} [--help | -h]"
-    echo '  Display this message.'
-    exit $(( argError < 0 ? 0 : argError ))
+    usage "${argError}"
 fi
 
 
