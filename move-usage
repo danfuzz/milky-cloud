@@ -1,0 +1,82 @@
+#!/bin/bash
+
+src="$1"
+dest="${src}-temp"
+
+awk <"${src}" >"${dest}" -v quote="'" '
+BEGIN {
+    count = 0
+    usageDest = -1
+    usageCount = 0
+    collect = 0
+}
+
+/^# Argument parsing/ { usageAt = count + 1 }
+
+/^if \(\( argError \)\); then/ && usageCount == 0 {
+    collect = 1
+    lines[count++] = $0
+    lines[count++] = "    usage \"${argError}\""
+    next
+}
+
+collect && /^fi$/ {
+    collect = 0
+}
+
+collect && /^ *exit/ {
+    next
+}
+
+collect && /^ *echo ./ {
+    sub(/^ *echo ./, "")
+    sub(/.$/, "")
+    gsub(/\${progName}/, "${name}")
+}
+
+collect {
+    usage[usageCount++] = "    " $0
+    next
+}
+
+{
+    lines[count++] = $0
+}
+
+END {
+    if (usageCount == 0) {
+        print "No usage?" > "/dev/stderr"
+        exit 1
+    }
+    if (usageSrc == -1) {
+        print "No source?" > "/dev/stderr"
+        exit 1
+    }
+    for (i = 0; i < count; i++) {
+        print lines[i]
+        if (i == usageAt) printUsage()
+    }
+}
+
+function printUsage(i) {
+    print ""
+    print "function usage {"
+    print "    print-usage $" quote
+    for (i = 0; i < usageCount; i++) {
+        print usage[i]
+    }
+    print "    " quote
+    print ""
+    print "    exit \"$1\""
+    print "}"
+}
+' \
+|| {
+    echo 1>&2 'Shucks.'
+    rm -f "${dest}"
+    exit 1
+}
+
+cp "${dest}" "${src}"
+rm -f "${dest}"
+echo 1>&2 'Yay!'
