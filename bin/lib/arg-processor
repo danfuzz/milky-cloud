@@ -657,7 +657,7 @@ function _argproc:statements-from-args {
             done
         else
             # Something weird and invalid, e.g. `--=`.
-            echo 1>&2 "Invalid option: ${arg}"
+            echo 1>&2 "Invalid option syntax: ${arg}"
             argError=1
         fi
 
