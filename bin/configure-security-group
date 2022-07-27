@@ -59,9 +59,6 @@ inLocation=''
 # Name tag to add.
 nameTag=''
 
-# Progress messages?
-progress=0
-
 while (( $# > 0 )); do
     case "$1" in
         --in=?*)
@@ -71,7 +68,7 @@ while (( $# > 0 )); do
             nameTag="${1#*=}"
             ;;
         --progress)
-            progress=1
+            progress-msg --enable
             ;;
         --security-group=?*)
             groupNameOrId="${1#*=}"
@@ -113,18 +110,6 @@ fi
 if (( argError )); then
     usage "${argError}"
 fi
-
-
-#
-# Helper functions
-#
-
-# Prints a progress message, if such messages have been requested.
-function progress-msg {
-    if (( progress )); then
-        echo 1>&2 "$@"
-    fi
-}
 
 
 #
