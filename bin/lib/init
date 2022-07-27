@@ -102,6 +102,7 @@ function progress-msg {
                 if (( _milky_cloud_progressEnabled )); then
                     echo '--progress'
                 fi
+                return
                 ;;
         esac
     fi
