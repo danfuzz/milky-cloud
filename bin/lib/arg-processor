@@ -460,22 +460,19 @@ function print-usage {
         indentExpr = ""; # Regex to match indentation to strip.
     }
 
-    # Count blank lines. They only get emitted if not at the start or end of
-    # the message.
+    # Count blank lines, but do not emit them.
     /^[ \t]*$/ {
         blankCount++;
         next;
     }
 
     blankCount != 0 {
-        if (atStart) {
-            # Ignore blank lines at the start of the message.
-            atStart = 0;
-            blankCount = 0;
-        } else {
-            # Emit some blank lines in the middle of the message.
+        if (!atStart) {
+            # Emit some blank lines in the middle of the message. (Ignore them
+            # at the start of the message.)
             while (blankCount-- > 0) print "";
         }
+        blankCount = 0;
     }
 
     # Determine first-line indentation; convert to regex.
@@ -485,6 +482,7 @@ function print-usage {
     }
 
     {
+        atStart = 0;
         sub(indentExpr, "");
         gsub(/\${name}/, name);
         print;
