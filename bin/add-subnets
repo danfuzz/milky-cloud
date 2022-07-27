@@ -39,12 +39,12 @@ function bits-needed {
 function usage {
     print-usage $'
     Usage:
-    
+
     ${name} [<opt> ...]
       Adds a set of subnets to a VPC -- one per availability zone -- along
       with an associated routing table. Upon success, prints a JSON array
       of all the created subnets.
-    
+
       --in=<region-or-zone>
         What region to make the subnets in. Must be specified. If specified
         as an availability zone, only the region portion matters.
@@ -57,7 +57,7 @@ function usage {
         Suppress non-error output to stdout.
       --vpc=<name-or-id>
         Name or ID of the VPC.
-    
+
     ${name} [--help | -h]
       Displays this message.
     '

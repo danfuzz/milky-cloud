@@ -20,21 +20,21 @@ progName="${progName##*/}"
 function usage {
     print-usage $'
     Usage:
-    
+
     ${name} [<opt> ...] [--] [<assignment> ...] [--] [<jq-expression> ...]
       Constructs and prints one or more JSON values from variable
       assignments passed into an expression evaluated by `jq` either with
       `--null-input` (by default) or as a usual pipeline over input values.
       If no expression is given, it is taken to be `.`, which will end up
       formatting the input as implied/specified by the output options.
-    
+
       The <jq-expression> arguments are concatenated together (separated by
       spaces) to form the final expression to be evaluated.
-    
+
       <assignment>
         <name>=<value> Assign `$name` to be the indicated string value.
         <name>:json=<value> Assign `$name` to be the indicated parsed JSON value.
-    
+
       --compact
         Output in compact form (not multiline JSON).
       --lines
@@ -50,7 +50,7 @@ function usage {
       --words
         Like `--lines`, except that the guarantee is a word per line. As such,
         strings with any whitespace get treated as non-raw.
-    
+
     ${name} [--help | -h]
       Displays this message.
     '

@@ -20,11 +20,11 @@ progName="${progName##*/}"
 function usage {
     print-usage $'
     Usage:
-    
+
     ${name} <json-value>
-    
+
     Prints the length of the given JSON value, per the `jq` length rules.
-    
+
     ${name} [--help | -h]
       Displays this message.
     '

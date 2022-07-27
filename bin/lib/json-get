@@ -20,7 +20,7 @@ progName="${progName##*/}"
 function usage {
     print-usage $'
     Usage:
-    
+
     ${name} [<opt> ...] [--] <json-value> [<assignment> ...] [--]
     [<jq-expression> ...]
       Performs an operation on a single JSON value (at least with typical
@@ -28,7 +28,7 @@ function usage {
       a `json-val` invocation consisting of the rest of the arguments. If
       no expression is given, it is taken to be `.`, which will end up just
       formatting the input value as implied/specified by the output options.
-    
+
       --compact
         Output in compact form (not multiline JSON).
       --lines
@@ -40,7 +40,7 @@ function usage {
       --words
         Like `--lines`, except that the guarantee is a word per line. As such,
         strings with any whitespace get treated as non-raw.
-    
+
     ${name} [--help | -h]
       Displays this message.
     '

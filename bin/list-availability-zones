@@ -20,12 +20,12 @@ progName="${progName##*/}"
 function usage {
     print-usage $'
     Usage:
-    
+
     ${name} [<opt> ...]
       Lists all accessible availability zones in a given region. The result
       is one zone name per line (by default), or a JSON array (given an
       appropriate option).
-    
+
       --compact-json
         Produce compact JSON output.
       --in=<region-or-zone>
@@ -33,7 +33,7 @@ function usage {
         availability zone, only the region portion matters.
       --json
         Produce JSON output.
-    
+
     ${name} [--help | -h]
       Displays this message.
     '

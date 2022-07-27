@@ -20,16 +20,16 @@ progName="${progName##*/}"
 function usage {
     print-usage $'
     Usage:
-    
+
     ${name} [<opt> ...]
       Finds a VPC subnet that meets the indicated criteria. On success,
       prints the subnet ID.
-    
+
       --in=<availability-zone>
         What availibility zone to look in. Must be specified.
       --vpc=<name-or-id>
         Name or ID of the VPC to look in. Must be specified.
-    
+
     ${name} [--help | -h]
       Displays this message.
     '

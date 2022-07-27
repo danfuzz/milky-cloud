@@ -54,17 +54,17 @@ function progress-msg {
 function usage {
     print-usage $'
     Usage:
-    
+
     ${name} [<opt> ...]
       Configures a security group in a standard way. This involves removing
       all pre-existing rules from the group and then adding exactly what is
       needed.
-    
+
       On success, the security group allows incoming TCP traffic to the SSH
       and HTTPS ports, and allows outgoing traffic to anywhere. It also allows
       incoming traffic on all ports, from sources that are within the same
       security group.
-    
+
       --in=<region-or-zone>
         What region to make the security group in. Must be specified. If
         specified as an availability zone, only the region portion matters.
@@ -73,7 +73,7 @@ function usage {
         to indicate the default security group for that VPC.
       --progress
         Print progress messages to stderr.
-    
+
     ${name} [--help | -h]
       Displays this message.
     '

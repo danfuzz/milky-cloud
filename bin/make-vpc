@@ -116,17 +116,17 @@ function make-vpc-per-se {
 function usage {
     print-usage $'
     Usage:
-    
+
     ${name} [<opt> ...]
       Makes a new VPC, plus associated accouterments. On success, prints
       the ID of the created VPC.
-    
+
       --in=<region-or-zone>
         What region to make the VPC in. Must be specified. If specified as
         an availability zone, only the region portion matters.
       --name=<name>
         Name to assign to the constructed VPC. Must be specified.
-    
+
     ${name} [--help | -h]
       Displays this message.
     '

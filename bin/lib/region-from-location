@@ -20,10 +20,10 @@ progName="${progName##*/}"
 function usage {
     print-usage $'
     Usage:
-    
+
     ${name} <zone>
       Prints the region associated with a location of any sort.
-    
+
     ${name} [--help | -h]
       Displays this message.
     '

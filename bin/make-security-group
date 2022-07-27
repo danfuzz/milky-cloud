@@ -54,12 +54,12 @@ function progress-msg {
 function usage {
     print-usage $'
     Usage:
-    
+
     ${name} [<opt> ...]
       Makes a new security group, configured in a standard way. On success,
       prints the ID of the created security group. See `configure-security-group`
       for details about the resulting configuration.
-    
+
       --description=<description>
         Brief description of the security group. If not specified, fairly
         generic and content-free text is used (because it does need to be
@@ -74,7 +74,7 @@ function usage {
         Print progress messages to stderr.
       --vpc=<name-or-id>
         Name or ID of the VPC to be associated with. Must be specified.
-    
+
     ${name} [--help | -h]
       Displays this message.
     '

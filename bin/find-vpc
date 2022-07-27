@@ -103,18 +103,18 @@ function find-via-describe-security-groups {
 function usage {
     print-usage $'
     Usage:
-    
+
     ${name} [<opt> ...] <name-or-id>
       Finds a VPC by name or security group ID, or validates the existence
       of one by ID. On success, prints the VPC ID (by default) or the
       full VPC info object.
-    
+
       --print-all
         Print the full info object, not just the ID.
       --in=<region-or-zone>
         Where to look. Must be specified. If specified as an availability
         zone, only the region portion matters.
-    
+
     ${name} [--help | -h]
       Displays this message.
     '

@@ -20,13 +20,13 @@ progName="${progName##*/}"
 function usage {
     print-usage $'
     Usage:
-    
+
     ${name} <zone-or-region>
       Parses a location -- a region or availability zone -- and if
       valid then optionally prints out one of the components. Note that
       only one each `--input-` and `--print-` option has any effect (the
       last specified).
-    
+
       --input-zone
         Require an availibility zone as input.
       --input-region
@@ -39,7 +39,7 @@ function usage {
       --print-zone-suffix
         Print the zone suffix (everything after the region).
         Implies `--input-zone`.
-    
+
     ${name} [--help | -h]
       Displays this message.
     '

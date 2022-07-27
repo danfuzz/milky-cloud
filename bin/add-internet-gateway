@@ -51,12 +51,12 @@ function progress-msg {
 function usage {
     print-usage $'
     Usage:
-    
+
     ${name} [<opt> ...]
       Creates an internet gateway and attaches it to a VPC, including adding
       all necessary routing rules to the default route table for the VPC. On
       success, prints the ID of the created gateway.
-    
+
       --in=<region-or-zone>
         What region to make the gateway in. Must be specified. If specified
         as an availability zone, only the region portion matters.
@@ -67,7 +67,7 @@ function usage {
         Print progress messages to stderr.
       --vpc=<name-or-id>
         Name or ID of the VPC to be associated with. Must be specified.
-    
+
     ${name} [--help | -h]
       Displays this message.
     '

@@ -20,7 +20,7 @@ progName="${progName##*/}"
 function usage {
     print-usage $'
     Usage:
-    
+
     ${name} [<opt> ...]
       Launches a standard-configured instance. On success, prints a JSON
       object with the most-salient values (including notably the instance
@@ -28,7 +28,7 @@ function usage {
       then this command will launch the instance into the default security
       group of the default VPC for the specified availability zone (which,
       TBQH, is probably not what you want).
-    
+
       --in=<availability-zone>
         Where to launch.
       --instance-type=<type>
@@ -57,7 +57,7 @@ function usage {
         Name or ID of the VPC to launch into. If specified, then the instance
         will be in the default security group of the indicated VPC. It is not
         valid to specify both this option and --security-group.
-    
+
     ${name} [--help | -h]
       Display this message.
     '

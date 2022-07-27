@@ -20,18 +20,18 @@ progName="${progName##*/}"
 function usage {
     print-usage $'
     Usage:
-    
+
     ${name} [<opt> ...] <resource-type> <name>
-    
+
     Constructs and prints a JSON object suitable for use as a
     `TagSpecifications` argument to an AWS command, to _just_ define a
     `Name` tag. The result is an object that binds `TagSpecifications`, so
     it can be used as-is (if that is the only argument) or merged with
     other arguments.
-    
+
     --compact
       Output in compact form (not multiline JSON).
-    
+
     ${name} [--help | -h]
       Displays this message.
     '

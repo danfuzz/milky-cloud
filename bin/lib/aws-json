@@ -43,20 +43,20 @@ function make-command-parts-json {
 function usage {
     print-usage $'
     Usage:
-    
+
     ${name} <cmd> <subcommand> [<opt> ...] [--] [<assignment> ...]
       [<jq-expression> ...]
       [:: [<out-opt> ...] [<assignment> ...] <jq-expression> ...]
-    
+
     Makes an AWS call with a JSON value constructed with `json-val`, and
     with successful result optionally post-processed through `json-val`.
     If no argument expression is supplied, the value `{}` (an empty object)
     is passed to the command. When post-processing, the original result
     becomes the sole input from stdin.
-    
+
     <cmd> <subcommand>
       The AWS command and subcommand to call, e.g. `ec2 run-instances`.
-    
+
     --in=<region-or-zone>
       What region to make the call in. Must be specified. If specified as
       an availability zone, only the region portion matters.
@@ -67,16 +67,16 @@ function usage {
     --skeleton
       Print out a JSON "skeleton" of parameters. This can be filtered just
       like any other result.
-    
+
     Output options:
-    
+
     --compact
       Output in compact form (not multiline JSON).
     --none
       Do not produce (non-error) output.
     --raw
       Output raw strings (and other values compactly).
-    
+
     ${name} [--help | -h]
       Displays this message.
     '

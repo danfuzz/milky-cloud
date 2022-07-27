@@ -20,13 +20,13 @@ progName="${progName##*/}"
 function usage {
     print-usage $'
     Usage:
-    
+
     ${name} [<suffix>]
-    
+
     Prints a standardized timestamp representing "now" with an optional
     suffix. This can be used to label things that have nothing more
     suitable.
-    
+
     ${name} [--help | -h]
       Displays this message.
     '

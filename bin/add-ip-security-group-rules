@@ -20,18 +20,18 @@ progName="${progName##*/}"
 function usage {
     print-usage $'
     Usage:
-    
+
     ${name} [<opt> ...]
       Adds one or more rules to a given security group to specify IP-based
       restrictions. Either `--port` or `--all-ports` must be passed. Similarly,
       one protocol option must be passed. Upon success, prints out a JSON
       array of all added rules.
-    
+
       Note: Even though this command only nominally lets you specify one
       rule, AWS splits out multiple rules when the specified rule applies
       to multiple IP address ranges (including notably treating "any IPv4"
       and "any IPv6" as different ranges).
-    
+
       --all-ports
         The rule is to apply to all ports.
       --all-protocols
@@ -56,7 +56,7 @@ function usage {
         The rule is for TCP traffic.
       --udp
         The rule is for UDP traffic.
-    
+
     ${name} [--help | -h]
       Displays this message.
     '

@@ -20,17 +20,17 @@ progName="${progName##*/}"
 function usage {
     print-usage $'
     Usage:
-    
+
     ${name} [<opt> ...]
       Detaches and removes an internet gateway, including removing routing
       rules from the default routing table of the formerly-associated VPC.
-    
+
       --in=<region-or-zone>
         What region to operate in. Must be specified. If specified as an
         availability zone, only the region portion matters.
       --gateway=<id>
         ID of the gateway to remove. Must be specified.
-    
+
     ${name} [--help | -h]
       Displays this message.
     '

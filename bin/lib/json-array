@@ -20,17 +20,17 @@ progName="${progName##*/}"
 function usage {
     print-usage $'
     Usage:
-    
+
     ${name} [<opt> ...] [--] [<value> ...]
       Constructs and prints a JSON array of values, of all of the value
       arguments passed to this script, each of which is interpreted as a
       JSON value (default) or a string (with the appropriate option).
-    
+
       --compact
         Output in compact form (not multiline JSON).
       --strings
         Treat arguments as literal strings instead of JSON values.
-    
+
     ${name} [--help | -h]
       Displays this message.
     '
