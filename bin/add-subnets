@@ -14,25 +14,6 @@ progName="${progName##*/}"
 
 
 #
-# Helper functions
-#
-
-# Gets the number of bits needed to represent N values (e.g. the numbers
-# 0..(N-1)).
-function bits-needed {
-    local n="$1"
-    local count=0
-
-    while (( n > 0 )); do
-        (( count++ ))
-        (( n >>= 1 ))
-    done
-
-    echo "${count}"
-}
-
-
-#
 # Argument parsing
 #
 
