@@ -29,6 +29,32 @@ function progress-msg {
 # Argument parsing
 #
 
+function usage {
+    print-usage $'
+    Usage:
+
+    ${name} [<opt> ...] [--] <assignment> ...
+      Sets one or more attributes on a thing-that-has-attributes. Supported
+      "things" are subnets and VPCs.
+
+      <assignment>
+        <name>=<value> Assign attribute `name` to be the indicated value.
+
+      --in=<region-or-zone>
+        What region to operate in. Must be specified. If specified as an
+        availability zone, only the region portion matters.
+      --id=<id>
+        ID of the thing to operate on.
+      --progress
+        Print progress messages to stderr.
+
+    ${name} [--help | -h]
+      Displays this message.
+    '
+
+    exit "$1"
+}
+
 # Error during argument processing?
 argError=0
 
@@ -103,32 +129,13 @@ while (( $# > 0 && !argError )); do
     shift
 done
 
-if (( ${#assignNames[@]} == 0 )); then
+if (( ${#assignNames[@]} == 0 && !argError )); then
     echo 1>&2 'Missing assignment(s).'
     argError=1
 fi
 
 if (( argError )); then
-    echo 'Usage:'
-    echo ''
-    echo "${progName} [<opt> ...] [--] <assignment> ..."
-    echo '  Sets one or more attributes on a thing-that-has-attributes. Supported'
-    echo '  "things" are subnets and VPCs.'
-    echo ''
-    echo '  <assignment>'
-    echo '    <name>=<value> Assign attribute `name` to be the indicated value.'
-    echo ''
-    echo '  --in=<region-or-zone>'
-    echo '    What region to operate in. Must be specified. If specified as an'
-    echo '    availability zone, only the region portion matters.'
-    echo '  --id=<id>'
-    echo '    ID of the thing to operate on.'
-    echo '  --progress'
-    echo '    Print progress messages to stderr.'
-    echo ''
-    echo "${progName} [--help | -h]"
-    echo '  Displays this message.'
-    exit $(( argError < 0 ? 0 : argError ))
+    usage "${argError}"
 fi
 
 
