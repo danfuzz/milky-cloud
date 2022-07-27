@@ -13,10 +13,13 @@ fi
 _milky_cloud_libDir="$(readlink -f "${BASH_SOURCE[0]}")" || exit "$?"
 _milky_cloud_libDir="${_milky_cloud_libDir%/*}"
 
-if [[ "$1" == '--lib' ]]; then
-    _milky_cloud_mainDir="$(cd "${progDir}/.."; /bin/pwd)"
-else
-    _milky_cloud_mainDir="${progDir}"
+# Figure out the "main" directory. If the directory of `$0` is the same as the
+# directory of this script, then we're running a library script, and the "main"
+# directory is one up. Otherwise, the main directory is the directory of `$0`.
+_milky_cloud_mainDir="$(readlink -f "$0")" || exit "$?"
+_milky_cloud_mainDir="${_milky_cloud_mainDir%/*}"
+if [[ ${_milky_cloud_mainDir} == ${_milky_cloud_libDir} ]]; then
+    _milky_cloud_mainDir="$(cd "${_milky_cloud_libDir}/.."; /bin/pwd)"
 fi
 
 
