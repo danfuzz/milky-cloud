@@ -44,7 +44,7 @@ function usage {
 }
 
 # Output style.
-opt-choice --var=outputStyle --default=string compact json
+opt-choice --var=outputStyle --default=json compact json
 
 # Want help?
 opt-action --call=usage --value=0 help/h
