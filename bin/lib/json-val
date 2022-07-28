@@ -42,6 +42,8 @@ function usage {
         Output each item as a single line. Similar to `--raw`, except that
         a strings with newlines or CRs in them get treated as non-raw so as
         to maintain the guarantee of item-per-line.
+      --null-stdin
+        Do not read from stdin. This is the default.
       --raw
         Output raw strings (and other values compactly).
       --read-stdin
@@ -59,11 +61,14 @@ function usage {
     exit "$1"
 }
 
+# Want help?
+opt-action --call=usage --value=0 help/h
+
 # Input style.
-inputStyle=none
+opt-choice --var=inputStyle --default=null-stdin null-stdin read-stdin slurp-stdin
 
 # Output style.
-outputStyle=json
+opt-choice --var=outputStyle --default=json compact json lines raw words
 
 # List of variable assignments, as parallel arrays of type, name, and value.
 varTypes=()
@@ -73,94 +78,45 @@ varValues=()
 # Value construction expression.
 valueExpression=''
 
-# Error during argument processing?
-argError=0
-
-# Parse options.
-while (( $# > 0 )); do
-    case "$1" in
-        --compact)
-            outputStyle=compact
-            ;;
-        --json)
-            outputStyle=json
-            ;;
-        --lines)
-            outputStyle=lines
-            ;;
-        --raw)
-            outputStyle=raw
-            ;;
-        --read-stdin)
-            inputStyle=read
-            ;;
-        --slurp-stdin)
-            inputStyle=slurp
-            ;;
-        --words)
-            outputStyle=words
-            ;;
-        -h|--help)
-            argError=-1 # `-1` suppresses error exit after displaying usage.
-            break
-            ;;
-        --)
-            # Explicit end of options.
+rest-arg --call=parse-rest
+function parse-rest {
+    # Parse assignments.
+    while (( $# > 0 )); do
+        arg="$1"
+        if [[ ${arg} == '--' ]]; then
             shift
             break
-            ;;
-        -?*)
-            echo 1>&2 "Unknown option: $1"
-            argError=1
-            break
-            ;;
-        *)
-            # Non-option argument.
-            break
-            ;;
-    esac
+        fi
 
-    shift
-done
+        [[ ${arg} =~ ^([_a-zA-Z0-9]+)(:[a-z]+)?=(.*)$ ]] \
+        || break
 
-# Parse assignments.
-while (( $# > 0 && !argError )); do
-    arg="$1"
-    if [[ ${arg} == '--' ]]; then
+        varNames+=("${BASH_REMATCH[1]}")
+        varValues+=("${BASH_REMATCH[3]}")
+
+        varType="${BASH_REMATCH[2]}"
+        if [[ ${varType} == '' ]]; then
+            varType='string'
+        else
+            # Drop initial `:`.
+            [[ ${varType} =~ ^:(.*)$ ]];
+            varType="${BASH_REMATCH[1]}"
+        fi
+
+        varTypes+=("${varType}")
+
         shift
-        break
-    fi
+    done
 
-    [[ ${arg} =~ ^([_a-zA-Z0-9]+)(:[a-z]+)?=(.*)$ ]] \
-    || break
-
-    varNames+=("${BASH_REMATCH[1]}")
-    varValues+=("${BASH_REMATCH[3]}")
-
-    varType="${BASH_REMATCH[2]}"
-    if [[ ${varType} == '' ]]; then
-        varType='string'
+    # Construct the value expression from the remaining arguments.
+    if (( $# == 0 )); then
+        valueExpression='.'
     else
-        # Drop initial `:`.
-        [[ ${varType} =~ ^:(.*)$ ]];
-        varType="${BASH_REMATCH[1]}"
+        valueExpression="$*"
     fi
+}
 
-    varTypes+=("${varType}")
-
-    shift
-done
-
-# Construct the value expression from the remaining arguments.
-if (( $# == 0 )); then
-    valueExpression='.'
-else
-    valueExpression="$*"
-fi
-
-if (( argError )); then
-    usage "${argError}"
-fi
+process-args "$@" || usage "$?"
 
 
 #
@@ -170,13 +126,13 @@ fi
 jqArgs=()
 
 case "${inputStyle}" in
-    none)
+    null-stdin)
         jqArgs+=('--null-input')
         ;;
-    read)
+    read-stdin)
         : # No additional arguments needed.
         ;;
-    slurp)
+    slurp-stdin)
         jqArgs+=('--slurp')
         ;;
 esac
