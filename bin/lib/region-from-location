@@ -20,8 +20,8 @@ function usage {
     print-usage $'
     Usage:
 
-    ${name} <zone>
-      Prints the region associated with a location of any sort.
+    ${name} <zone-or-region>
+      Prints the region associated with an availability zone or region.
 
     ${name} [--help | -h]
       Displays this message.
