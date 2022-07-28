@@ -28,7 +28,9 @@ function usage {
     specification contains both IPv4 and IPv6 entries.
 
     --compact
-      Output in compact form (not multiline JSON).
+      Output in compact (not multiline) JSON form.
+    --json
+      Output in JSON form. This is the default.
 
     ${name} [--help | -h]
       Displays this message.
@@ -37,11 +39,11 @@ function usage {
     exit "$1"
 }
 
-# Error during argument processing?
-argError=0
+# Want help?
+opt-action --call=usage --value=0 help/h
 
-# Compact output?
-compactOutput=0
+# Output style.
+opt-choice --var=outputStyle --default=string compact json
 
 # Protocol.
 protocol=''
@@ -49,68 +51,45 @@ protocol=''
 # Port.
 port=''
 
-while (( $# > 0 )); do
-    case "$1" in
-        --compact)
-            compactOutput=1
-            ;;
-        -h|--help)
-            argError=-1 # `-1` suppresses error exit after displaying usage.
-            ;;
-        --)
-            # Explicit end of options.
-            shift
-            break
-            ;;
-        -?*)
-            echo 1>&2 "Unknown option: $1"
-            argError=1
-            break
-            ;;
-        *)
-            # Non-option argument.
-            break
-            ;;
-    esac
+rest-arg --call=parse-spec
+function parse-spec {
+    if (( $# < 2 )); then
+        echo 1>&2 'Missing argument: protocol and/or port'
+        return 1
+    elif (( $# > 2 )); then
+        echo 1>&2 'Too many arguments.'
+        return 1
+    fi
 
-    shift
-done
+    protocol="$1"
+    port="$2"
 
-protocol="$1"
-port="$2"
-
-if (( $# < 2 )); then
-    echo 1>&2 'Missing argument: protocol and/or port'
-    argError=1
-else
     case "${protocol}" in
         all|tcp|udp)
             : # It's valid.
             ;;
         *)
             echo 1>&2 "Invalid value for protocol: ${protocol}"
-            argError=1
+            return 1
             ;;
     esac
+
     if [[ ${port} != 'all' && ! ${port} =~ ^[0-9]+$ ]]; then
         echo 1>&2 "Invalid value for port: ${port}"
-        argError=1
+        return 1
     fi
-fi
+}
 
-if (( argError )); then
-    usage "${argError}"
-fi
+process-args "$@" || usage "$?"
 
 
 #
 # Main script
 #
 
-jqArgs=(-n)
-
-if (( compactOutput )); then
-    jqArgs+=('--compact-output')
+outputArg=()
+if [[ ${outputStyle} == 'compact' ]]; then
+    outputArg=('--compact')
 fi
 
 if [[ ${port} == 'all' ]]; then
@@ -123,12 +102,9 @@ if [[ ${protocol} == 'all' ]]; then
     protocol='-1'
 fi
 
-jqArgs+=(
-    --argjson port "${port}"
-    --arg protocol "${protocol}"
-)
-
-exec jq "${jqArgs[@]}" \
+jval "${outputArg[@]}" \
+    port:json="${port}" \
+    protocol="${protocol}" \
 '{
     FromPort:   $port,
     ToPort:     $port,
