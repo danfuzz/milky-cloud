@@ -26,8 +26,6 @@ function usage {
     Performs a calculation of some sort on a CIDR address/mask. Input CIDR
     values can be either standard-form strings or parsed JSON values (such
     as are produced by the `--json` option of this tool).
-    --compact-json
-      Like `--json`, except produces compact output.
     --json
       Produces JSON output representing the parsed components of a CIDR
       value, instead of a standard-form CIDR string. This only affects
@@ -72,7 +70,7 @@ function usage {
 }
 
 # Output style.
-opt-choice --var=outputStyle --default=string compact-json json string
+opt-choice --var=outputStyle --default=string json string
 
 # Want help?
 opt-action --call=usage --value=0 help/h
@@ -772,9 +770,6 @@ if [[ ${resultType} != 'text' ]]; then
     # A JSON result is interpreted as a CIDR or list thereof, in which case the
     # output style matters.
     case "${outputStyle}" in
-        compact-json)
-            jget --compact "${result}" '.'
-            ;;
         json)
             jget "${result}" '.'
             ;;
