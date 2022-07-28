@@ -73,13 +73,19 @@ else
     shift 2
 fi
 
+# Want help?
+opt-action --call=usage --value=0 help/h
+
 # Location (region or availability zone).
-inLocation=''
+opt-value --match='[a-z][-a-z0-9]*' --var=inLocation in
 
 # File to print the constructed command to.
-printCommandTo=''
+opt-value --match='.+' --var=printCommandTo print-command-to
 
-# Output style.
+# Just print argument "skeleton" ?
+opt-action --var=skeleton skeleton
+
+# Output style (result post-processor option).
 outputStyle=normal
 
 # Assignments and expression arguments to use to construct the value to pass to
@@ -87,101 +93,66 @@ outputStyle=normal
 argConstructor=()
 
 # Assignments and expression arguments to use to perform the result
-# postprocessing.
+# post-processing.
 resultConstructor=()
 
-# Just print argument "skeleton" ?
-skeleton=0
+rest-arg --call=parse-rest
+function parse-rest {
+    local error=0
+    local arg
 
-while (( $# > 0 )); do
-    case "$1" in
-        --in=?*)
-            inLocation="${1#*=}"
-            ;;
-        --print-command-to=?*)
-            printCommandTo="${1#*=}"
-            ;;
-        --skeleton)
-            skeleton=1
-            ;;
-        -h|--help)
-            argError=-1 # `-1` suppresses error exit after displaying usage.
-            break
-            ;;
-        --)
-            # Explicit end of options.
+    # Collect constructor arguments.
+    while (( $# > 0 )); do
+        arg="$1"
+        if [[ ${arg} == '::' ]]; then
             shift
             break
-            ;;
-        -?*)
-            echo 1>&2 "Unknown option: $1"
-            argError=1
-            break
-            ;;
-        *)
-            # Explicit end of options.
-            break
-            ;;
-    esac
+        fi
 
-    shift
-done
-
-if (( !argError )); then
-    if [[ ${inLocation} == '' ]] && (( !skeleton )); then
-        echo 1>&2 'Missing option: --in'
-        argError=1
-    fi
-fi
-
-# "Parse" constructor arguments.
-while (( $# > 0 && !argError )); do
-    arg="$1"
-    if [[ ${arg} == '::' ]]; then
+        argConstructor+=("${arg}")
         shift
-        break
-    fi
+    done
 
-    argConstructor+=("${arg}")
-    shift
-done
+    # Process result post-processor arguments.
+    while (( $# > 0 )); do
+        case "$1" in
+            --compact)
+                outputStyle=compact
+                ;;
+            --none)
+                outputStyle=none
+                ;;
+            --raw)
+                outputStyle=raw
+                ;;
+            --)
+                # Explicit end of options.
+                shift
+                break
+                ;;
+            -?*)
+                echo 1>&2 "Unknown result option: $1"
+                return 1
+                ;;
+            *)
+                # Non-option argument.
+                break
+                ;;
+        esac
 
-# Process postprocessor arguments, if any.
+        shift
+    done
 
-while (( $# > 0 && !argError )); do
-    case "$1" in
-        --compact)
-            outputStyle=compact
-            ;;
-        --none)
-            outputStyle=none
-            ;;
-        --raw)
-            outputStyle=raw
-            ;;
-        --)
-            # Explicit end of options.
-            shift
-            break
-            ;;
-        -?*)
-            echo 1>&2 "Unknown option: $1"
-            argError=1
-            break
-            ;;
-        *)
-            # Explicit end of options.
-            break
-            ;;
-    esac
+    resultConstructor=("$@")
+}
 
-    shift
-done
+process-args "$@" || usage "$?"
 
-resultConstructor=("$@")
-
-if (( argError )); then
-    usage "${argError}"
+if [[ ${inLocation} == '' ]] && (( !skeleton )); then
+    # TODO: Maybe there should be something like `opt-require-one skeleton in`
+    # which could be called to declare this kind of requirement.
+    echo 1>&2 'Missing option: --in or --skeleton'
+    usage 1
 fi
 
 
