@@ -38,19 +38,15 @@ opt-action --call=usage --value=0 help/h
 rest-arg --call=parse-rest
 value=''
 function parse-rest {
-    case "$#" in
-        0)
-            echo 1>&2 'Missing JSON value argument.'
-            return 1
-            ;;
-        1)
-            value="$1"
-            ;;
-        *)
-            echo 1>&2 'Extra arguments.'
-            return 1
-            ;;
-    esac
+    if (( $# < 1 )); then
+        echo 1>&2 'Missing argument: <json-value>'
+        return 1
+    elif (( $# > 1 )); then
+        echo 1>&2 'Too many arguments.'
+        return 1
+    fi
+
+    value="$1"
 }
 
 process-args "$@" || usage "$?"
