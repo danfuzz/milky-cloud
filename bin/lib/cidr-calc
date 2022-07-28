@@ -75,20 +75,12 @@ opt-choice --var=outputStyle --default=string json string
 # Want help?
 opt-action --call=usage --value=0 help/h
 
-# Command and arguments.
-command=
-args=()
-rest-arg --call=parse-command
-function parse-command {
-    if (( $# == 0 )); then
-        echo 1>&2 'Missing command argument.'
-        return 1
-    fi
+# Command.
+positional-arg --var=command --required command
 
-    command="$1"
-    shift
-    args=("$@")
-}
+# Command arguments.
+args=()
+rest-arg --var=args
 
 process-args "$@" || usage "$?"
 
