@@ -29,7 +29,9 @@ function usage {
     other arguments.
 
     --compact
-      Output in compact form (not multiline JSON).
+      Output in compact (not multiline) JSON form.
+    --json
+      Output in JSON form. This is the default.
 
     ${name} [--help | -h]
       Displays this message.
@@ -38,11 +40,11 @@ function usage {
     exit "$1"
 }
 
-# Error during argument processing?
-argError=0
+# Want help?
+opt-action --call=usage --value=0 help/h
 
-# Compact output?
-compactOutput=0
+# Output style.
+opt-choice --var=outputStyle --default=json compact json
 
 # Resource type.
 resourceType=''
@@ -50,73 +52,40 @@ resourceType=''
 # Name for the resource.
 name=''
 
-while (( $# > 0 )); do
-    case "$1" in
-        --compact)
-            compactOutput=1
-            ;;
-        -h|--help)
-            argError=-1 # `-1` suppresses error exit after displaying usage.
-            break
-            ;;
-        --)
-            # Explicit end of options.
-            shift
-            break
-            ;;
-        -?*)
-            echo 1>&2 "Unknown option: $1"
-            argError=1
-            break
-            ;;
-        *)
-            # Non-option argument.
-            break
-            ;;
-    esac
+rest-arg --call=parse-rest
+function parse-rest {
+    if (( $# < 2 )); then
+        echo 1>&2 'Missing argument: resource type and/or name'
+        return 1
+    elif (( $# > 2 )); then
+        echo 1>&2 'Too many arguments.'
+        return 1
+    fi
 
-    shift
-done
+    resourceType="$1"
+    name="$2"
+}
 
-if (( $# < 2 )); then
-    echo 1>&2 'Missing argument: resource type and/or name'
-    argError=1
-fi
-
-resourceType="$1"
-name="$2"
-
-if (( argError )); then
-    usage "${argError}"
-fi
+process-args "$@" || usage "$?"
 
 
 #
 # Main script
 #
 
-jqArgs=(-n)
-
-if (( compactOutput )); then
-    jqArgs+=('--compact-output')
-fi
-
-jqArgs+=(
-    --arg name "${name}"
-    --arg resourceType "${resourceType}"
-)
-
-exec jq "${jqArgs[@]}" \
-'{
-    TagSpecifications: [
-        {
-            ResourceType: $resourceType,
-            Tags: [
-                {
-                    Key: "Name",
-                    Value: $name
-                }
-            ]
-        }
-    ]
-}'
+jval --"${outputStyle}" \
+    name="${name}" \
+    resourceType="${resourceType}" \
+    '{
+        TagSpecifications: [
+            {
+                ResourceType: $resourceType,
+                Tags: [
+                    {
+                        Key: "Name",
+                        Value: $name
+                    }
+                ]
+            }
+        ]
+    }'
