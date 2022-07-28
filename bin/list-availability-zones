@@ -23,11 +23,9 @@ function usage {
 
     ${name} [<opt> ...]
       Lists all accessible availability zones in a given region. The result
-      is one zone name per line (by default), or a JSON array (given an
+      is one zone name per line (by default), or a JSON array (given the
       appropriate option).
 
-      --compact-json
-        Produce compact JSON output.
       --in=<region-or-zone>
         What region to look in. Must be specified. If specified as an
         availability zone, only the region portion matters.
@@ -52,9 +50,6 @@ inLocation=''
 
 while (( $# > 0 )); do
     case "$1" in
-        --compact-json)
-            outputStyle=compact-json
-            ;;
         --in=?*)
             inLocation="${1#*=}"
             ;;
@@ -106,14 +101,9 @@ inRegion="$(lib region-from-location "${inLocation}")" \
 cmd=(ec2-json describe-availability-zones --in="${inRegion}" ::)
 suffix=()
 
-case "${outputStyle}" in
-    compact-json)
-        cmd+=(--compact)
-        ;;
-    strings)
-        cmd+=(--raw)
-        suffix=('| .[]')
-        ;;
-esac
+if [[ ${outputStyle} == 'strings' ]]; then
+    cmd+=(--raw)
+    suffix=('| .[]')
+fi
 
 "${cmd[@]}" '.AvailabilityZones | map(.ZoneName) | sort' "${suffix[@]}"
