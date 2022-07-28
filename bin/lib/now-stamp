@@ -33,54 +33,32 @@ function usage {
     exit "$1"
 }
 
-# Error during argument processing?
-argError=0
+# Want help?
+opt-action --call=usage --value=0 help/h
 
 # Suffix text.
 suffix=''
+rest-arg --call=parse-rest
+function parse-rest {
+    if (( $# < 1 )); then
+        return
+    elif (( $# > 1 )); then
+        echo 1>&2 'Too many arguments.'
+        return 1
+    fi
 
-while (( $# > 0 )); do
-    case "$1" in
-        -h|--help)
-            argError=-1 # `-1` suppresses error exit after displaying usage.
-            break
-            ;;
-        --)
-            # Explicit end of options.
-            shift
-            break
-            ;;
-        -?*)
-            echo 1>&2 "Unknown option: $1"
-            argError=1
-            break
-            ;;
-        *)
-            # Non-option argument.
-            break
-            ;;
-    esac
-
-    shift
-done
-
-if (( $# > 0 )); then
     suffix="$1"
-fi
+}
 
-if (( argError )); then
-    usage "${argError}"
-fi
+process-args "$@" || usage "$?"
 
 
 #
 # Main script
 #
 
-now="$(date -u '+%Y-%m-%d-%H%M%S')"
-
-if [[ ${suffix} == '' ]]; then
-    echo "${now}"
-else
-    echo "${now}-${suffix}"
+if [[ ${suffix} != '' ]]; then
+    suffix="-${suffix}"
 fi
+
+echo "$(date -u '+%Y-%m-%d-%H%M%S')${suffix}"
