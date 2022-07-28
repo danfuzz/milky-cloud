@@ -26,7 +26,9 @@ function usage {
       JSON value (default) or a string (with the appropriate option).
 
       --compact
-        Output in compact form (not multiline JSON).
+        Output in compact (not multiline) JSON form.
+      --json
+        Output in JSON form. This is the default.
       --strings
         Treat arguments as literal strings instead of JSON values.
 
@@ -37,53 +39,19 @@ function usage {
     exit "$1"
 }
 
-# Compact output?
-compactOutput=0
+# Want help?
+opt-action --call=usage --value=0 help/h
+
+# Output style.
+opt-choice --var=outputStyle --default=string compact json
 
 # String arguments?
-strings=0
+opt-toggle --var=strings strings
 
-# Error during argument processing?
-argError=0
+# The array elements.
+rest-arg --var=args
 
-# Parse options.
-while (( $# > 0 )); do
-    case "$1" in
-        --compact)
-            compactOutput=1
-            ;;
-        --strings)
-            strings=1
-            ;;
-        -h|--help)
-            argError=-1 # `-1` suppresses error exit after displaying usage.
-            break
-            ;;
-        --)
-            # Explicit end of options.
-            shift
-            break
-            ;;
-        -?*)
-            echo 1>&2 "Unknown option: $1"
-            argError=1
-            break
-            ;;
-        *)
-            # Non-option argument.
-            break
-            ;;
-    esac
-
-    shift
-done
-
-# Collect remaining arguments.
-args=("$@")
-
-if (( argError )); then
-    usage "${argError}"
-fi
+process-args "$@" || usage "$?"
 
 
 #
@@ -101,7 +69,7 @@ fi
 
 jqArgs=(--null-input)
 
-if (( compactOutput )); then
+if [[ ${outputStyle} == 'compact' ]]; then
     jqArgs+=('--compact-output')
 fi
 
