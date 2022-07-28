@@ -18,6 +18,9 @@
 # * required option "got the option" initializers
 _argproc_initStatements=()
 
+# List of functions to run to parse positional arguments.
+_argproc_positionalFuncs=()
+
 # List of statements to run after parsing, to do pre-return validation. This
 # includes:
 #
@@ -336,7 +339,7 @@ function opt-toggle {
 }
 
 # Declares a "value" option, specified as just `<name>` (no `<abbrev>` allowed
-# for these). When parsed value options require a value, passed in the form
+# for these). When parsed, value options require a value, passed in the form
 # `--<name>=<value>`. At least one of `--call` or `--var` must be used to define
 # the option.
 #
@@ -417,8 +420,8 @@ function opt-value {
     fi
 
     if (( ${required} )); then
-        # Replace `required` with a variable name based on the first
-        # option, and use it to form all the dependant bits.
+        # Replace `required` with a variable name based on the option name, and
+        # use it to form all the dependant bits.
         required="_argproc_gotOption_${name/-/_}"
         requiredSetter="${required}=1"
         _argproc_initStatements+=("local ${required}=0")
@@ -440,6 +443,107 @@ function opt-value {
         '"${setVar}"'
         '"${requiredSetter}"'
     }'
+}
+
+# Declares a positional argument, specified as just <name>, the name of the
+# argument to use in error messages and internal bookkeeping. At least one of
+# `--call` or `--var` must be used to define the argument.
+#
+# --call=<name> -- Calls the function with the given name, passing it the
+#   argument value. If `--var` is also used, the call is made first, and then
+#   the variable is set only if the call returned successfully.
+# --default=<value> -- The default value for the variable. If not specified, the
+#   default value is `''` (the empty string).
+# --match=<regex> -- Regular expression matched against the entire argument
+#   value. If the value does not match, then the argument gets rejected.
+# --required -- Indicates that this argument must be passed.
+# --var=<name> -- Sets the global `<name>` to the argument value. This also
+#   causes the variable to be initialized at the start of argument processing.
+function positional-args {
+    local callFunc=''
+    local defaultValue=''
+    local match=''
+    local setVar=''
+    local required=0
+    local ifMissing=''
+
+    while (( $# > 0 )); do
+        case "$1" in
+            --call=?*)
+                callFunc="${1#*=}"
+                ;;
+            --default=*)
+                defaultValue="${1#*=}"
+                ;;
+            --match=?*)
+                match="${1#*=}"
+                ;;
+            --required)
+                required=1
+                ;;
+            --var=?*)
+                setVar="${1#*=}"
+                ;;
+            *)
+                # End of options / unrecognized option.
+                break
+                ;;
+        esac
+        shift
+    done
+
+    local name="$1"
+
+    if ! [[ ${name} =~ ^[a-zA-Z0-9][-a-zA-Z0-9]*$ ]]; then
+        echo 1>&2 "Invalid argument spec: ${name}"
+        return 1
+    fi
+
+    if [[ ${callFunc} == '' && ${setVar} == '' ]]; then
+        echo 1>&2 "Must use at least one of --call or --var for argument: ${name}."
+        return 1
+    fi
+
+    if [[ ${callFunc} != '' ]]; then
+        # Re-form as the caller code.
+        callFunc="${callFunc}"' "${value}" || return "$?"'
+    fi
+
+    if [[ ${setVar} != '' ]]; then
+        # Set up the default initializer, and then re-form as the setter code.
+        _argproc_initStatements+=("${setVar}=$(_argproc:quote "${defaultValue}")")
+        setVar="${setVar}"'="$1"'
+    fi
+
+    if [[ ${match} != '' ]]; then
+        # Re-form as the clause to insert to perform the check.
+        match='
+            elif ! [[ $1 =~ ^('"${match}"')$ ]]; then
+                echo 1>&2 "Invalid value for argument <'"${name}"'>."
+                echo 1>&2 "Value: $1"
+                return 1'
+    fi
+
+    if (( ${required} )); then
+        # Code to issue a complaint about the missing argument.
+        ifMissing='
+            echo 1>&2 "Missing required argument: <'"${name}"'>"
+            return 1'
+    else
+        ifMissing='return'
+    fi
+
+    eval 'function _argproc:positional-'"${name}"' {
+        if (( $# < 1 )); then
+            '"${ifMissing}"'
+        '"${match}"'
+        fi
+
+        '"${callFunc}"'
+        '"${setVar}"'
+    }'
+
+    _argproc_positionalFuncs+=("_argproc:positional-${name}")
 }
 
 # Prints a usage message. This is just a convenient shorthand to do just a few
@@ -612,7 +716,7 @@ function rest-arg {
 # read.
 function _argproc:statements-from-args {
     local argError=0
-    local arg handler name value
+    local arg handler name statement value
 
     while (( $# > 0 )); do
         arg="$1"
@@ -664,8 +768,16 @@ function _argproc:statements-from-args {
         shift
     done
 
+    for statement in "${_argproc_positionalFuncs[@]}"; do
+        if (( $# > 0 )); then
+            statement="${statement} $(_argproc:quote "$1")"
+            shift
+        fi
+        _argproc_statements+=("${statement}")
+    done
+
     if declare -F _argproc:rest >/dev/null; then
-        local statement="_argproc:rest $(_argproc:quote "$@")"
+        statement="_argproc:rest $(_argproc:quote "$@")"
         _argproc_statements+=("${statement}")
     elif (( $# > 0 )); then
         echo 1>&2 'Non-option arguments are not allowed.'
