@@ -459,7 +459,7 @@ function opt-value {
 # --required -- Indicates that this argument must be passed.
 # --var=<name> -- Sets the global `<name>` to the argument value. This also
 #   causes the variable to be initialized at the start of argument processing.
-function positional-args {
+function positional-arg {
     local callFunc=''
     local defaultValue=''
     local match=''
