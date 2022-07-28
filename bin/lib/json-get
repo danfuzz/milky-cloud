@@ -29,7 +29,9 @@ function usage {
       formatting the input value as implied/specified by the output options.
 
       --compact
-        Output in compact form (not multiline JSON).
+        Output in compact (not multiline) JSON form.
+      --json
+        Output in JSON form. This is the default.
       --lines
         Output each item as a single line. Similar to `--raw`, except that
         a strings with newlines or CRs in them get treated as non-raw so as
@@ -47,63 +49,37 @@ function usage {
     exit "$1"
 }
 
-# Output option.
-outputOpt=()
+# Want help?
+opt-action --call=usage --value=0 help/h
 
-# Error during argument processing?
-argError=0
+# Output style.
+opt-choice --var=outputStyle --default=json compact json lines raw words
 
-# Parse options.
-while (( $# > 0 )); do
-    case "$1" in
-        --compact|--lines|--raw|--words)
-            outputOpt=("$1")
-            ;;
-        -h|--help)
-            argError=-1 # `-1` suppresses error exit after displaying usage.
-            break
-            ;;
-        --)
-            # Explicit end of options.
-            shift
-            break
-            ;;
-        -?*)
-            echo 1>&2 "Unknown option: $1"
-            argError=1
-            break
-            ;;
-        *)
-            # Non-option argument.
-            break
-            ;;
-    esac
+# Value and expressions to operate on it.
+rest-arg --call=parse-value-and-exprs
+value=''
+exprArgs=('.')
+function parse-value-and-exprs {
+    if (( $# < 1 )); then
+        echo 1>&2 'Missing <json-value> argument.'
+        argError=1
+    fi
 
+    # JSON value.
+    value="$1"
     shift
-done
 
-if (( $# < 1 )); then
-    echo 1>&2 'Missing <json-value> argument.'
-    argError=1
-fi
+    # Processing expressions.
+    if (( $# !=  0 )); then
+        exprArgs=("$@")
+    fi
+}
 
-# JSON value.
-value="$1"
-shift
-
-# JQ expression.
-exprArgs=("$@")
-if (( $# ==  0 )); then
-    exprArgs=('.')
-fi
-
-if (( argError )); then
-    usage "${argError}"
-fi
+process-args "$@" || usage "$?"
 
 
 #
 # Main script
 #
 
-lib json-val <<< "${value}" "${outputOpt[@]}" --read-stdin -- "${exprArgs[@]}"
+lib json-val <<< "${value}" --"${outputStyle}" --read-stdin -- "${exprArgs[@]}"
