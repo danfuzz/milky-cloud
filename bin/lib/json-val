@@ -35,7 +35,9 @@ function usage {
         <name>:json=<value> Assign `$name` to be the indicated parsed JSON value.
 
       --compact
-        Output in compact form (not multiline JSON).
+        Output in compact (not multiline) JSON form.
+      --json
+        Output in JSON form. This is the default.
       --lines
         Output each item as a single line. Similar to `--raw`, except that
         a strings with newlines or CRs in them get treated as non-raw so as
@@ -61,7 +63,7 @@ function usage {
 inputStyle=none
 
 # Output style.
-outputStyle=normal
+outputStyle=json
 
 # List of variable assignments, as parallel arrays of type, name, and value.
 varTypes=()
@@ -79,6 +81,9 @@ while (( $# > 0 )); do
     case "$1" in
         --compact)
             outputStyle=compact
+            ;;
+        --json)
+            outputStyle=json
             ;;
         --lines)
             outputStyle=lines
