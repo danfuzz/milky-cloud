@@ -78,18 +78,14 @@ process-args "$@" || usage "$?"
 # Main script
 #
 
-jqArgs=(-n)
-
+outputArg=()
 if [[ ${outputStyle} == 'compact' ]]; then
-    jqArgs+=('--compact-output')
+    outputArg=('--compact')
 fi
 
-jqArgs+=(
-    --argjson names "$(jarray --strings "${filterNames[@]}")"
-    --argjson values "$(jarray --strings "${filterValues[@]}")"
-)
-
-exec jq "${jqArgs[@]}" \
+jval "${outputArg[@]}" \
+    names:json="$(jarray --strings "${filterNames[@]}")" \
+    values:json="$(jarray --strings "${filterValues[@]}")" \
 '
     [$names, $values]
     |
