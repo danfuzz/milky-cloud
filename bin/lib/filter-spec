@@ -32,7 +32,9 @@ function usage {
         result is a logical OR of the values.
 
       --compact
-        Output in compact form (not multiline JSON).
+        Output in compact (not multiline) JSON form.
+      --json
+        Output in JSON form. This is the default.
 
     ${name} [--help | -h]
       Displays this message.
@@ -41,69 +43,35 @@ function usage {
     exit "$1"
 }
 
-# Compact output?
-compactOutput=0
+# Output style.
+opt-choice --var=outputStyle --default=string compact json
+
+# Want help?
+opt-action --call=usage --value=0 help/h
 
 # List of filter specifications, as parallel arrays of name and value.
 filterNames=()
 filterValues=()
 
-# Error during argument processing?
-argError=0
+rest-arg --call=parse-specs
+function parse-specs {
+    local arg
 
-# Parse options.
-while (( $# > 0 )); do
-    case "$1" in
-        --compact)
-            compactOutput=1
-            ;;
-        -h|--help)
-            argError=-1 # `-1` suppresses error exit after displaying usage.
-            ;;
-        --)
-            # Explicit end of options.
-            shift
-            break
-            ;;
-        -?*)
-            echo 1>&2 "Unknown option: $1"
-            argError=1
-            break
-            ;;
-        *)
-            # Non-option argument.
-            break
-            ;;
-    esac
+    while (( $# > 0 )); do
+        arg="$1"
+        if ! [[ ${arg} =~ ^([-_:.a-zA-Z0-9]+)=(.*)$ ]]; then
+            echo 1>&2 'Could not parse filter specification:' "${arg}"
+            return 1
+        fi
 
-    shift
-done
+        filterNames+=("${BASH_REMATCH[1]}")
+        filterValues+=("${BASH_REMATCH[2]}")
 
-# Parse filter specifications.
-while (( $# > 0 && !argError )); do
-    arg="$1"
-    if [[ ${arg} == '--' ]]; then
         shift
-        break
-    fi
+    done
+}
 
-    [[ ${arg} =~ ^([-_:.a-zA-Z0-9]+)=(.*)$ ]] \
-    || break
-
-    filterNames+=("${BASH_REMATCH[1]}")
-    filterValues+=("${BASH_REMATCH[2]}")
-
-    shift
-done
-
-if (( $# != 0 )); then
-    echo 1>&2 'Could not parse filter specification:' "$1"
-    argError=1
-fi
-
-if (( argError )); then
-    usage "${argError}"
-fi
+process-args "$@" || usage "$?"
 
 
 #
@@ -112,7 +80,7 @@ fi
 
 jqArgs=(-n)
 
-if (( compactOutput )); then
+if [[ ${outputStyle} == 'compact' ]]; then
     jqArgs+=('--compact-output')
 fi
 
