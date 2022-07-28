@@ -87,11 +87,6 @@ process-args "$@" || usage "$?"
 # Main script
 #
 
-outputArg=()
-if [[ ${outputStyle} == 'compact' ]]; then
-    outputArg=('--compact')
-fi
-
 if [[ ${port} == 'all' ]]; then
     port='-1'
 fi
@@ -102,7 +97,7 @@ if [[ ${protocol} == 'all' ]]; then
     protocol='-1'
 fi
 
-jval "${outputArg[@]}" \
+jval --"${outputStyle}" \
     port:json="${port}" \
     protocol="${protocol}" \
 '{

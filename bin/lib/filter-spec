@@ -78,12 +78,7 @@ process-args "$@" || usage "$?"
 # Main script
 #
 
-outputArg=()
-if [[ ${outputStyle} == 'compact' ]]; then
-    outputArg=('--compact')
-fi
-
-jval "${outputArg[@]}" \
+jval --"${outputStyle}" \
     names:json="$(jarray --strings "${filterNames[@]}")" \
     values:json="$(jarray --strings "${filterValues[@]}")" \
 '
