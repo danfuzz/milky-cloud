@@ -76,7 +76,7 @@ opt-choice --var=outputStyle --default=string json string
 opt-action --call=usage --value=0 help/h
 
 # Command.
-positional-arg --var=command --required command
+positional-arg --required --var=command command
 
 # Command arguments.
 args=()
