@@ -165,8 +165,8 @@ function opt-choice {
     done
 
     local specs=("$@")
-    if (( ${#specs[@]} < 2 )); then
-        echo 1>&2 'Need at least two option specs for a choice.'
+    if (( ${#specs[@]} < 1 )); then
+        echo 1>&2 'Need at least one option spec for a choice.'
         return 1
     fi
 
