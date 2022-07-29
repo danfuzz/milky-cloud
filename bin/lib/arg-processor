@@ -228,28 +228,11 @@ function opt-choice {
 function opt-toggle {
     local optCall=''
     local optVar=''
+    local args=("$@")
+    _argproc_janky-args call var \
+    || return 1
 
-    ################################
-    ################################ CONVERT THIS ONE NEXT TO janky-args
-    ################################
-
-    while (( $# > 0 )); do
-        case "$1" in
-            --call=?*)
-                optCall="${1#*=}"
-                ;;
-            --var=?*)
-                optVar="${1#*=}"
-                ;;
-            *)
-                # End of options / unrecognized option.
-                break
-                ;;
-        esac
-        shift
-    done
-
-    local name="$1"
+    local name="${args[0]}"
 
     if ! [[ ${name} =~ ^([a-zA-Z0-9][-a-zA-Z0-9]*)(/[a-zA-Z0-9]?)?(/[a-zA-Z0-9])?$ ]]; then
         echo 1>&2 "Invalid option spec: ${name}"
