@@ -31,6 +31,8 @@ function usage {
         availability zone, only the region portion matters.
       --json
         Produce JSON output.
+      --strings
+        Produce a list of strings (one per line). This is the default.
 
     ${name} [--help | -h]
       Displays this message.
@@ -39,56 +41,16 @@ function usage {
     exit "$1"
 }
 
-# Output style.
-outputStyle=strings
+# Want help?
+opt-action --call=usage --value=0 help/h
 
-# Error during argument processing?
-argError=0
+# Location (region or availability zone).
+opt-value --required --var=inLocation in
 
-# Location (availability zone).
-inLocation=''
+# What to print.
+opt-choice --var=outputStyle --default=strings json strings
 
-while (( $# > 0 )); do
-    case "$1" in
-        --in=?*)
-            inLocation="${1#*=}"
-            ;;
-        --json)
-            outputStyle=json
-            ;;
-        -h|--help)
-            argError=-1 # `-1` suppresses error exit after displaying usage.
-            break
-            ;;
-        --)
-            # Explicit end of options.
-            shift
-            break
-            ;;
-        -?*)
-            echo 1>&2 "Unknown option: $1"
-            argError=1
-            break
-            ;;
-        *)
-            # Non-option argument.
-            break
-            ;;
-    esac
-
-    shift
-done
-
-if (( !argError )); then
-    if [[ ${inLocation} == '' ]]; then
-        echo 1>&2 'Missing option: --in'
-        argError=1
-    fi
-fi
-
-if (( argError )); then
-    usage "${argError}"
-fi
+process-args "$@" || usage "$?"
 
 
 #
