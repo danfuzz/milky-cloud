@@ -34,7 +34,7 @@ function usage {
         generated programatically.
       --progress
         Print progress messages to stderr.
-      --quiet
+      --quiet (--no-quiet to disable)
         Suppress non-error output to stdout.
       --vpc=<name-or-id>
         Name or ID of the VPC.
@@ -46,75 +46,25 @@ function usage {
     exit "$1"
 }
 
-# Error during argument processing?
-argError=0
+# Want help?
+opt-action --call=usage --value=0 help/h
 
 # Location (region or availability zone).
-inLocation=''
+opt-value --required --var=inLocation in
 
 # Name for the subnets.
-name=''
+opt-value --var=name --match='.+' name
+
+# Progress messages?
+opt-toggle --call=progress-msg-switch progress
 
 # Quiet?
-quiet=0
+opt-toggle --var=quiet quiet
 
 # Name or ID of the VPC.
-vpcNameOrId=''
+opt-value --required --var=vpcNameOrId --match='.+' vpc
 
-while (( $# > 0 )); do
-    case "$1" in
-        --in=?*)
-            inLocation="${1#*=}"
-            ;;
-        --name=?*)
-            name="${1#*=}"
-            ;;
-        --progress)
-            progress-msg-switch --enable
-            ;;
-        --quiet)
-            quiet=1
-            ;;
-        --vpc=?*)
-            vpcNameOrId="${1#*=}"
-            ;;
-        -h|--help)
-            argError=-1 # `-1` suppresses error exit after displaying usage.
-            break
-            ;;
-        --)
-            # Explicit end of options.
-            shift
-            break
-            ;;
-        -?*)
-            echo 1>&2 "Unknown option: $1"
-            argError=1
-            break
-            ;;
-        *)
-            # Non-option argument.
-            break
-            ;;
-    esac
-
-    shift
-done
-
-if (( !argError )); then
-    if [[ ${inLocation} == '' ]]; then
-        echo 1>&2 'Missing option: --in'
-        argError=1
-    fi
-    if [[ ${vpcNameOrId} == '' ]]; then
-        echo 1>&2 'Missing option: --vpc'
-        argError=1
-    fi
-fi
-
-if (( argError )); then
-    usage "${argError}"
-fi
+process-args "$@" || usage "$?"
 
 
 #
