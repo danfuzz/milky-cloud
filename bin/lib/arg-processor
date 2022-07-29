@@ -744,7 +744,7 @@ function _argproc_janky-args {
             local value="${BASH_REMATCH[2]}"
 
             if ! [[ ${argSpecs} =~ " ${name} " ]]; then
-                echo 1>&2 "Unknown option: ${name}"
+                echo 1>&2 "Unknown option: --${name}"
                 return 1
             fi
 
@@ -772,7 +772,11 @@ function _argproc_janky-args {
             esac
 
             if (( argError )); then
-                echo 1>&2 "Invalid value for option --${name}."
+                if [[ ${value} != '' ]]; then
+                    echo 1>&2 "Invalid value for option --${name}: ${value:1}"
+                else
+                    echo 1>&2 "Value required for option --${name}."
+                fi
                 return 1
             fi
         elif [[ ${a} == '--' ]]; then
