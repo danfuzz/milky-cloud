@@ -312,36 +312,13 @@ function opt-value {
     local optCall=''
     local optDefault=''
     local optMatch=''
-    local optVar=''
     local optRequired=0
-    local requiredSetter=''
+    local optVar=''
+    local args=("$@")
+    _argproc_janky-args call default match required var \
+    || return 1
 
-    while (( $# > 0 )); do
-        case "$1" in
-            --call=?*)
-                optCall="${1#*=}"
-                ;;
-            --default=*)
-                optDefault="${1#*=}"
-                ;;
-            --match=?*)
-                optMatch="${1#*=}"
-                ;;
-            --required)
-                optRequired=1
-                ;;
-            --var=?*)
-                optVar="${1#*=}"
-                ;;
-            *)
-                # End of options / unrecognized option.
-                break
-                ;;
-        esac
-        shift
-    done
-
-    local name="$1"
+    local name="${args[0]}"
 
     if ! [[ ${name} =~ ^[a-zA-Z0-9][-a-zA-Z0-9]*$ ]]; then
         echo 1>&2 "Invalid option spec: ${name}"
@@ -373,6 +350,7 @@ function opt-value {
                 return 1'
     fi
 
+    local requiredSetter=''
     if (( ${optRequired} )); then
         # Replace `optRequired` with a variable name based on the option name,
         # and use it to form all the dependant bits.
@@ -703,6 +681,11 @@ function _argproc_janky-args {
                     && optDefault="${BASH_REMATCH[1]}" \
                     || argError=1
                     ;;
+                match)
+                    [[ ${value} =~ ^=(.*)$ ]] \
+                    && optMatch="${BASH_REMATCH[1]}" \
+                    || argError=1
+                    ;;
                 required)
                     [[ ${value} == '' ]] \
                     && optRequired=1 \
@@ -717,6 +700,10 @@ function _argproc_janky-args {
                     [[ ${value} =~ ^=([_a-zA-Z][_a-zA-Z0-9]*)$ ]] \
                     && optVar="${BASH_REMATCH[1]}" \
                     || argError=1
+                    ;;
+                *)
+                    echo 1>&2 "Unknown arg-processing option: --${name}"
+                    return 1
                     ;;
             esac
 
