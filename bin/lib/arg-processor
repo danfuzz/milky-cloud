@@ -48,7 +48,7 @@ _argproc_preReturnStatements=()
 #   causes it to be defaulted at the start of argument processing.
 function opt-action {
     local optCall=''
-    local optDefaul=''
+    local optDefault=''
     local optValue='1'
     local optVar=''
     local args=("$@")
@@ -723,8 +723,71 @@ function rest-arg {
 # parsed option. Assumes the variable `args` (again presumed local to the
 # caller) contains all the arguments, which gets updates by this function.
 function _argproc_janky-args {
-    # TODO
-    :
+    local argError=0
+    local argSpecs=" $* "
+    local optsDone=0
+    local a
+
+    for a in "${args[@]}"; do
+        if (( optsDone )); then
+            args+=("${a}")
+            continue
+        fi
+
+        if [[ ${a} =~ --(.+) ]]; then
+            if ! [[ ${a} =~ ^--([a-z]+)(=.*)?$ ]]; then
+                echo 1>&2 "Invalid option syntax: ${a}"
+                return 1
+            fi
+
+            local name="${BASH_REMATCH[1]}"
+            local value="${BASH_REMATCH[2]}"
+
+            if ! [[ ${argSpecs} =~ " ${name} " ]]; then
+                echo 1>&2 "Unknown option: ${name}"
+                return 1
+            fi
+
+            case "${name}" in
+                call)
+                    [[ ${value} =~ ^=([-_a-zA-Z0-9]+)$ ]] \
+                    && optCall="${BASH_REMATCH[1]}" \
+                    || argError=1
+                    ;;
+                default)
+                    [[ ${value} =~ ^=(.*)$ ]] \
+                    && optDefault="${BASH_REMATCH[1]}" \
+                    || argError=1
+                    ;;
+                value)
+                    [[ ${value} =~ ^=(.*)$ ]] \
+                    && optValue="${BASH_REMATCH[1]}" \
+                    || argError=1
+                    ;;
+                var)
+                    [[ ${value} =~ ^=([_a-zA-Z0-9]+)$ ]] \
+                    && optVar="${BASH_REMATCH[1]}" \
+                    || argError=1
+                    ;;
+            esac
+
+            if (( argError )); then
+                echo 1>&2 "Invalid value for option --${name}."
+                return 1
+            fi
+        elif [[ ${a} == '--' ]]; then
+            # Explicit end of options.
+            args=()
+            optsDone=1
+        elif [[ (${a} == '-') || (${a:0:0} != '-') ]]; then
+            # Non-option argument.
+            args=("${a}")
+            optsDone=1
+        else
+            echo 1>&2 "Invalid option syntax: ${a}"
+            return 1
+        fi
+   done
 }
 
 # Builds up a list of statements to evaluate, based on the given arguments. It
