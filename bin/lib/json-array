@@ -29,7 +29,7 @@ function usage {
         Output in compact (not multiline) JSON form.
       --json
         Output in JSON form. This is the default.
-      --strings
+      --strings (--no-strings to disable)
         Treat arguments as literal strings instead of JSON values.
 
     ${name} [--help | -h]
