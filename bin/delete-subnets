@@ -56,7 +56,7 @@ opt-value --required --var=inLocation in
 # Name or ID of the VPC.
 opt-value --required --var=vpcNameOrId --match='.+' vpc
 
-# Simple filter for `--all` (degenerate choice).
+# Simple filter for `--all` (degenerate choice option).
 opt-choice --var=simpleFilter \
     all='.'
 
