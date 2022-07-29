@@ -34,6 +34,9 @@ function usage {
       --in=<region-or-zone>
         What region to make the security group in. Must be specified. If
         specified as an availability zone, only the region portion matters.
+      --name=<name>
+        Name _tag_ to add to the security group. This is particularly useful
+        when configuring a default security group.
       --security-group=<name-or-id>
         Name or ID of the security group to modify. Can also be a VPC ID,
         to indicate the default security group for that VPC.
@@ -57,15 +60,15 @@ groupNameOrId=''
 inLocation=''
 
 # Name tag to add.
-nameTag=''
+name=''
 
 while (( $# > 0 )); do
     case "$1" in
         --in=?*)
             inLocation="${1#*=}"
             ;;
-        --name-tag=?*)
-            nameTag="${1#*=}"
+        --name=?*)
+            name="${1#*=}"
             ;;
         --progress)
             progress-msg-switch --enable
@@ -203,10 +206,10 @@ if (( !error )); then
     || error="$?"
 fi
 
-if (( !error )) && [[ ${nameTag} != '' ]]; then
+if (( !error )) && [[ ${name} != '' ]]; then
     ec2-json create-tags --in="${inRegion}" \
         groupId="${groupId}" \
-        value="${nameTag}" \
+        value="${name}" \
         '{
             Resources: [$groupId],
             Tags: [{
