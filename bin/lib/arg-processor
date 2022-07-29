@@ -648,15 +648,15 @@ function process-args {
     return "${_argproc_error}"
 }
 
-# Declares a "rest" argument, which gets all the non-option arguments during
-# parsing. If not declared, argument processing will report an error if any
-# non-option arguments are passed. At least one of the two options must be
-# specified.
+# Declares a "rest" argument, which gets all the non-option and non-positional
+# arguments, during parsing. If this is not declared, argument processing will
+# report an error in the presence of any "rest" arguments. At least one of
+# `--call` or `--var` must be used to define this argument.
 #
 # --call=<name> -- Calls the function with the given name, passing it all the
-#   non-option arguments. If `--var` is also used, the call is made first, and
-#   then the variable is set only if the call returned successfully.
-# --var=<name> -- Sets the global `<name>` to an array of all the non-option
+#   rest arguments. If `--var` is also used, the call is made first, and then
+#   the variable is set only if the call returned successfully.
+# --var=<name> -- Sets the global `<name>` to an array of all the rest
 #   arguments. This also causes the variable to be initialized to an empty
 #   array at the start of argument processing.
 function rest-arg {
