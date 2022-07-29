@@ -47,6 +47,16 @@ _argproc_preReturnStatements=()
 # --var=<name> -- Sets the global `<name>` to the configured action value, and
 #   causes it to be defaulted at the start of argument processing.
 function opt-action {
+    local optCall=''
+    local optDefaul=''
+    local optValue='1'
+    local optVar=''
+    local args=("$@")
+    _argproc_janky-args call default value var \
+    || return 1
+
+    # TODO: Convert the rest of this to deal with the new args stuff.
+
     local callFunc=''
     local defaultValue=0
     local setVar=''
@@ -705,6 +715,18 @@ function rest-arg {
 #
 # Library-internal functions
 #
+
+# Janky yet reasonable argument parser for the commands in this library. (How
+# meta!) Takes a list of option names to accept, each of which is parsed in a
+# standard way (e.g. `var` is always a variable name, etc.). Sets `opt<Name>`
+# (presumed to be a local variable declared in the calling scope) for each
+# parsed option. Assumes the variable `args` (again presumed local to the
+# caller) contains all the arguments, which gets updates by this function.
+function _argproc_janky-args {
+    # TODO
+    :
+}
+
 
 # Builds up a list of statements to evaluate, based on the given arguments. It
 # is stored in the variable `_argproc_statements`, which is assumed to be
