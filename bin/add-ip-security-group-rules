@@ -23,19 +23,13 @@ function usage {
 
     ${name} [<opt> ...]
       Adds one or more rules to a given security group to specify IP-based
-      restrictions. Either `--port` or `--all-ports` must be passed. Similarly,
-      one protocol option must be passed. Upon success, prints out a JSON
-      array of all added rules.
+      restrictions. Upon success, prints out a JSON array of all added rules.
 
       Note: Even though this command only nominally lets you specify one
       rule, AWS splits out multiple rules when the specified rule applies
       to multiple IP address ranges (including notably treating "any IPv4"
       and "any IPv6" as different ranges).
 
-      --all-ports
-        The rule is to apply to all ports.
-      --all-protocols
-        The rule is to apply to all protocols.
       --egress
         The rule is to be an egress rule.
       --in=<region-or-zone>
@@ -45,17 +39,17 @@ function usage {
         The rule is to be an ingress rule.
       --name=<name>
         Name to attach to the rule, if any.
-      --port=<number>
-        Port for the rule.
-      --quiet
+      --port=<number> or --port=all
+        Port for the rule, or an indicator to apply to all ports. Must be
+        specified.
+      --protocol=<spec>
+        Protocol(s) the rule applies to, one of `all`, `tcp`, or `udp`. Must be
+        specified.
+      --quiet (or --no-quiet to disable)
         Suppress non-error output.
       --security-group=<name-or-id>
         Name or ID of the security group to add to. Can also be a VPC ID,
         to indicate the default security group for that VPC.
-      --tcp
-        The rule is for TCP traffic.
-      --udp
-        The rule is for UDP traffic.
 
     ${name} [--help | -h]
       Displays this message.
@@ -64,114 +58,31 @@ function usage {
     exit "$1"
 }
 
-# Error during argument processing?
-argError=0
+# Want help?
+opt-action --call=usage --value=0 help/h
 
 # Rule direction (`ingress` or `egress`).
-direction=''
+opt-choice --required --var=direction egress ingress
 
 # Name or ID of the security group.
-groupNameOrId=''
+opt-value --required --var=groupNameOrId --match='.+' security-group
 
 # Location (region or availability zone).
-inLocation=''
+opt-value --required --var=inLocation in
 
 # Name of the rule.
-name=''
+opt-value --var=name --match='.+' name
 
 # Port of the rule.
-port=''
+opt-value --required --var=port --match='[0-9]+|all' port
 
 # Protocol of the rule.
-protocol=''
+opt-value --required --var=protocol --match='all|tcp|udp' protocol
 
 # Quiet?
-quiet=0
+opt-toggle --var=quiet quiet
 
-while (( $# > 0 )); do
-    case "$1" in
-        --all-ports)
-            port='all'
-            ;;
-        --all-protocols)
-            protocol='all'
-            ;;
-        --egress)
-            direction='egress'
-            ;;
-        --in=?*)
-            inLocation="${1#*=}"
-            ;;
-        --ingress)
-            direction='ingress'
-            ;;
-        --name=?*)
-            name="${1#*=}"
-            ;;
-        --port=?*)
-            port="${1#*=}"
-            ;;
-        --quiet)
-            quiet=1
-            ;;
-        --security-group=?*)
-            groupNameOrId="${1#*=}"
-            ;;
-        --tcp)
-            protocol='tcp'
-            ;;
-        --udp)
-            protocol='udp'
-            ;;
-        -h|--help)
-            argError=-1 # `-1` suppresses error exit after displaying usage.
-            break
-            ;;
-        --)
-            # Explicit end of options.
-            shift
-            break
-            ;;
-        -?*)
-            echo 1>&2 "Unknown option: $1"
-            argError=1
-            break
-            ;;
-        *)
-            # Non-option argument.
-            break
-            ;;
-    esac
-
-    shift
-done
-
-if (( !argError )); then
-    if [[ ${inLocation} == '' ]]; then
-        echo 1>&2 'Missing option: --in'
-        argError=1
-    fi
-    if [[ ${groupNameOrId} == '' ]]; then
-        echo 1>&2 'Missing option: --security-group'
-        argError=1
-    fi
-    if [[ ${direction} == '' ]]; then
-        echo 1>&2 'Missing option: --egress or --ingress'
-        argError=1
-    fi
-    if [[ ${port} == '' ]]; then
-        echo 1>&2 'Missing option: --all-ports or --port'
-        argError=1
-    fi
-    if [[ ${protocol} == '' ]]; then
-        echo 1>&2 'Missing option: --all-protocols, --tcp, or --udp'
-        argError=1
-    fi
-fi
-
-if (( argError )); then
-    usage "${argError}"
-fi
+process-args "$@" || usage "$?"
 
 
 #

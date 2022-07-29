@@ -156,7 +156,7 @@ commonArgs=(--quiet --in="${inRegion}" --security-group="${groupId}"
 
 if (( !error )); then
     lib add-ip-security-group-rules "${commonArgs[@]}" \
-        --egress --all-protocols --all-ports \
+        --egress --protocol=all --port=all \
     && progress-msg "Added all-access egress rules." \
     || error="$?"
 fi
@@ -191,14 +191,14 @@ fi
 
 if (( !error )); then
     lib add-ip-security-group-rules "${commonArgs[@]}" \
-        --ingress --tcp --port=22 \
+        --ingress --protocol=tcp --port=22 \
     && progress-msg "Added SSH ingress rules." \
     || error="$?"
 fi
 
 if (( !error )); then
     lib add-ip-security-group-rules "${commonArgs[@]}" \
-        --ingress --tcp --port=443 \
+        --ingress --protocol=tcp --port=443 \
     && progress-msg "Added HTTPS ingress rules." \
     || error="$?"
 fi
