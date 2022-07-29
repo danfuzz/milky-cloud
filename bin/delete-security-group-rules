@@ -41,7 +41,7 @@ function usage {
         What region to make the security group in. Must be specified. If
         specified as an availability zone, only the region portion matters.
       --quiet
-        Suppress non-error output.
+        Suppress non-error output to stdout.
       --security-group=<name-or-id>
         Name or ID of the security group to operate on. Can also be a VPC ID,
         to indicate the default security group for that VPC.

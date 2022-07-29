@@ -45,8 +45,8 @@ function usage {
       --protocol=<spec>
         Protocol(s) the rule applies to, one of `all`, `tcp`, or `udp`. Must be
         specified.
-      --quiet (or --no-quiet to disable)
-        Suppress non-error output.
+      --quiet (--no-quiet to disable)
+        Suppress non-error output to stdout.
       --security-group=<name-or-id>
         Name or ID of the security group to add to. Can also be a VPC ID,
         to indicate the default security group for that VPC.
