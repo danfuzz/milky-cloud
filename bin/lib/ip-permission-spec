@@ -49,7 +49,7 @@ opt-choice --var=outputStyle --default=json compact json
 positional-arg --required --var=protocol --match='all|tcp|udp' protocol
 
 # Port.
-positional-arg --required --var=port --match='[0-9]+' port
+positional-arg --required --var=port --match='[0-9]+|all' port
 
 process-args "$@" || usage "$?"
 
