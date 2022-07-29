@@ -125,26 +125,25 @@ function progress-msg {
 #   command.)
 # --status -- Prints `1` or `0` to stdout, to indicate enabled status.
 function progress-msg-toggle {
-        case "$1" in
-            --enable|1)
-                _milky_cloud_progressEnabled=1
-                ;;
-            --disable|0)
-                _milky_cloud_progressEnabled=0
-                ;;
-            --print-option)
-                if (( _milky_cloud_progressEnabled )); then
-                    echo '--progress'
-                fi
-                ;;
-            --status)
-                echo "${_milky_cloud_progressEnabled}"
-                ;;
-            *)
-                echo 1>&2 "Unrecognized argument: $1"
-                return 1
-        esac
-    fi
+    case "$1" in
+        --enable|1)
+            _milky_cloud_progressEnabled=1
+            ;;
+        --disable|0)
+            _milky_cloud_progressEnabled=0
+            ;;
+        --print-option)
+            if (( _milky_cloud_progressEnabled )); then
+                echo '--progress'
+            fi
+            ;;
+        --status)
+            echo "${_milky_cloud_progressEnabled}"
+            ;;
+        *)
+            echo 1>&2 "Unrecognized argument: $1"
+            return 1
+    esac
 }
 
 
