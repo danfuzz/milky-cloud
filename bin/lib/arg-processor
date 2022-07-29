@@ -65,7 +65,7 @@ function opt-action {
     name="${BASH_REMATCH[1]}"
     local abbrev="${BASH_REMATCH[2]:1}" # `:1` to drop the slash.
 
-    if [[ ${optCall} == '' && ${optSet} == '' ]]; then
+    if [[ ${optCall} == '' && ${optVar} == '' ]]; then
         echo 1>&2 "Must use at least one of --call or --var for option: ${name}."
         return 1
     fi
@@ -75,10 +75,10 @@ function opt-action {
         optCall="${optCall} $(_argproc:quote "${optValue}")"' || return "$?"'
     fi
 
-    if [[ ${optSet} != '' ]]; then
+    if [[ ${optVar} != '' ]]; then
         # Set up the default initializer, and then re-form as the setter code.
-        _argproc_initStatements+=("${optSet}=$(_argproc:quote "${optDefault}")")
-        optSet="${optSet}=$(_argproc:quote "${optValue}")"
+        _argproc_initStatements+=("${optVar}=$(_argproc:quote "${optDefault}")")
+        optVar="${optVar}=$(_argproc:quote "${optValue}")"
     fi
 
     eval 'function _argproc:long-'"${name}"' {
@@ -88,7 +88,7 @@ function opt-action {
         fi
 
         '"${optCall}"'
-        '"${optSet}"'
+        '"${optVar}"'
     }'
 
     if [[ ${abbrev} != '' ]]; then
@@ -340,7 +340,7 @@ function opt-value {
     local optDefault=''
     local match=''
     local optVar=''
-    local required=0
+    local optRequired=0
     local requiredSetter=''
 
     while (( $# > 0 )); do
@@ -355,7 +355,7 @@ function opt-value {
                 match="${1#*=}"
                 ;;
             --required)
-                required=1
+                optRequired=1
                 ;;
             --var=?*)
                 optVar="${1#*=}"
@@ -400,14 +400,14 @@ function opt-value {
                 return 1'
     fi
 
-    if (( ${required} )); then
-        # Replace `required` with a variable name based on the option name, and
-        # use it to form all the dependant bits.
-        required="_argproc_gotOption_${name/-/_}"
-        requiredSetter="${required}=1"
-        _argproc_initStatements+=("local ${required}=0")
+    if (( ${optRequired} )); then
+        # Replace `optRequired` with a variable name based on the option name,
+        # and use it to form all the dependant bits.
+        optRequired="_argproc_gotOption_${name/-/_}"
+        requiredSetter="${optRequired}=1"
+        _argproc_initStatements+=("local ${optRequired}=0")
         _argproc_preReturnStatements+=('
-            (( '"${required}"' )) || {
+            (( '"${optRequired}"' )) || {
                 echo 1>&2 "Missing required option: --'"${name}"'"
                 false
             }')
@@ -445,7 +445,7 @@ function positional-arg {
     local optDefault=''
     local match=''
     local optVar=''
-    local required=0
+    local optRequired=0
     local ifMissing=''
 
     while (( $# > 0 )); do
@@ -460,7 +460,7 @@ function positional-arg {
                 match="${1#*=}"
                 ;;
             --required)
-                required=1
+                optRequired=1
                 ;;
             --var=?*)
                 optVar="${1#*=}"
@@ -505,7 +505,7 @@ function positional-arg {
                 return 1'
     fi
 
-    if (( ${required} )); then
+    if (( ${optRequired} )); then
         # Code to issue a complaint about the missing argument.
         ifMissing='
             echo 1>&2 "Missing required argument: <'"${name}"'>"
