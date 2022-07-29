@@ -32,8 +32,8 @@ function usage {
         What region to operate in. Must be specified. If specified as an
         availability zone, only the region portion matters.
       --id=<id>
-        ID of the thing to operate on.
-      --progress
+        ID of the thing to operate on. Must be specified.
+      --progress (--no-progress to disable)
         Print progress messages to stderr.
 
     ${name} [--help | -h]
@@ -43,85 +43,46 @@ function usage {
     exit "$1"
 }
 
-# Error during argument processing?
-argError=0
+# Want help?
+opt-action --call=usage --value=0 help/h
+
+# Location (region or availability zone).
+opt-value --required --var=inLocation in
+
+# ID of the thing to operate on.
+opt-value --required --var=id --match='.*' id
+
+# Progress messages?
+opt-toggle --call=progress-msg-switch progress
 
 # Names and values of assignments, as parallel arrays.
 assignNames=()
 assignValues=()
+rest-arg --call=parse-rest
+function parse-rest {
+    local arg
 
-# ID of the thing to operate on.
-id=''
+    while (( $# > 0)); do
+        arg="$1"
 
-# Location (region or availability zone).
-inLocation=''
+        if ! [[ ${arg} =~ ^([-_:.a-zA-Z0-9]+)=(.*)$ ]]; then
+            echo 1>&2 "Invalid assignment: ${arg}"
+            return 1
+        fi
 
-while (( $# > 0 )); do
-    case "$1" in
-        --id=?*)
-            id="${1#*=}"
-            ;;
-        --in=?*)
-            inLocation="${1#*=}"
-            ;;
-        --progress)
-            progress-msg-switch --enable
-            ;;
-        -h|--help)
-            argError=-1 # `-1` suppresses error exit after displaying usage.
-            break
-            ;;
-        --)
-            # Explicit end of options.
-            shift
-            break
-            ;;
-        -?*)
-            echo 1>&2 "Unknown option: $1"
-            argError=1
-            break
-            ;;
-        *)
-            # Non-option argument.
-            break
-            ;;
-    esac
+        assignNames+=("${BASH_REMATCH[1]}")
+        assignValues+=("${BASH_REMATCH[2]}")
 
-    shift
-done
+        shift
+    done
 
-if (( !argError )); then
-    if [[ ${inLocation} == '' ]]; then
-        echo 1>&2 'Missing option: --in'
-        argError=1
+    if (( ${#assignNames[@]} == 0 )); then
+        echo 1>&2 'Missing assignment(s).'
+        return 1
     fi
-    if [[ ${id} == '' ]]; then
-        echo 1>&2 'Missing option: --id'
-        argError=1
-    fi
-fi
+}
 
-# Parse the assignments.
-while (( $# > 0 && !argError )); do
-    arg="$1"
-
-    [[ ${arg} =~ ^([-_:.a-zA-Z0-9]+)=(.*)$ ]] \
-    || break
-
-    assignNames+=("${BASH_REMATCH[1]}")
-    assignValues+=("${BASH_REMATCH[2]}")
-
-    shift
-done
-
-if (( ${#assignNames[@]} == 0 && !argError )); then
-    echo 1>&2 'Missing assignment(s).'
-    argError=1
-fi
-
-if (( argError )); then
-    usage "${argError}"
-fi
+process-args "$@" || usage "$?"
 
 
 #
