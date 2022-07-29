@@ -36,7 +36,7 @@ function usage {
       --name=<name>
         Name to assign to the constructed security group. If not specified,
         a name is derived from the associated VPC.
-      --progress
+      --progress (--no-progress to disable)
         Print progress messages to stderr.
       --vpc=<name-or-id>
         Name or ID of the VPC to be associated with. Must be specified.
@@ -48,75 +48,25 @@ function usage {
     exit "$1"
 }
 
-# Error during argument processing?
-argError=0
+# Want help?
+opt-action --call=usage --value=0 help/h
 
-# Description of the security group.
-description=''
+# Location (availability zone).
+opt-value --required --var=inLocation in
 
-# Location (region or availability zone).
-inLocation=''
+# Description of the resulting security group.
+opt-value --var=description --match='.*' description
 
-# Name of the security group.
-name=''
+# Name for the resulting security group.
+opt-value --var=name --match='.*' name
 
-# Name or ID of the VPC.
-vpcNameOrId=''
+# Progress messages?
+opt-toggle --call=progress-msg-switch progress
 
-while (( $# > 0 )); do
-    case "$1" in
-        --description=?*)
-            description="${1#*=}"
-            ;;
-        --in=?*)
-            inLocation="${1#*=}"
-            ;;
-        --name=?*)
-            name="${1#*=}"
-            ;;
-        --progress)
-            progress-msg-switch --enable
-            ;;
-        --vpc=?*)
-            vpcNameOrId="${1#*=}"
-            ;;
-        -h|--help)
-            argError=-1 # `-1` suppresses error exit after displaying usage.
-            break
-            ;;
-        --)
-            # Explicit end of options.
-            shift
-            break
-            ;;
-        -?*)
-            echo 1>&2 "Unknown option: $1"
-            argError=1
-            break
-            ;;
-        *)
-            # Non-option argument.
-            break
-            ;;
-    esac
+# Name or ID of VPC to look up.
+opt-value --required --var=vpcNameOrId --match='.+' vpc
 
-    shift
-done
-
-if (( !argError )); then
-    if [[ ${inLocation} == '' ]]; then
-        echo 1>&2 'Missing option: --in'
-        argError=1
-    fi
-    if [[ ${vpcNameOrId} == '' ]]; then
-        echo 1>&2 'Missing option: --vpc'
-        argError=1
-    fi
-fi
-
-if (( argError )); then
-    usage "${argError}"
-fi
+process-args "$@" || usage "$?"
 
 
 #
