@@ -115,7 +115,7 @@ function opt-action {
 # --var=<name> -- Sets the global `<name>` to the option value, and causes it to
 #   be defaulted at the start of argument processing.
 function opt-choice {
-    local callFunc=''
+    local optCall=''
     local defaultValue=''
     local setVar=''
 
@@ -126,7 +126,7 @@ function opt-choice {
     while (( $# > 0 )); do
         case "$1" in
             --call=?*)
-                callFunc="${1#*=}"
+                optCall="${1#*=}"
                 ;;
             --default=*)
                 defaultValue="${1#*=}"
@@ -151,14 +151,14 @@ function opt-choice {
         return 1
     fi
 
-    if [[ ${callFunc} == '' && ${setVar} == '' ]]; then
+    if [[ ${optCall} == '' && ${setVar} == '' ]]; then
         echo 1>&2 "Must use at least one of --call or --var for option: ${name}."
         return 1
     fi
 
-    if [[ ${callFunc} != '' ]]; then
+    if [[ ${optCall} != '' ]]; then
         # Re-form as the caller code.
-        callFunc="${callFunc}"' "${_approc_value}" || return "$?"'
+        optCall="${optCall}"' "${_approc_value}" || return "$?"'
     fi
 
     if [[ ${setVar} != '' ]]; then
@@ -205,7 +205,7 @@ function opt-choice {
             fi
 
             local _argproc_value='"${value}"'
-            '"${callFunc}"'
+            '"${optCall}"'
             '"${setVar}"'
             '"${requiredSetter}"'
         }'
@@ -240,13 +240,13 @@ function opt-choice {
 # --var=<name> -- Sets the global `<name>` to `1` or `0`, and causes it to be
 #   defauled to `0` at the start of argument processing.
 function opt-toggle {
-    local callFunc=''
+    local optCall=''
     local setVar=''
 
     while (( $# > 0 )); do
         case "$1" in
             --call=?*)
-                callFunc="${1#*=}"
+                optCall="${1#*=}"
                 ;;
             --var=?*)
                 setVar="${1#*=}"
@@ -270,14 +270,14 @@ function opt-toggle {
     local abbrevOn="${BASH_REMATCH[2]:1}"  # `:1` to drop the slash.
     local abbrevOff="${BASH_REMATCH[3]:1}" # Likewise.
 
-    if [[ ${callFunc} == '' && ${setVar} == '' ]]; then
+    if [[ ${optCall} == '' && ${setVar} == '' ]]; then
         echo 1>&2 "Must use at least one of --call or --var for option: ${name}."
         return 1
     fi
 
-    if [[ ${callFunc} != '' ]]; then
+    if [[ ${optCall} != '' ]]; then
         # Re-form as the caller code.
-        callFunc="${callFunc}"' "$1" || return "$?"'
+        optCall="${optCall}"' "$1" || return "$?"'
     fi
 
     if [[ ${setVar} != '' ]]; then
@@ -293,7 +293,7 @@ function opt-toggle {
                 return 1
             fi
 
-            '"${callFunc}"'
+            '"${optCall}"'
             '"${setVar}"'
         }
 
@@ -336,7 +336,7 @@ function opt-toggle {
 #   argument. This also causes the variable to be initialized at the start of
 #   argument processing.
 function opt-value {
-    local callFunc=''
+    local optCall=''
     local defaultValue=''
     local match=''
     local setVar=''
@@ -346,7 +346,7 @@ function opt-value {
     while (( $# > 0 )); do
         case "$1" in
             --call=?*)
-                callFunc="${1#*=}"
+                optCall="${1#*=}"
                 ;;
             --default=*)
                 defaultValue="${1#*=}"
@@ -375,14 +375,14 @@ function opt-value {
         return 1
     fi
 
-    if [[ ${callFunc} == '' && ${setVar} == '' ]]; then
+    if [[ ${optCall} == '' && ${setVar} == '' ]]; then
         echo 1>&2 "Must use at least one of --call or --var for option: ${name}."
         return 1
     fi
 
-    if [[ ${callFunc} != '' ]]; then
+    if [[ ${optCall} != '' ]]; then
         # Re-form as the caller code.
-        callFunc="${callFunc}"' "${value}" || return "$?"'
+        optCall="${optCall}"' "${value}" || return "$?"'
     fi
 
     if [[ ${setVar} != '' ]]; then
@@ -420,7 +420,7 @@ function opt-value {
         '"${match}"'
         fi
 
-        '"${callFunc}"'
+        '"${optCall}"'
         '"${setVar}"'
         '"${requiredSetter}"'
     }'
@@ -441,7 +441,7 @@ function opt-value {
 # --var=<name> -- Sets the global `<name>` to the argument value. This also
 #   causes the variable to be initialized at the start of argument processing.
 function positional-arg {
-    local callFunc=''
+    local optCall=''
     local defaultValue=''
     local match=''
     local setVar=''
@@ -451,7 +451,7 @@ function positional-arg {
     while (( $# > 0 )); do
         case "$1" in
             --call=?*)
-                callFunc="${1#*=}"
+                optCall="${1#*=}"
                 ;;
             --default=*)
                 defaultValue="${1#*=}"
@@ -480,14 +480,14 @@ function positional-arg {
         return 1
     fi
 
-    if [[ ${callFunc} == '' && ${setVar} == '' ]]; then
+    if [[ ${optCall} == '' && ${setVar} == '' ]]; then
         echo 1>&2 "Must use at least one of --call or --var for argument: ${name}."
         return 1
     fi
 
-    if [[ ${callFunc} != '' ]]; then
+    if [[ ${optCall} != '' ]]; then
         # Re-form as the caller code.
-        callFunc="${callFunc}"' "${value}" || return "$?"'
+        optCall="${optCall}"' "${value}" || return "$?"'
     fi
 
     if [[ ${setVar} != '' ]]; then
@@ -520,7 +520,7 @@ function positional-arg {
         '"${match}"'
         fi
 
-        '"${callFunc}"'
+        '"${optCall}"'
         '"${setVar}"'
     }'
 
@@ -641,13 +641,13 @@ function process-args {
 #   arguments. This also causes the variable to be initialized to an empty
 #   array at the start of argument processing.
 function rest-arg {
-    local callFunc=''
+    local optCall=''
     local setVar=''
 
     while (( $# > 0 )); do
         case "$1" in
             --call=?*)
-                callFunc="${1#*=}"
+                optCall="${1#*=}"
                 ;;
             --var=?*)
                 setVar="${1#*=}"
@@ -660,14 +660,14 @@ function rest-arg {
         shift
     done
 
-    if [[ ${callFunc} == '' && ${setVar} == '' ]]; then
+    if [[ ${optCall} == '' && ${setVar} == '' ]]; then
         echo 1>&2 'Must use at least one of --call or --var for rest argument.'
         return 1
     fi
 
-    if [[ ${callFunc} != '' ]]; then
+    if [[ ${optCall} != '' ]]; then
         # Re-form as the caller code.
-        callFunc="${callFunc}"' "$@" || return "$?"'
+        optCall="${optCall}"' "$@" || return "$?"'
     fi
 
     if [[ ${setVar} != '' ]]; then
@@ -677,7 +677,7 @@ function rest-arg {
     fi
 
     eval 'function _argproc:rest {
-        '"${callFunc}"'
+        '"${optCall}"'
         '"${setVar}"'
     }'
 }
