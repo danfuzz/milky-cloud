@@ -30,6 +30,8 @@ function usage {
         availability zone, only the region portion matters.
       --gateway=<id>
         ID of the gateway to remove. Must be specified.
+      --progress (--no-progress to disable)
+        Print progress messages to stderr.
 
     ${name} [--help | -h]
       Displays this message.
@@ -38,63 +40,19 @@ function usage {
     exit "$1"
 }
 
-# Error during argument processing?
-argError=0
+# Want help?
+opt-action --call=usage --value=0 help/h
 
 # Location (region or availability zone).
-inLocation=''
+opt-value --required --var=inLocation in
 
 # ID of the gateway.
-gatewayId=''
+opt-value --required --var=gatewayId --match='.+' gateway
 
-while (( $# > 0 )); do
-    case "$1" in
-        --in=?*)
-            inLocation="${1#*=}"
-            ;;
-        --name=?*)
-            name="${1#*=}"
-            ;;
-        --gateway=?*)
-            gatewayId="${1#*=}"
-            ;;
-        -h|--help)
-            argError=-1 # `-1` suppresses error exit after displaying usage.
-            break
-            ;;
-        --)
-            # Explicit end of options.
-            shift
-            break
-            ;;
-        -?*)
-            echo 1>&2 "Unknown option: $1"
-            argError=1
-            break
-            ;;
-        *)
-            # Non-option argument.
-            break
-            ;;
-    esac
+# Progress messages?
+opt-toggle --call=progress-msg-switch progress
 
-    shift
-done
-
-if (( !argError )); then
-    if [[ ${inLocation} == '' ]]; then
-        echo 1>&2 'Missing option: --in'
-        argError=1
-    fi
-    if [[ ${gatewayId} == '' ]]; then
-        echo 1>&2 'Missing option: --gateway'
-        argError=1
-    fi
-fi
-
-if (( argError )); then
-    usage "${argError}"
-fi
+process-args "$@" || usage "$?"
 
 
 #
@@ -155,7 +113,7 @@ fi
 error=0
 
 if (( hasIpv4Route )); then
-    echo 1>&2 'Deleting IPv4 route...'
+    progress-msg 'Deleting IPv4 route...'
     ec2-json delete-route \
         --in="${inRegion}" \
         rtId="${rtId}" \
@@ -167,7 +125,7 @@ if (( hasIpv4Route )); then
 fi
 
 if (( hasIpv6Route )); then
-    echo 1>&2 'Deleting IPv6 route...'
+    progress-msg 'Deleting IPv6 route...'
     ec2-json delete-route \
         --in="${inRegion}" \
         rtId="${rtId}" \
@@ -179,7 +137,7 @@ if (( hasIpv6Route )); then
 fi
 
 if (( attached )); then
-    echo 1>&2 'Detaching gateway...'
+    progress-msg 'Detaching gateway...'
     ec2-json detach-internet-gateway \
         --in="${inRegion}" \
         gatewayId="${gatewayId}" \
@@ -191,7 +149,7 @@ if (( attached )); then
     || error=1
 fi
 
-echo 1>&2 'Deleting gateway...'
+progress-msg 'Deleting gateway...'
 ec2-json delete-internet-gateway \
     --in="${inRegion}" \
     gatewayId="${gatewayId}" \
@@ -201,7 +159,7 @@ ec2-json delete-internet-gateway \
 if (( error )); then
     echo 1>&2 'Trouble with gateway deletion. May not be fully deleted. Alas!'
 else
-    echo 1>&2 'Done with gateway deletion.'
+    progress-msg 'Done with gateway deletion.'
 fi
 
 exit "${error}"

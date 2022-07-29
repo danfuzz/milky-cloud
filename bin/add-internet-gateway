@@ -190,7 +190,8 @@ fi
 
 if (( error )); then
     progress-msg 'Error(s) after gateway creation. Attempting cleanup!'
-    lib delete-internet-gateway --in="${inRegion}" --gateway="${gatewayId}"
+    lib delete-internet-gateway $(progress-msg-switch --print-option) \
+        --in="${inRegion}" --gateway="${gatewayId}"
     progress-msg 'Done with post-error gateway cleanup.'
     exit "${error}"
 fi
