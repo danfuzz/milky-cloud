@@ -117,36 +117,22 @@ function opt-action {
 function opt-choice {
     local optCall=''
     local optDefault=''
+    local optRequired=0
     local optVar=''
+    local args=("$@")
+    _argproc_janky-args call default required var \
+    || return 1
 
     local requiredName=''
     local requiredSetter=''
     local requiredError=''
 
-    while (( $# > 0 )); do
-        case "$1" in
-            --call=?*)
-                optCall="${1#*=}"
-                ;;
-            --default=*)
-                optDefault="${1#*=}"
-                ;;
-            --required)
-                requiredName='?' # Gets replaced with a valid long name.
-                ;;
-            --var=?*)
-                optVar="${1#*=}"
-                ;;
-            *)
-                # End of options / unrecognized option.
-                break
-                ;;
-        esac
-        shift
-    done
+    if (( optRequired )); then
+        # Gets replaced with a valid long name.
+        requiredName='?'
+    fi
 
-    local specs=("$@")
-    if (( ${#specs[@]} < 1 )); then
+    if (( ${#args[@]} < 1 )); then
         echo 1>&2 'Need at least one option spec for a choice.'
         return 1
     fi
@@ -168,7 +154,7 @@ function opt-choice {
     fi
 
     local s
-    for s in "${specs[@]}"; do
+    for s in "${args[@]}"; do
         if ! [[ ${s} =~ ^([a-zA-Z0-9][-a-zA-Z0-9]*)(/[a-zA-Z0-9])?(=(.*))?$ ]]; then
             echo 1>&2 "Invalid option spec: ${s}"
             return 1
@@ -705,7 +691,7 @@ function _argproc_janky-args {
             continue
         fi
 
-        if [[ ${a} =~ --(.+) ]]; then
+        if [[ ${a} =~ ^--. ]]; then
             if ! [[ ${a} =~ ^--([a-z]+)(=.*)?$ ]]; then
                 echo 1>&2 "Invalid option syntax: ${a}"
                 return 1
@@ -728,6 +714,11 @@ function _argproc_janky-args {
                 default)
                     [[ ${value} =~ ^=(.*)$ ]] \
                     && optDefault="${BASH_REMATCH[1]}" \
+                    || argError=1
+                    ;;
+                required)
+                    [[ ${value} == '' ]] \
+                    && optRequired=1 \
                     || argError=1
                     ;;
                 value)
