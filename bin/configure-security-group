@@ -35,12 +35,14 @@ function usage {
         What region to make the security group in. Must be specified. If
         specified as an availability zone, only the region portion matters.
       --name=<name>
-        Name _tag_ to add to the security group. This is particularly useful
-        when configuring a default security group.
+        Name tag to add to the security group and to all the added rules. If not
+        specified, it defaults to the name of the security group. This option is
+        particularly useful when configuring a default security group, whose
+        name is always just `default`.
       --security-group=<name-or-id>
         Name or ID of the security group to modify. Can also be a VPC ID,
         to indicate the default security group for that VPC.
-      --progress
+      --progress (--no-progress to disable)
         Print progress messages to stderr.
 
     ${name} [--help | -h]
@@ -50,69 +52,22 @@ function usage {
     exit "$1"
 }
 
-# Error during argument processing?
-argError=0
-
-# Name or ID of the security group.
-groupNameOrId=''
+# Want help?
+opt-action --call=usage --value=0 help/h
 
 # Location (region or availability zone).
-inLocation=''
+opt-value --required --var=inLocation in
 
-# Name tag to add.
-name=''
+# Name for the subnets.
+opt-value --var=name --match='.+' name
 
-while (( $# > 0 )); do
-    case "$1" in
-        --in=?*)
-            inLocation="${1#*=}"
-            ;;
-        --name=?*)
-            name="${1#*=}"
-            ;;
-        --progress)
-            progress-msg-switch --enable
-            ;;
-        --security-group=?*)
-            groupNameOrId="${1#*=}"
-            ;;
-        -h|--help)
-            argError=-1 # `-1` suppresses error exit after displaying usage.
-            break
-            ;;
-        --)
-            # Explicit end of options.
-            shift
-            break
-            ;;
-        -?*)
-            echo 1>&2 "Unknown option: $1"
-            argError=1
-            break
-            ;;
-        *)
-            # Non-option argument.
-            break
-            ;;
-    esac
+# Name or ID of the security group.
+opt-value --required --var=groupNameOrId --match='.+' security-group
 
-    shift
-done
+# Progress messages?
+opt-toggle --call=progress-msg-switch progress
 
-if (( !argError )); then
-    if [[ ${inLocation} == '' ]]; then
-        echo 1>&2 'Missing option: --in'
-        argError=1
-    fi
-    if [[ ${groupNameOrId} == '' ]]; then
-        echo 1>&2 'Missing option: --security-group'
-        argError=1
-    fi
-fi
-
-if (( argError )); then
-    usage "${argError}"
-fi
+process-args "$@" || usage "$?"
 
 
 #
@@ -129,7 +84,11 @@ groupInfo="$(
 || exit "$?"
 
 groupId="$(jget --raw "${groupInfo}" '.GroupId')"
-name="$(jget --raw "${groupInfo}" '.GroupName')"
+groupName="$(jget --raw "${groupInfo}" '.GroupName')"
+
+if [[ ${name} == '' ]]; then
+    name="${groupName}"
+fi
 
 progress-msg "Configuring security group ${groupId}..."
 
