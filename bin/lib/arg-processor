@@ -725,7 +725,7 @@ function _argproc:statements-from-args {
             # Explicit end of options.
             shift
             break
-        elif [[ ${arg} == '-' || ${arg} =~ ^[^-] ]]; then
+        elif [[ ${arg} == '' || ${arg} == '-' || ${arg} =~ ^[^-] ]]; then
             # Non-option argument.
             break
         elif [[ ${arg} =~ ^--([-a-zA-Z0-9]+)(=.*)?$ ]]; then
