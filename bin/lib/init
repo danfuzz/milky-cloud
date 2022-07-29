@@ -82,15 +82,9 @@ function lib {
 # Whether progress messages are enabled.
 _milky_cloud_progressEnabled=0
 
-# Prints a "progress" message to stderr, if such are enabled. Or, if a single
-# recognized option is passed, performs that action. (Hopefully, you never just
-# want to say those as a message!)
-#
-# --disable | --set=0 -- Disables progress messages.
-# --enable | --set=1` -- Enables progress messages.
-# --print-option -- Prints `--progress` to stdout, if progress messages are
-#   enabled. (This is to make it easy to pass this option down to another
-#   command.)
+# Prints a "progress" message to stderr, if such are enabled. Use
+# `progress-msg-switch` to change or check the enabled status of progress
+# messages.
 function progress-msg {
     if (( $# == 1 )); then
         case "$1" in
