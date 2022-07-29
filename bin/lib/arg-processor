@@ -727,7 +727,6 @@ function _argproc_janky-args {
     :
 }
 
-
 # Builds up a list of statements to evaluate, based on the given arguments. It
 # is stored in the variable `_argproc_statements`, which is assumed to be
 # declared by its caller.
