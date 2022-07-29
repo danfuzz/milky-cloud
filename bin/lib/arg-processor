@@ -779,7 +779,7 @@ function _argproc_janky-args {
             # Explicit end of options.
             args=()
             optsDone=1
-        elif [[ (${a} == '-') || (${a:0:0} != '-') ]]; then
+        elif [[ (${a} == '-') || (${a:0:1} != '-') ]]; then
             # Non-option argument.
             args=("${a}")
             optsDone=1
