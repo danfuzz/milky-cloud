@@ -55,36 +55,7 @@ function opt-action {
     _argproc_janky-args call default value var \
     || return 1
 
-    # TODO: Convert the rest of this to deal with the new args stuff.
-
-    local callFunc=''
-    local defaultValue=0
-    local setVar=''
-    local value='1'
-
-    while (( $# > 0 )); do
-        case "$1" in
-            --call=?*)
-                callFunc="${1#*=}"
-                ;;
-            --default=*)
-                defaultValue="${1#*=}"
-                ;;
-            --value=*)
-                value="${1#*=}"
-                ;;
-            --var=?*)
-                setVar="${1#*=}"
-                ;;
-            *)
-                # End of options / unrecognized option.
-                break
-                ;;
-        esac
-        shift
-    done
-
-    local name="$1"
+    local name="${args[0]}"
 
     if ! [[ ${name} =~ ^([a-zA-Z0-9][-a-zA-Z0-9]*)(/[a-zA-Z0-9])?$ ]]; then
         echo 1>&2 "Invalid option spec: ${name}"
@@ -94,20 +65,20 @@ function opt-action {
     name="${BASH_REMATCH[1]}"
     local abbrev="${BASH_REMATCH[2]:1}" # `:1` to drop the slash.
 
-    if [[ ${callFunc} == '' && ${setVar} == '' ]]; then
+    if [[ ${optCall} == '' && ${optSet} == '' ]]; then
         echo 1>&2 "Must use at least one of --call or --var for option: ${name}."
         return 1
     fi
 
-    if [[ ${callFunc} != '' ]]; then
+    if [[ ${optCall} != '' ]]; then
         # Re-form as the caller code.
-        callFunc="${callFunc} $(_argproc:quote "${value}")"' || return "$?"'
+        optCall="${optCall} $(_argproc:quote "${optValue}")"' || return "$?"'
     fi
 
-    if [[ ${setVar} != '' ]]; then
+    if [[ ${optSet} != '' ]]; then
         # Set up the default initializer, and then re-form as the setter code.
-        _argproc_initStatements+=("${setVar}=$(_argproc:quote "${defaultValue}")")
-        setVar="${setVar}=$(_argproc:quote "${value}")"
+        _argproc_initStatements+=("${optSet}=$(_argproc:quote "${optDefault}")")
+        optSet="${optSet}=$(_argproc:quote "${optValue}")"
     fi
 
     eval 'function _argproc:long-'"${name}"' {
@@ -116,8 +87,8 @@ function opt-action {
             return 1
         fi
 
-        '"${callFunc}"'
-        '"${setVar}"'
+        '"${optCall}"'
+        '"${optSet}"'
     }'
 
     if [[ ${abbrev} != '' ]]; then
