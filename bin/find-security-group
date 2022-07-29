@@ -33,6 +33,8 @@ function usage {
         zone, only the region portion matters.
       --print-all
         Print the full info object, not just the ID.
+      --print-id
+        Print the ID of the security group. This is the default.
 
     ${name} [--help | -h]
       Displays this message.
@@ -41,64 +43,19 @@ function usage {
     exit "$1"
 }
 
-# Error during argument processing?
-argError=0
+# Want help?
+opt-action --call=usage --value=0 help/h
 
 # Location (region or availability zone).
-inLocation=''
+opt-value --required --var=inLocation in
 
-# Print full object?
-printAll=0
+# What to print.
+opt-choice --var=outputStyle --default=print-id print-all print-id
 
-while (( $# > 0 )); do
-    case "$1" in
-        --in=?*)
-            inLocation="${1#*=}"
-            ;;
-        -h|--help)
-            argError=-1 # `-1` suppresses error exit after displaying usage.
-            break
-            ;;
-        --print-all)
-            printAll=1
-            ;;
-        --)
-            # Explicit end of options.
-            shift
-            break
-            ;;
-        -?*)
-            echo 1>&2 "Unknown option: $1"
-            argError=1
-            break
-            ;;
-        *)
-            # Non-option argument.
-            break
-            ;;
-    esac
+# Name or ID to look up.
+positional-arg --var=nameOrId name-or-id
 
-    shift
-done
-
-if (( !argError && ($# < 1) )); then
-    echo 1>&2 'Missing argument: name or ID'
-    argError=1
-else
-    nameOrId="$1"
-    shift
-fi
-
-if (( !argError )); then
-    if [[ ${inLocation} == '' ]]; then
-        echo 1>&2 'Missing option: --in'
-        argError=1
-    fi
-fi
-
-if (( argError )); then
-    usage "${argError}"
-fi
+process-args "$@" || usage "$?"
 
 
 #
@@ -148,7 +105,7 @@ elif (( count != 1 )); then
     exit 1
 fi
 
-if (( printAll )); then
+if [[ ${outputStyle} == 'print-all' ]]; then
     jget "${result}" '.group'
 else
     jget --raw "${result}" '.group.GroupId'

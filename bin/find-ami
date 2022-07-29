@@ -46,61 +46,16 @@ function usage {
     exit "$1"
 }
 
-# Error during argument processing?
-argError=0
-
-# Instance type.
-instanceType=''
+# Want help?
+opt-action --call=usage --value=0 help/h
 
 # Location (availability zone).
-inLocation=''
+opt-value --required --var=inLocation in
 
-while (( $# > 0 )); do
-    case "$1" in
-        --in=?*)
-            inLocation="${1#*=}"
-            ;;
-        --instance-type=?*)
-            instanceType="${1#*=}"
-            ;;
-        -h|--help)
-            argError=-1 # `-1` suppresses error exit after displaying usage.
-            break
-            ;;
-        --)
-            # Explicit end of options.
-            shift
-            break
-            ;;
-        -?*)
-            echo 1>&2 "Unknown option: $1"
-            argError=1
-            break
-            ;;
-        *)
-            # Non-option argument.
-            break
-            ;;
-    esac
+# Instance type.
+opt-value --required --var=instanceType instance-type
 
-    shift
-done
-
-if (( !argError )); then
-    if [[ ${inLocation} == '' ]]; then
-        echo 1>&2 'Missing option: --in'
-        argError=1
-    fi
-
-    if [[ ${instanceType} == '' ]]; then
-        echo 1>&2 'Missing option: --instance-type'
-        argError=1
-    fi
-fi
-
-if (( argError )); then
-    usage "${argError}"
-fi
+process-args "$@" || usage "$?"
 
 
 #

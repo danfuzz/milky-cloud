@@ -26,11 +26,13 @@ function usage {
       of one by ID. On success, prints the VPC ID (by default) or the
       full VPC info object.
 
-      --print-all
-        Print the full info object, not just the ID.
       --in=<region-or-zone>
         Where to look. Must be specified. If specified as an availability
         zone, only the region portion matters.
+      --print-all
+        Print the full info object, not just the ID.
+      --print-id
+        Print the ID of the VPC. This is the default.
 
     ${name} [--help | -h]
       Displays this message.
@@ -39,64 +41,19 @@ function usage {
     exit "$1"
 }
 
-# Error during argument processing?
-argError=0
+# Want help?
+opt-action --call=usage --value=0 help/h
 
 # Location (region or availability zone).
-inLocation=''
+opt-value --required --var=inLocation in
 
-# Print full object?
-printAll=0
+# What to print.
+opt-choice --var=outputStyle --default=print-id print-all print-id
 
-while (( $# > 0 )); do
-    case "$1" in
-        --in=?*)
-            inLocation="${1#*=}"
-            ;;
-        --print-all)
-            printAll=1
-            ;;
-        -h|--help)
-            argError=-1 # `-1` suppresses error exit after displaying usage.
-            break
-            ;;
-        --)
-            # Explicit end of options.
-            shift
-            break
-            ;;
-        -?*)
-            echo 1>&2 "Unknown option: $1"
-            argError=1
-            break
-            ;;
-        *)
-            # Non-option argument.
-            break
-            ;;
-    esac
+# Name or ID to look up.
+positional-arg --var=nameOrId name-or-id
 
-    shift
-done
-
-if (( $# < 1 )); then
-    echo 1>&2 'Missing argument: name or ID'
-    argError=1
-else
-    nameOrId="$1"
-    shift
-fi
-
-if (( !argError )); then
-    if [[ ${inLocation} == '' ]]; then
-        echo 1>&2 'Missing option: --in'
-        argError=1
-    fi
-fi
-
-if (( argError )); then
-    usage "${argError}"
-fi
+process-args "$@" || usage "$?"
 
 
 #
@@ -112,6 +69,7 @@ function do-find {
     local topKey="$2"
     local filterName="$3"
     local nameOrId="$4"
+    local printAll="$5"
 
     local result
     result="$(ec2-json "${commandName}" \
@@ -170,15 +128,18 @@ function do-find {
 function find-via-describe-vpcs {
     local filterName="$1"
     local nameOrId="$2"
+    local printAll="$3"
 
-    do-find describe-vpcs Vpcs "${filterName}" "${nameOrId}"
+    do-find describe-vpcs Vpcs "${filterName}" "${nameOrId}" "${printAll}"
 }
 
 # Find a VPC from an associated security group.
 function find-via-describe-security-groups {
     local nameOrId="$1"
+    local printAll="$2"
 
-    do-find describe-security-groups SecurityGroups group-id "${nameOrId}"
+    do-find describe-security-groups SecurityGroups group-id "${nameOrId}" \
+        "${printAll}"
 }
 
 
@@ -189,13 +150,18 @@ function find-via-describe-security-groups {
 inRegion="$(lib region-from-location "${inLocation}")" \
 || exit "$?"
 
+printAll=0
+if [[ ${outputStyle} == 'print-all' ]]; then
+    printAll=1
+fi
+
 if [[ ${nameOrId} =~ ^vpc- ]]; then
     # It looks like an ID.
-    find-via-describe-vpcs 'vpc-id' "${nameOrId}"
+    find-via-describe-vpcs 'vpc-id' "${nameOrId}" "${printAll}"
 elif [[ ${nameOrId} =~ ^sg- ]]; then
     # It looks like a security group ID.
-    find-via-describe-security-groups "${nameOrId}"
+    find-via-describe-security-groups "${nameOrId}" "${printAll}"
 else
     # It's expected to be a name.
-    find-via-describe-vpcs 'tag:Name' "${nameOrId}"
+    find-via-describe-vpcs 'tag:Name' "${nameOrId}" "${printAll}"
 fi
