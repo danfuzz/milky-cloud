@@ -229,6 +229,10 @@ function opt-toggle {
     local optCall=''
     local optVar=''
 
+    ################################
+    ################################ CONVERT THIS ONE NEXT TO janky-args
+    ################################
+
     while (( $# > 0 )); do
         case "$1" in
             --call=?*)
@@ -681,7 +685,7 @@ function rest-arg {
 # caller) contains all the arguments, which gets updates by this function.
 function _argproc_janky-args {
     local argError=0
-    local argSpecs=" $* "
+    local argSpecs=" $* " # Spaces on the ends to make the match code work.
     local optsDone=0
     local a
 
