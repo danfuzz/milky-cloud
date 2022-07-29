@@ -296,7 +296,7 @@ function opt-toggle {
 
     if [[ ${callFunc} != '' ]]; then
         # Re-form as the caller code.
-        callFunc="${callFunc}"' "${value}" || return "$?"'
+        callFunc="${callFunc}"' "$1" || return "$?"'
     fi
 
     if [[ ${setVar} != '' ]]; then
