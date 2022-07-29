@@ -37,18 +37,7 @@ function usage {
 opt-action --call=usage --value=0 help/h
 
 # Suffix text.
-suffix=''
-rest-arg --call=parse-rest
-function parse-rest {
-    if (( $# < 1 )); then
-        return
-    elif (( $# > 1 )); then
-        echo 1>&2 'Too many arguments.'
-        return 1
-    fi
-
-    suffix="$1"
-}
+positional-arg --var=suffix --match='[-_:./a-zA-Z0-9]+' suffix
 
 process-args "$@" || usage "$?"
 

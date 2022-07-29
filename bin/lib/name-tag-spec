@@ -47,24 +47,10 @@ opt-action --call=usage --value=0 help/h
 opt-choice --var=outputStyle --default=json compact json
 
 # Resource type.
-resourceType=''
+positional-arg --required --var=resourceType --match='[-a-z0-9]+' resource-type
 
 # Name for the resource.
-name=''
-
-rest-arg --call=parse-rest
-function parse-rest {
-    if (( $# < 2 )); then
-        echo 1>&2 'Missing argument: resource type and/or name'
-        return 1
-    elif (( $# > 2 )); then
-        echo 1>&2 'Too many arguments.'
-        return 1
-    fi
-
-    resourceType="$1"
-    name="$2"
-}
+positional-arg --required --var=name --match='.+' name
 
 process-args "$@" || usage "$?"
 

@@ -35,19 +35,7 @@ function usage {
 opt-action --call=usage --value=0 help/h
 
 # JSON value.
-rest-arg --call=parse-rest
-value=''
-function parse-rest {
-    if (( $# < 1 )); then
-        echo 1>&2 'Missing argument: <json-value>'
-        return 1
-    elif (( $# > 1 )); then
-        echo 1>&2 'Too many arguments.'
-        return 1
-    fi
-
-    value="$1"
-}
+positional-arg --required --var=value json-value
 
 process-args "$@" || usage "$?"
 

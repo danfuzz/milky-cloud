@@ -34,19 +34,7 @@ function usage {
 opt-action --call=usage --value=0 help/h
 
 # Location (availability zone or region).
-inLocation=''
-rest-arg --call=parse-rest
-function parse-rest {
-    if (( $# < 1 )); then
-        echo 1>&2 'Missing argument: <zone-or-region>'
-        return 1
-    elif (( $# > 1 )); then
-        echo 1>&2 'Too many arguments.'
-        return 1
-    fi
-
-    inLocation="$1"
-}
+positional-arg --required --var=inLocation zone-or-region
 
 process-args "$@" || usage "$?"
 

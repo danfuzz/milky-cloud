@@ -46,39 +46,10 @@ opt-action --call=usage --value=0 help/h
 opt-choice --var=outputStyle --default=json compact json
 
 # Protocol.
-protocol=''
+positional-arg --required --var=protocol --match='all|tcp|udp' protocol
 
 # Port.
-port=''
-
-rest-arg --call=parse-spec
-function parse-spec {
-    if (( $# < 2 )); then
-        echo 1>&2 'Missing argument: protocol and/or port'
-        return 1
-    elif (( $# > 2 )); then
-        echo 1>&2 'Too many arguments.'
-        return 1
-    fi
-
-    protocol="$1"
-    port="$2"
-
-    case "${protocol}" in
-        all|tcp|udp)
-            : # It's valid.
-            ;;
-        *)
-            echo 1>&2 "Invalid value for protocol: ${protocol}"
-            return 1
-            ;;
-    esac
-
-    if [[ ${port} != 'all' && ! ${port} =~ ^[0-9]+$ ]]; then
-        echo 1>&2 "Invalid value for port: ${port}"
-        return 1
-    fi
-}
+positional-arg --required --var=port --match='[0-9]+|all' port
 
 process-args "$@" || usage "$?"
 
