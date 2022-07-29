@@ -58,7 +58,7 @@ opt-action --call=usage --value=0 help/h
 # Location (region or availability zone).
 opt-value --required --var=inLocation in
 
-# Name for the subnets.
+# Name for the security group.
 opt-value --var=name --match='.+' name
 
 # Name or ID of the security group.
