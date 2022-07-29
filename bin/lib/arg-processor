@@ -338,7 +338,7 @@ function opt-toggle {
 function opt-value {
     local optCall=''
     local optDefault=''
-    local match=''
+    local optMatch=''
     local optVar=''
     local optRequired=0
     local requiredSetter=''
@@ -352,7 +352,7 @@ function opt-value {
                 optDefault="${1#*=}"
                 ;;
             --match=?*)
-                match="${1#*=}"
+                optMatch="${1#*=}"
                 ;;
             --required)
                 optRequired=1
@@ -391,10 +391,10 @@ function opt-value {
         optVar="${optVar}"'="$1"'
     fi
 
-    if [[ ${match} != '' ]]; then
+    if [[ ${optMatch} != '' ]]; then
         # Re-form as the clause to insert to perform the check.
-        match='
-            elif ! [[ $1 =~ ^('"${match}"')$ ]]; then
+        optMatch='
+            elif ! [[ $1 =~ ^('"${optMatch}"')$ ]]; then
                 echo 1>&2 "Invalid value for option: --'"${name}"'"
                 echo 1>&2 "Value: $1"
                 return 1'
@@ -417,7 +417,7 @@ function opt-value {
         if (( $# < 1 )); then
             echo 1>&2 "Value required for option: --'"${name}"'"
             return 1
-        '"${match}"'
+        '"${optMatch}"'
         fi
 
         '"${optCall}"'
@@ -443,7 +443,7 @@ function opt-value {
 function positional-arg {
     local optCall=''
     local optDefault=''
-    local match=''
+    local optMatch=''
     local optVar=''
     local optRequired=0
     local ifMissing=''
@@ -457,7 +457,7 @@ function positional-arg {
                 optDefault="${1#*=}"
                 ;;
             --match=?*)
-                match="${1#*=}"
+                optMatch="${1#*=}"
                 ;;
             --required)
                 optRequired=1
@@ -496,10 +496,10 @@ function positional-arg {
         optVar="${optVar}"'="$1"'
     fi
 
-    if [[ ${match} != '' ]]; then
+    if [[ ${optMatch} != '' ]]; then
         # Re-form as the clause to insert to perform the check.
-        match='
-            elif ! [[ $1 =~ ^('"${match}"')$ ]]; then
+        optMatch='
+            elif ! [[ $1 =~ ^('"${optMatch}"')$ ]]; then
                 echo 1>&2 "Invalid value for argument <'"${name}"'>."
                 echo 1>&2 "Value: $1"
                 return 1'
@@ -517,7 +517,7 @@ function positional-arg {
     eval 'function _argproc:positional-'"${name}"' {
         if (( $# < 1 )); then
             '"${ifMissing}"'
-        '"${match}"'
+        '"${optMatch}"'
         fi
 
         '"${optCall}"'
