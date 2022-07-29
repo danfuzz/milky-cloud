@@ -32,13 +32,13 @@ function usage {
       --in=<availability-zone>
         Where to launch.
       --instance-type=<type>
-        What type of instance to install.
+        What type of instance to install. Defaults to `t3.nano`, for convenience.
       --key-name=<name>
         Name of the keypair to use for SSH access. If not specified, then
         something else will have to have set up SSH access (e.g. the user
         data script, or something baked into the AMI).
       --name=<name>
-        Name (label) for the resulting instance.
+        Name tag for the resulting instance.
       --security-group=<name-or-id>
         Name or ID of the security group to use for network access control.
         If specified, this is used to derive the VPC to use, and in conjunction
@@ -65,94 +65,43 @@ function usage {
     exit "$1"
 }
 
-# Error during argument processing?
-argError=0
+# Want help?
+opt-action --call=usage --value=0 help/h
 
-# Security group to use (name or id), if any.
-groupNameOrId=''
-
-# Location (availability zone).
-inLocation='us-west-2a'
+# Location (region or availability zone).
+opt-value --required --var=inLocation in
 
 # Instance type.
-instanceType='t3.nano'
+opt-value --var=instanceType --default='t3.nano' instance-type
 
 # Name for the SSH keypair that allows for login access.
-keyName=''
+opt-value --var=keyName --match='.*' key-name
 
-# Name for the resulting instance.
-name=''
+# Name for the instance.
+opt-value --var=name --match='.+' name
+
+# Name or ID of the security group to be in.
+opt-value --var=groupNameOrId --match='.+' security-group
 
 # Actual user data (first-boot script).
-userData=''
+opt-value --var=userData --match='.*' user-data
 
 # Name of file containing user data.
-userDataFile=''
+opt-value --var=userDataFile --match='.*' user-data-file
 
-# Name or ID of VPC to use, if any.
-vpcNameOrId=''
+# Name or ID of the VPC to be in.
+opt-value --var=vpcNameOrId --match='.+' vpc
 
-while (( $# > 0 )); do
-    case "$1" in
-        --in=?*)
-            inLocation="${1#*=}"
-            ;;
-        --instance-type=?*)
-            instanceType="${1#*=}"
-            ;;
-        --key-name=?*)
-            keyName="${1#*=}"
-            ;;
-        --name=?*)
-            name="${1#*=}"
-            ;;
-        --security-group=?*)
-            groupNameOrId="${1#*=}"
-            ;;
-        --user-data=?*)
-            userData="${1#*=}"
-            ;;
-        --user-data-file=?*)
-            userDataFile="${1#*=}"
-            ;;
-        --vpc=?*)
-            vpcNameOrId="${1#*=}"
-            ;;
-        -h|--help)
-            argError=-1 # `-1` suppresses error exit after displaying usage.
-            break
-            ;;
-        --)
-            # Explicit end of options.
-            shift
-            break
-            ;;
-        -?*)
-            echo 1>&2 "Unknown option: $1"
-            argError=1
-            break
-            ;;
-        *)
-            # Non-option argument.
-            break
-            ;;
-    esac
+process-args "$@" || usage "$?"
 
-    shift
-done
-
-if (( !argError )) && [[ (${userData} != '') && (${userDataFile} != '') ]]; then
+if [[ (${userData} != '') && (${userDataFile} != '') ]]; then
     echo 1>&2 'Cannot specify both --user-data and --user-data-file.'
-    argError=1
+    exit 1
 fi
 
-if (( !argError )) && [[ (${groupNameOrId} != '') && (${vpc} != '') ]]; then
+if [[ (${groupNameOrId} != '') && (${vpc} != '') ]]; then
     echo 1>&2 'Cannot specify both --security-group and --vpc.'
-    argError=1
-fi
-
-if (( argError )); then
-    usage "${argError}"
+    exit 1
 fi
 
 
