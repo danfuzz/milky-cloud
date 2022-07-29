@@ -750,7 +750,7 @@ function _argproc_janky-args {
 
             case "${name}" in
                 call)
-                    [[ ${value} =~ ^=([-_a-zA-Z0-9]+)$ ]] \
+                    [[ ${value} =~ ^=([-_a-zA-Z][-_a-zA-Z0-9]*)$ ]] \
                     && optCall="${BASH_REMATCH[1]}" \
                     || argError=1
                     ;;
@@ -765,7 +765,7 @@ function _argproc_janky-args {
                     || argError=1
                     ;;
                 var)
-                    [[ ${value} =~ ^=([_a-zA-Z0-9]+)$ ]] \
+                    [[ ${value} =~ ^=([_a-zA-Z][_a-zA-Z0-9]*)$ ]] \
                     && optVar="${BASH_REMATCH[1]}" \
                     || argError=1
                     ;;
