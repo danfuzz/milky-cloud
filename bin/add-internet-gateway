@@ -54,7 +54,7 @@ opt-value --required --var=inLocation in
 opt-value --var=name --match='.+' name
 
 # Progress messages?
-opt-toggle --call=progress-msg-toggle progress
+opt-toggle --call=progress-msg-switch progress
 
 # Name or ID of the VPC.
 opt-value --required --var=vpcNameOrId --match='.+' vpc

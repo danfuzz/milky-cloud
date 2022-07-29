@@ -68,7 +68,7 @@ while (( $# > 0 )); do
             nameTag="${1#*=}"
             ;;
         --progress)
-            progress-msg --enable
+            progress-msg-switch --enable
             ;;
         --security-group=?*)
             groupNameOrId="${1#*=}"

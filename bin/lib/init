@@ -124,7 +124,7 @@ function progress-msg {
 #   enabled. (This is to make it easy to pass this option down to another
 #   command.)
 # --status -- Prints `1` or `0` to stdout, to indicate enabled status.
-function progress-msg-toggle {
+function progress-msg-switch {
     case "$1" in
         --enable|1)
             _milky_cloud_progressEnabled=1

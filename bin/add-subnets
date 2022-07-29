@@ -70,7 +70,7 @@ while (( $# > 0 )); do
             name="${1#*=}"
             ;;
         --progress)
-            progress-msg --enable
+            progress-msg-switch --enable
             ;;
         --quiet)
             quiet=1
@@ -180,7 +180,7 @@ fi
 
 tagSpec="$(lib name-tag-spec 'subnet' "${name}")"
 
-progressArg=($(progress-msg --print-option))
+progressArg=($(progress-msg-switch --print-option))
 
 results=()
 error=0

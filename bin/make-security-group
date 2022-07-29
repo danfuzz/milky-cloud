@@ -75,7 +75,7 @@ while (( $# > 0 )); do
             name="${1#*=}"
             ;;
         --progress)
-            progress-msg --enable
+            progress-msg-switch --enable
             ;;
         --vpc=?*)
             vpcNameOrId="${1#*=}"
@@ -195,7 +195,7 @@ progress-msg "  name: ${name}"
 
 error=0
 
-progressArg=($(progress-msg --print-option))
+progressArg=($(progress-msg-switch --print-option))
 lib configure-security-group \
     "${progressArg[@]}" \
     --in="${inRegion}" --security-group="${groupId}" \
