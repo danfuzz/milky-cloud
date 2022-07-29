@@ -117,7 +117,7 @@ function opt-action {
 function opt-choice {
     local optCall=''
     local defaultValue=''
-    local setVar=''
+    local optVar=''
 
     local requiredName=''
     local requiredSetter=''
@@ -135,7 +135,7 @@ function opt-choice {
                 requiredName='?' # Gets replaced with a valid long name.
                 ;;
             --var=?*)
-                setVar="${1#*=}"
+                optVar="${1#*=}"
                 ;;
             *)
                 # End of options / unrecognized option.
@@ -151,7 +151,7 @@ function opt-choice {
         return 1
     fi
 
-    if [[ ${optCall} == '' && ${setVar} == '' ]]; then
+    if [[ ${optCall} == '' && ${optVar} == '' ]]; then
         echo 1>&2 "Must use at least one of --call or --var for option: ${name}."
         return 1
     fi
@@ -161,10 +161,10 @@ function opt-choice {
         optCall="${optCall}"' "${_approc_value}" || return "$?"'
     fi
 
-    if [[ ${setVar} != '' ]]; then
+    if [[ ${optVar} != '' ]]; then
         # Set up the default initializer, and then re-form as the setter code.
-        _argproc_initStatements+=("${setVar}=$(_argproc:quote "${defaultValue}")")
-        setVar="${setVar}"'="${_argproc_value}"'
+        _argproc_initStatements+=("${optVar}=$(_argproc:quote "${defaultValue}")")
+        optVar="${optVar}"'="${_argproc_value}"'
     fi
 
     local s
@@ -206,7 +206,7 @@ function opt-choice {
 
             local _argproc_value='"${value}"'
             '"${optCall}"'
-            '"${setVar}"'
+            '"${optVar}"'
             '"${requiredSetter}"'
         }'
 
@@ -241,7 +241,7 @@ function opt-choice {
 #   defauled to `0` at the start of argument processing.
 function opt-toggle {
     local optCall=''
-    local setVar=''
+    local optVar=''
 
     while (( $# > 0 )); do
         case "$1" in
@@ -249,7 +249,7 @@ function opt-toggle {
                 optCall="${1#*=}"
                 ;;
             --var=?*)
-                setVar="${1#*=}"
+                optVar="${1#*=}"
                 ;;
             *)
                 # End of options / unrecognized option.
@@ -270,7 +270,7 @@ function opt-toggle {
     local abbrevOn="${BASH_REMATCH[2]:1}"  # `:1` to drop the slash.
     local abbrevOff="${BASH_REMATCH[3]:1}" # Likewise.
 
-    if [[ ${optCall} == '' && ${setVar} == '' ]]; then
+    if [[ ${optCall} == '' && ${optVar} == '' ]]; then
         echo 1>&2 "Must use at least one of --call or --var for option: ${name}."
         return 1
     fi
@@ -280,10 +280,10 @@ function opt-toggle {
         optCall="${optCall}"' "$1" || return "$?"'
     fi
 
-    if [[ ${setVar} != '' ]]; then
+    if [[ ${optVar} != '' ]]; then
         # Set up the default initializer, and then re-form as the setter code.
-        _argproc_initStatements+=("${setVar}=0")
-        setVar="${setVar}"'="$1"'
+        _argproc_initStatements+=("${optVar}=0")
+        optVar="${optVar}"'="$1"'
     fi
 
     eval '
@@ -294,7 +294,7 @@ function opt-toggle {
             fi
 
             '"${optCall}"'
-            '"${setVar}"'
+            '"${optVar}"'
         }
 
         function _argproc:long-'"${name}"' {
@@ -339,7 +339,7 @@ function opt-value {
     local optCall=''
     local defaultValue=''
     local match=''
-    local setVar=''
+    local optVar=''
     local required=0
     local requiredSetter=''
 
@@ -358,7 +358,7 @@ function opt-value {
                 required=1
                 ;;
             --var=?*)
-                setVar="${1#*=}"
+                optVar="${1#*=}"
                 ;;
             *)
                 # End of options / unrecognized option.
@@ -375,7 +375,7 @@ function opt-value {
         return 1
     fi
 
-    if [[ ${optCall} == '' && ${setVar} == '' ]]; then
+    if [[ ${optCall} == '' && ${optVar} == '' ]]; then
         echo 1>&2 "Must use at least one of --call or --var for option: ${name}."
         return 1
     fi
@@ -385,10 +385,10 @@ function opt-value {
         optCall="${optCall}"' "${value}" || return "$?"'
     fi
 
-    if [[ ${setVar} != '' ]]; then
+    if [[ ${optVar} != '' ]]; then
         # Set up the default initializer, and then re-form as the setter code.
-        _argproc_initStatements+=("${setVar}=$(_argproc:quote "${defaultValue}")")
-        setVar="${setVar}"'="$1"'
+        _argproc_initStatements+=("${optVar}=$(_argproc:quote "${defaultValue}")")
+        optVar="${optVar}"'="$1"'
     fi
 
     if [[ ${match} != '' ]]; then
@@ -421,7 +421,7 @@ function opt-value {
         fi
 
         '"${optCall}"'
-        '"${setVar}"'
+        '"${optVar}"'
         '"${requiredSetter}"'
     }'
 }
@@ -444,7 +444,7 @@ function positional-arg {
     local optCall=''
     local defaultValue=''
     local match=''
-    local setVar=''
+    local optVar=''
     local required=0
     local ifMissing=''
 
@@ -463,7 +463,7 @@ function positional-arg {
                 required=1
                 ;;
             --var=?*)
-                setVar="${1#*=}"
+                optVar="${1#*=}"
                 ;;
             *)
                 # End of options / unrecognized option.
@@ -480,7 +480,7 @@ function positional-arg {
         return 1
     fi
 
-    if [[ ${optCall} == '' && ${setVar} == '' ]]; then
+    if [[ ${optCall} == '' && ${optVar} == '' ]]; then
         echo 1>&2 "Must use at least one of --call or --var for argument: ${name}."
         return 1
     fi
@@ -490,10 +490,10 @@ function positional-arg {
         optCall="${optCall}"' "${value}" || return "$?"'
     fi
 
-    if [[ ${setVar} != '' ]]; then
+    if [[ ${optVar} != '' ]]; then
         # Set up the default initializer, and then re-form as the setter code.
-        _argproc_initStatements+=("${setVar}=$(_argproc:quote "${defaultValue}")")
-        setVar="${setVar}"'="$1"'
+        _argproc_initStatements+=("${optVar}=$(_argproc:quote "${defaultValue}")")
+        optVar="${optVar}"'="$1"'
     fi
 
     if [[ ${match} != '' ]]; then
@@ -521,7 +521,7 @@ function positional-arg {
         fi
 
         '"${optCall}"'
-        '"${setVar}"'
+        '"${optVar}"'
     }'
 
     _argproc_positionalFuncs+=("_argproc:positional-${name}")
@@ -642,7 +642,7 @@ function process-args {
 #   array at the start of argument processing.
 function rest-arg {
     local optCall=''
-    local setVar=''
+    local optVar=''
 
     while (( $# > 0 )); do
         case "$1" in
@@ -650,7 +650,7 @@ function rest-arg {
                 optCall="${1#*=}"
                 ;;
             --var=?*)
-                setVar="${1#*=}"
+                optVar="${1#*=}"
                 ;;
             *)
                 # End of options / unrecognized option.
@@ -660,7 +660,7 @@ function rest-arg {
         shift
     done
 
-    if [[ ${optCall} == '' && ${setVar} == '' ]]; then
+    if [[ ${optCall} == '' && ${optVar} == '' ]]; then
         echo 1>&2 'Must use at least one of --call or --var for rest argument.'
         return 1
     fi
@@ -670,15 +670,15 @@ function rest-arg {
         optCall="${optCall}"' "$@" || return "$?"'
     fi
 
-    if [[ ${setVar} != '' ]]; then
+    if [[ ${optVar} != '' ]]; then
         # Set up the default initializer, and then re-form as the setter code.
-        _argproc_initStatements+=("${setVar}=()")
-        setVar="${setVar}"'=("$@")'
+        _argproc_initStatements+=("${optVar}=()")
+        optVar="${optVar}"'=("$@")'
     fi
 
     eval 'function _argproc:rest {
         '"${optCall}"'
-        '"${setVar}"'
+        '"${optVar}"'
     }'
 }
 
