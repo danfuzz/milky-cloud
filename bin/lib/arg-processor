@@ -116,7 +116,7 @@ function opt-action {
 #   be defaulted at the start of argument processing.
 function opt-choice {
     local optCall=''
-    local defaultValue=''
+    local optDefault=''
     local optVar=''
 
     local requiredName=''
@@ -129,7 +129,7 @@ function opt-choice {
                 optCall="${1#*=}"
                 ;;
             --default=*)
-                defaultValue="${1#*=}"
+                optDefault="${1#*=}"
                 ;;
             --required)
                 requiredName='?' # Gets replaced with a valid long name.
@@ -163,7 +163,7 @@ function opt-choice {
 
     if [[ ${optVar} != '' ]]; then
         # Set up the default initializer, and then re-form as the setter code.
-        _argproc_initStatements+=("${optVar}=$(_argproc:quote "${defaultValue}")")
+        _argproc_initStatements+=("${optVar}=$(_argproc:quote "${optDefault}")")
         optVar="${optVar}"'="${_argproc_value}"'
     fi
 
@@ -337,7 +337,7 @@ function opt-toggle {
 #   argument processing.
 function opt-value {
     local optCall=''
-    local defaultValue=''
+    local optDefault=''
     local match=''
     local optVar=''
     local required=0
@@ -349,7 +349,7 @@ function opt-value {
                 optCall="${1#*=}"
                 ;;
             --default=*)
-                defaultValue="${1#*=}"
+                optDefault="${1#*=}"
                 ;;
             --match=?*)
                 match="${1#*=}"
@@ -387,7 +387,7 @@ function opt-value {
 
     if [[ ${optVar} != '' ]]; then
         # Set up the default initializer, and then re-form as the setter code.
-        _argproc_initStatements+=("${optVar}=$(_argproc:quote "${defaultValue}")")
+        _argproc_initStatements+=("${optVar}=$(_argproc:quote "${optDefault}")")
         optVar="${optVar}"'="$1"'
     fi
 
@@ -442,7 +442,7 @@ function opt-value {
 #   causes the variable to be initialized at the start of argument processing.
 function positional-arg {
     local optCall=''
-    local defaultValue=''
+    local optDefault=''
     local match=''
     local optVar=''
     local required=0
@@ -454,7 +454,7 @@ function positional-arg {
                 optCall="${1#*=}"
                 ;;
             --default=*)
-                defaultValue="${1#*=}"
+                optDefault="${1#*=}"
                 ;;
             --match=?*)
                 match="${1#*=}"
@@ -492,7 +492,7 @@ function positional-arg {
 
     if [[ ${optVar} != '' ]]; then
         # Set up the default initializer, and then re-form as the setter code.
-        _argproc_initStatements+=("${optVar}=$(_argproc:quote "${defaultValue}")")
+        _argproc_initStatements+=("${optVar}=$(_argproc:quote "${optDefault}")")
         optVar="${optVar}"'="$1"'
     fi
 
