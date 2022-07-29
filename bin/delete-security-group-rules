@@ -53,88 +53,38 @@ function usage {
     exit "$1"
 }
 
-# Error during argument processing?
-argError=0
-
-# Filter to apply, to determine which rule(s) to remove.
-filterArgs=()
-
-# Name or ID of the security group.
-groupNameOrId=''
+# Want help?
+opt-action --call=usage --value=0 help/h
 
 # Location (region or availability zone).
-inLocation=''
+opt-value --required --var=inLocation in
+
+# Name or ID of the security group.
+opt-value --required --var=groupNameOrId --match='.+' security-group
+
+# Simple filter.
+opt-choice --var=simpleFilter \
+    all='.' \
+    all-egress='select(.IsEgress == true)' \
+    all-ingress='select(.IsEgress == false)'
 
 # Quiet?
-quiet=0
+opt-toggle --var=quiet quiet
 
-while (( $# > 0 )); do
-    case "$1" in
-        --all)
-            filterArgs=('.')
-            ;;
-        --all-egress)
-            filterArgs=('select(.IsEgress == true)')
-            ;;
-        --all-ingress)
-            filterArgs=('select(.IsEgress == false)')
-            ;;
-        --in=?*)
-            inLocation="${1#*=}"
-            ;;
-        --quiet)
-            quiet=1
-            ;;
-        --security-group=?*)
-            groupNameOrId="${1#*=}"
-            ;;
-        -h|--help)
-            argError=-1 # `-1` suppresses error exit after displaying usage.
-            break
-            ;;
-        --)
-            # Explicit end of options.
-            shift
-            break
-            ;;
-        -?*)
-            echo 1>&2 "Unknown option: $1"
-            argError=1
-            break
-            ;;
-        *)
-            # Non-option argument.
-            break
-            ;;
-    esac
+# Filter arguments.
+rest-arg --var=filterArgs
 
-    shift
-done
-
-if (( !argError )); then
-    if [[ ${inLocation} == '' ]]; then
-        echo 1>&2 'Missing option: --in'
-        argError=1
-    fi
-    if [[ ${groupNameOrId} == '' ]]; then
-        echo 1>&2 'Missing option: --security-group'
-        argError=1
-    fi
-fi
+process-args "$@" || usage "$?"
 
 if (( ${#filterArgs[@]} == 0 )); then
-    if (( $# == 0 )); then
+    if [[ ${simpleFilter} == '' ]]; then
         echo 1>&2 'Missing filter option or arguments.'
-        argError=1
+        exit 1
     fi
-    filterArgs=("$@")
-elif (( $# > 0 )); then
+    filterArgs=("${simpleFilter}")
+elif [[ ${simpleFilter} != '' ]]; then
     echo 1>&2 'Cannot specify both filter option and arguments.'
-    argError=1
-fi
-
-if (( argError )); then
-    usage "${argError}"
+    exit 1
 fi
 
 
