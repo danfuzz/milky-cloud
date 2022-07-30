@@ -502,18 +502,6 @@ function print-usage {
         print;
     }
     '
-
-    return 0
-    # Trim away empty lines (including just newlines) at the start and end of
-    # the message.
-    [[ ${msg} =~ ^([$' \t']*$'\n')*(.*[^$'\n'])$'\n'*$ ]]
-    msg="${BASH_REMATCH[1]}"
-
-    # Determine first-line indentation, and strip it from all lines.
-    [[ ${msg} =~ ^([$' \t']*) ]]
-    local indent="${BASH_REMATCH[1]}"
-
-    awk <<<"${msg}" -v indent="/^${indent}/" 'sub(indent, "")'
 }
 
 # Processes all of the given arguments, according to the configured handlers.
