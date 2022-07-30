@@ -47,34 +47,15 @@ _argproc_preReturnStatements=()
 # --var=<name> -- Sets the global `<name>` to the configured action value, and
 #   causes it to be defaulted at the start of argument processing.
 function opt-action {
-    local callFunc=''
-    local defaultValue=0
-    local setVar=''
-    local value='1'
+    local optCall=''
+    local optDefault=''
+    local optValue='1'
+    local optVar=''
+    local args=("$@")
+    _argproc_janky-args call default value var \
+    || return 1
 
-    while (( $# > 0 )); do
-        case "$1" in
-            --call=?*)
-                callFunc="${1#*=}"
-                ;;
-            --default=*)
-                defaultValue="${1#*=}"
-                ;;
-            --value=*)
-                value="${1#*=}"
-                ;;
-            --var=?*)
-                setVar="${1#*=}"
-                ;;
-            *)
-                # End of options / unrecognized option.
-                break
-                ;;
-        esac
-        shift
-    done
-
-    local name="$1"
+    local name="${args[0]}"
 
     if ! [[ ${name} =~ ^([a-zA-Z0-9][-a-zA-Z0-9]*)(/[a-zA-Z0-9])?$ ]]; then
         echo 1>&2 "Invalid option spec: ${name}"
@@ -84,20 +65,20 @@ function opt-action {
     name="${BASH_REMATCH[1]}"
     local abbrev="${BASH_REMATCH[2]:1}" # `:1` to drop the slash.
 
-    if [[ ${callFunc} == '' && ${setVar} == '' ]]; then
+    if [[ ${optCall} == '' && ${optVar} == '' ]]; then
         echo 1>&2 "Must use at least one of --call or --var for option: ${name}."
         return 1
     fi
 
-    if [[ ${callFunc} != '' ]]; then
+    if [[ ${optCall} != '' ]]; then
         # Re-form as the caller code.
-        callFunc="${callFunc} $(_argproc:quote "${value}")"' || return "$?"'
+        optCall="${optCall} $(_argproc:quote "${optValue}")"' || return "$?"'
     fi
 
-    if [[ ${setVar} != '' ]]; then
+    if [[ ${optVar} != '' ]]; then
         # Set up the default initializer, and then re-form as the setter code.
-        _argproc_initStatements+=("${setVar}=$(_argproc:quote "${defaultValue}")")
-        setVar="${setVar}=$(_argproc:quote "${value}")"
+        _argproc_initStatements+=("${optVar}=$(_argproc:quote "${optDefault}")")
+        optVar="${optVar}=$(_argproc:quote "${optValue}")"
     fi
 
     eval 'function _argproc:long-'"${name}"' {
@@ -106,8 +87,8 @@ function opt-action {
             return 1
         fi
 
-        '"${callFunc}"'
-        '"${setVar}"'
+        '"${optCall}"'
+        '"${optVar}"'
     }'
 
     if [[ ${abbrev} != '' ]]; then
@@ -134,60 +115,46 @@ function opt-action {
 # --var=<name> -- Sets the global `<name>` to the option value, and causes it to
 #   be defaulted at the start of argument processing.
 function opt-choice {
-    local callFunc=''
-    local defaultValue=''
-    local setVar=''
+    local optCall=''
+    local optDefault=''
+    local optRequired=0
+    local optVar=''
+    local args=("$@")
+    _argproc_janky-args call default required var \
+    || return 1
 
     local requiredName=''
     local requiredSetter=''
     local requiredError=''
 
-    while (( $# > 0 )); do
-        case "$1" in
-            --call=?*)
-                callFunc="${1#*=}"
-                ;;
-            --default=*)
-                defaultValue="${1#*=}"
-                ;;
-            --required)
-                requiredName='?' # Gets replaced with a valid long name.
-                ;;
-            --var=?*)
-                setVar="${1#*=}"
-                ;;
-            *)
-                # End of options / unrecognized option.
-                break
-                ;;
-        esac
-        shift
-    done
+    if (( optRequired )); then
+        # Gets replaced with a valid long name.
+        requiredName='?'
+    fi
 
-    local specs=("$@")
-    if (( ${#specs[@]} < 1 )); then
+    if (( ${#args[@]} < 1 )); then
         echo 1>&2 'Need at least one option spec for a choice.'
         return 1
     fi
 
-    if [[ ${callFunc} == '' && ${setVar} == '' ]]; then
+    if [[ ${optCall} == '' && ${optVar} == '' ]]; then
         echo 1>&2 "Must use at least one of --call or --var for option: ${name}."
         return 1
     fi
 
-    if [[ ${callFunc} != '' ]]; then
+    if [[ ${optCall} != '' ]]; then
         # Re-form as the caller code.
-        callFunc="${callFunc}"' "${_approc_value}" || return "$?"'
+        optCall="${optCall}"' "${_approc_value}" || return "$?"'
     fi
 
-    if [[ ${setVar} != '' ]]; then
+    if [[ ${optVar} != '' ]]; then
         # Set up the default initializer, and then re-form as the setter code.
-        _argproc_initStatements+=("${setVar}=$(_argproc:quote "${defaultValue}")")
-        setVar="${setVar}"'="${_argproc_value}"'
+        _argproc_initStatements+=("${optVar}=$(_argproc:quote "${optDefault}")")
+        optVar="${optVar}"'="${_argproc_value}"'
     fi
 
     local s
-    for s in "${specs[@]}"; do
+    for s in "${args[@]}"; do
         if ! [[ ${s} =~ ^([a-zA-Z0-9][-a-zA-Z0-9]*)(/[a-zA-Z0-9])?(=(.*))?$ ]]; then
             echo 1>&2 "Invalid option spec: ${s}"
             return 1
@@ -224,8 +191,8 @@ function opt-choice {
             fi
 
             local _argproc_value='"${value}"'
-            '"${callFunc}"'
-            '"${setVar}"'
+            '"${optCall}"'
+            '"${optVar}"'
             '"${requiredSetter}"'
         }'
 
@@ -259,26 +226,13 @@ function opt-choice {
 # --var=<name> -- Sets the global `<name>` to `1` or `0`, and causes it to be
 #   defauled to `0` at the start of argument processing.
 function opt-toggle {
-    local callFunc=''
-    local setVar=''
+    local optCall=''
+    local optVar=''
+    local args=("$@")
+    _argproc_janky-args call var \
+    || return 1
 
-    while (( $# > 0 )); do
-        case "$1" in
-            --call=?*)
-                callFunc="${1#*=}"
-                ;;
-            --var=?*)
-                setVar="${1#*=}"
-                ;;
-            *)
-                # End of options / unrecognized option.
-                break
-                ;;
-        esac
-        shift
-    done
-
-    local name="$1"
+    local name="${args[0]}"
 
     if ! [[ ${name} =~ ^([a-zA-Z0-9][-a-zA-Z0-9]*)(/[a-zA-Z0-9]?)?(/[a-zA-Z0-9])?$ ]]; then
         echo 1>&2 "Invalid option spec: ${name}"
@@ -289,20 +243,20 @@ function opt-toggle {
     local abbrevOn="${BASH_REMATCH[2]:1}"  # `:1` to drop the slash.
     local abbrevOff="${BASH_REMATCH[3]:1}" # Likewise.
 
-    if [[ ${callFunc} == '' && ${setVar} == '' ]]; then
+    if [[ ${optCall} == '' && ${optVar} == '' ]]; then
         echo 1>&2 "Must use at least one of --call or --var for option: ${name}."
         return 1
     fi
 
-    if [[ ${callFunc} != '' ]]; then
+    if [[ ${optCall} != '' ]]; then
         # Re-form as the caller code.
-        callFunc="${callFunc}"' "$1" || return "$?"'
+        optCall="${optCall}"' "$1" || return "$?"'
     fi
 
-    if [[ ${setVar} != '' ]]; then
+    if [[ ${optVar} != '' ]]; then
         # Set up the default initializer, and then re-form as the setter code.
-        _argproc_initStatements+=("${setVar}=0")
-        setVar="${setVar}"'="$1"'
+        _argproc_initStatements+=("${optVar}=0")
+        optVar="${optVar}"'="$1"'
     fi
 
     eval '
@@ -312,8 +266,8 @@ function opt-toggle {
                 return 1
             fi
 
-            '"${callFunc}"'
-            '"${setVar}"'
+            '"${optCall}"'
+            '"${optVar}"'
         }
 
         function _argproc:long-'"${name}"' {
@@ -355,78 +309,55 @@ function opt-toggle {
 #   argument. This also causes the variable to be initialized at the start of
 #   argument processing.
 function opt-value {
-    local callFunc=''
-    local defaultValue=''
-    local match=''
-    local setVar=''
-    local required=0
-    local requiredSetter=''
+    local optCall=''
+    local optDefault=''
+    local optMatch=''
+    local optRequired=0
+    local optVar=''
+    local args=("$@")
+    _argproc_janky-args call default match required var \
+    || return 1
 
-    while (( $# > 0 )); do
-        case "$1" in
-            --call=?*)
-                callFunc="${1#*=}"
-                ;;
-            --default=*)
-                defaultValue="${1#*=}"
-                ;;
-            --match=?*)
-                match="${1#*=}"
-                ;;
-            --required)
-                required=1
-                ;;
-            --var=?*)
-                setVar="${1#*=}"
-                ;;
-            *)
-                # End of options / unrecognized option.
-                break
-                ;;
-        esac
-        shift
-    done
-
-    local name="$1"
+    local name="${args[0]}"
 
     if ! [[ ${name} =~ ^[a-zA-Z0-9][-a-zA-Z0-9]*$ ]]; then
         echo 1>&2 "Invalid option spec: ${name}"
         return 1
     fi
 
-    if [[ ${callFunc} == '' && ${setVar} == '' ]]; then
+    if [[ ${optCall} == '' && ${optVar} == '' ]]; then
         echo 1>&2 "Must use at least one of --call or --var for option: ${name}."
         return 1
     fi
 
-    if [[ ${callFunc} != '' ]]; then
+    if [[ ${optCall} != '' ]]; then
         # Re-form as the caller code.
-        callFunc="${callFunc}"' "${value}" || return "$?"'
+        optCall="${optCall}"' "${value}" || return "$?"'
     fi
 
-    if [[ ${setVar} != '' ]]; then
+    if [[ ${optVar} != '' ]]; then
         # Set up the default initializer, and then re-form as the setter code.
-        _argproc_initStatements+=("${setVar}=$(_argproc:quote "${defaultValue}")")
-        setVar="${setVar}"'="$1"'
+        _argproc_initStatements+=("${optVar}=$(_argproc:quote "${optDefault}")")
+        optVar="${optVar}"'="$1"'
     fi
 
-    if [[ ${match} != '' ]]; then
+    if [[ ${optMatch} != '' ]]; then
         # Re-form as the clause to insert to perform the check.
-        match='
-            elif ! [[ $1 =~ ^('"${match}"')$ ]]; then
-                echo 1>&2 "Invalid value for option: --'"${name}"'"
-                echo 1>&2 "Value: $1"
+        optMatch='
+            elif ! [[ $1 =~ ^('"${optMatch}"')$ ]]; then
+                echo 1>&2 "Invalid value for option --'"${name}"': $1"
                 return 1'
     fi
 
-    if (( ${required} )); then
-        # Replace `required` with a variable name based on the option name, and
-        # use it to form all the dependant bits.
-        required="_argproc_gotOption_${name/-/_}"
-        requiredSetter="${required}=1"
-        _argproc_initStatements+=("local ${required}=0")
+    local requiredSetter=''
+    if (( ${optRequired} )); then
+        # Replace `optRequired` with a variable name based on the option name,
+        # and use it to form all the dependant bits.
+        optRequired="_argproc_gotOption_${name/-/_}"
+        requiredSetter="${optRequired}=1"
+        _argproc_initStatements+=("local ${optRequired}=0")
         _argproc_preReturnStatements+=('
-            (( '"${required}"' )) || {
+            (( '"${optRequired}"' )) || {
                 echo 1>&2 "Missing required option: --'"${name}"'"
                 false
             }')
@@ -436,11 +367,11 @@ function opt-value {
         if (( $# < 1 )); then
             echo 1>&2 "Value required for option: --'"${name}"'"
             return 1
-        '"${match}"'
+        '"${optMatch}"'
         fi
 
-        '"${callFunc}"'
-        '"${setVar}"'
+        '"${optCall}"'
+        '"${optVar}"'
         '"${requiredSetter}"'
     }'
 }
@@ -460,71 +391,49 @@ function opt-value {
 # --var=<name> -- Sets the global `<name>` to the argument value. This also
 #   causes the variable to be initialized at the start of argument processing.
 function positional-arg {
-    local callFunc=''
-    local defaultValue=''
-    local match=''
-    local setVar=''
-    local required=0
-    local ifMissing=''
+    local optCall=''
+    local optDefault=''
+    local optMatch=''
+    local optRequired=0
+    local optVar=''
+    local args=("$@")
+    _argproc_janky-args call default match required var \
+    || return 1
 
-    while (( $# > 0 )); do
-        case "$1" in
-            --call=?*)
-                callFunc="${1#*=}"
-                ;;
-            --default=*)
-                defaultValue="${1#*=}"
-                ;;
-            --match=?*)
-                match="${1#*=}"
-                ;;
-            --required)
-                required=1
-                ;;
-            --var=?*)
-                setVar="${1#*=}"
-                ;;
-            *)
-                # End of options / unrecognized option.
-                break
-                ;;
-        esac
-        shift
-    done
-
-    local name="$1"
+    local name="${args[0]}"
 
     if ! [[ ${name} =~ ^[a-zA-Z0-9][-a-zA-Z0-9]*$ ]]; then
         echo 1>&2 "Invalid argument spec: ${name}"
         return 1
     fi
 
-    if [[ ${callFunc} == '' && ${setVar} == '' ]]; then
+    if [[ ${optCall} == '' && ${optVar} == '' ]]; then
         echo 1>&2 "Must use at least one of --call or --var for argument: ${name}."
         return 1
     fi
 
-    if [[ ${callFunc} != '' ]]; then
+    if [[ ${optCall} != '' ]]; then
         # Re-form as the caller code.
-        callFunc="${callFunc}"' "${value}" || return "$?"'
+        optCall="${optCall}"' "${value}" || return "$?"'
     fi
 
-    if [[ ${setVar} != '' ]]; then
+    if [[ ${optVar} != '' ]]; then
         # Set up the default initializer, and then re-form as the setter code.
-        _argproc_initStatements+=("${setVar}=$(_argproc:quote "${defaultValue}")")
-        setVar="${setVar}"'="$1"'
+        _argproc_initStatements+=("${optVar}=$(_argproc:quote "${optDefault}")")
+        optVar="${optVar}"'="$1"'
     fi
 
-    if [[ ${match} != '' ]]; then
+    if [[ ${optMatch} != '' ]]; then
         # Re-form as the clause to insert to perform the check.
-        match='
-            elif ! [[ $1 =~ ^('"${match}"')$ ]]; then
+        optMatch='
+            elif ! [[ $1 =~ ^('"${optMatch}"')$ ]]; then
                 echo 1>&2 "Invalid value for argument <'"${name}"'>."
                 echo 1>&2 "Value: $1"
                 return 1'
     fi
 
-    if (( ${required} )); then
+    local ifMissing=''
+    if (( ${optRequired} )); then
         # Code to issue a complaint about the missing argument.
         ifMissing='
             echo 1>&2 "Missing required argument: <'"${name}"'>"
@@ -536,11 +445,11 @@ function positional-arg {
     eval 'function _argproc:positional-'"${name}"' {
         if (( $# < 1 )); then
             '"${ifMissing}"'
-        '"${match}"'
+        '"${optMatch}"'
         fi
 
-        '"${callFunc}"'
-        '"${setVar}"'
+        '"${optCall}"'
+        '"${optVar}"'
     }'
 
     _argproc_positionalFuncs+=("_argproc:positional-${name}")
@@ -660,44 +569,31 @@ function process-args {
 #   arguments. This also causes the variable to be initialized to an empty
 #   array at the start of argument processing.
 function rest-arg {
-    local callFunc=''
-    local setVar=''
+    local optCall=''
+    local optVar=''
+    local args=("$@")
+    _argproc_janky-args call var \
+    || return 1
 
-    while (( $# > 0 )); do
-        case "$1" in
-            --call=?*)
-                callFunc="${1#*=}"
-                ;;
-            --var=?*)
-                setVar="${1#*=}"
-                ;;
-            *)
-                # End of options / unrecognized option.
-                break
-                ;;
-        esac
-        shift
-    done
-
-    if [[ ${callFunc} == '' && ${setVar} == '' ]]; then
+    if [[ ${optCall} == '' && ${optVar} == '' ]]; then
         echo 1>&2 'Must use at least one of --call or --var for rest argument.'
         return 1
     fi
 
-    if [[ ${callFunc} != '' ]]; then
+    if [[ ${optCall} != '' ]]; then
         # Re-form as the caller code.
-        callFunc="${callFunc}"' "$@" || return "$?"'
+        optCall="${optCall}"' "$@" || return "$?"'
     fi
 
-    if [[ ${setVar} != '' ]]; then
+    if [[ ${optVar} != '' ]]; then
         # Set up the default initializer, and then re-form as the setter code.
-        _argproc_initStatements+=("${setVar}=()")
-        setVar="${setVar}"'=("$@")'
+        _argproc_initStatements+=("${optVar}=()")
+        optVar="${optVar}"'=("$@")'
     fi
 
     eval 'function _argproc:rest {
-        '"${callFunc}"'
-        '"${setVar}"'
+        '"${optCall}"'
+        '"${optVar}"'
     }'
 }
 
@@ -705,6 +601,98 @@ function rest-arg {
 #
 # Library-internal functions
 #
+
+# Janky yet reasonable argument parser for the commands in this library. (How
+# meta!) Takes a list of option names to accept, each of which is parsed in a
+# standard way (e.g. `var` is always a variable name, etc.). Sets `opt<Name>`
+# (presumed to be a local variable declared in the calling scope) for each
+# parsed option. Assumes the variable `args` (again presumed local to the
+# caller) contains all the arguments, which gets updates by this function.
+function _argproc_janky-args {
+    local argError=0
+    local argSpecs=" $* " # Spaces on the ends to make the match code work.
+    local optsDone=0
+    local a
+
+    for a in "${args[@]}"; do
+        if (( optsDone )); then
+            args+=("${a}")
+            continue
+        fi
+
+        if [[ ${a} =~ ^--. ]]; then
+            if ! [[ ${a} =~ ^--([a-z]+)(=.*)?$ ]]; then
+                echo 1>&2 "Invalid option syntax: ${a}"
+                return 1
+            fi
+
+            local name="${BASH_REMATCH[1]}"
+            local value="${BASH_REMATCH[2]}"
+
+            if ! [[ ${argSpecs} =~ " ${name} " ]]; then
+                echo 1>&2 "Unknown option: --${name}"
+                return 1
+            fi
+
+            case "${name}" in
+                call)
+                    [[ ${value} =~ ^=([-_a-zA-Z][-_a-zA-Z0-9]*)$ ]] \
+                    && optCall="${BASH_REMATCH[1]}" \
+                    || argError=1
+                    ;;
+                default)
+                    [[ ${value} =~ ^=(.*)$ ]] \
+                    && optDefault="${BASH_REMATCH[1]}" \
+                    || argError=1
+                    ;;
+                match)
+                    [[ ${value} =~ ^=(.*)$ ]] \
+                    && optMatch="${BASH_REMATCH[1]}" \
+                    || argError=1
+                    ;;
+                required)
+                    [[ ${value} == '' ]] \
+                    && optRequired=1 \
+                    || argError=1
+                    ;;
+                value)
+                    [[ ${value} =~ ^=(.*)$ ]] \
+                    && optValue="${BASH_REMATCH[1]}" \
+                    || argError=1
+                    ;;
+                var)
+                    [[ ${value} =~ ^=([_a-zA-Z][_a-zA-Z0-9]*)$ ]] \
+                    && optVar="${BASH_REMATCH[1]}" \
+                    || argError=1
+                    ;;
+                *)
+                    echo 1>&2 "Unknown arg-processing option: --${name}"
+                    return 1
+                    ;;
+            esac
+
+            if (( argError )); then
+                if [[ ${value} != '' ]]; then
+                    echo 1>&2 "Invalid value for option --${name}: ${value:1}"
+                else
+                    echo 1>&2 "Value required for option --${name}."
+                fi
+                return 1
+            fi
+        elif [[ ${a} == '--' ]]; then
+            # Explicit end of options.
+            args=()
+            optsDone=1
+        elif [[ (${a} == '-') || (${a:0:1} != '-') ]]; then
+            # Non-option argument.
+            args=("${a}")
+            optsDone=1
+        else
+            echo 1>&2 "Invalid option syntax: ${a}"
+            return 1
+        fi
+   done
+}
 
 # Builds up a list of statements to evaluate, based on the given arguments. It
 # is stored in the variable `_argproc_statements`, which is assumed to be
