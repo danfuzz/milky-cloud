@@ -572,22 +572,9 @@ function process-args {
 function rest-arg {
     local optCall=''
     local optVar=''
-
-    while (( $# > 0 )); do
-        case "$1" in
-            --call=?*)
-                optCall="${1#*=}"
-                ;;
-            --var=?*)
-                optVar="${1#*=}"
-                ;;
-            *)
-                # End of options / unrecognized option.
-                break
-                ;;
-        esac
-        shift
-    done
+    local args=("$@")
+    _argproc_janky-args call var \
+    || return 1
 
     if [[ ${optCall} == '' && ${optVar} == '' ]]; then
         echo 1>&2 'Must use at least one of --call or --var for rest argument.'
