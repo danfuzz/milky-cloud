@@ -113,15 +113,6 @@ function opt-choice {
     _argproc_janky-args --multi-spec call default required var \
     || return 1
 
-    local requiredName=''
-    local requiredSetter=''
-    local requiredError=''
-
-    if (( optRequired )); then
-        # Gets replaced with a valid long name.
-        requiredName='?'
-    fi
-
     if [[ ${optCall} != '' ]]; then
         # Re-form as the caller code.
         optCall="${optCall}"' "${_approc_value}" || return "$?"'
@@ -133,52 +124,57 @@ function opt-choice {
         optVar="${optVar}"'="${_argproc_value}"'
     fi
 
-    local s
-    for s in "${args[@]}"; do
-        if ! [[ ${s} =~ ^([a-zA-Z0-9][-a-zA-Z0-9]*)(/[a-zA-Z0-9])?(=(.*))?$ ]]; then
-            echo 1>&2 "Invalid option spec: ${s}"
-            return 1
-        fi
+    local requiredName=''
+    local requiredSetter=''
+    local requiredError=''
 
-        local name="${BASH_REMATCH[1]}"
-        local abbrev="${BASH_REMATCH[2]:1}" # `:1` to drop the slash.
-        local value="${BASH_REMATCH[3]:1}"  # Likewise.
+    if (( optRequired )); then
+        # Gets replaced with a valid long name.
+        requiredName='?'
+    fi
+
+    local spec
+    for spec in "${args[@]}"; do
+        local specName=''
+        local specAbbrev=''
+        local specHasValue=0
+        local specValue=''
+        _argproc_parse-spec --value "${spec}" \
+        || return 1
 
         if [[ ${requiredName} != '' ]]; then
             if [[ ${requiredName} == '?' ]]; then
                 # Replace `requiredName` with a variable name based on the first
                 # option, and use it to form all the dependant bits.
-                requiredName="_argproc_gotOption_${name/-/_}"
+                requiredName="_argproc_gotOption_${specName/-/_}"
                 requiredSetter="${requiredName}=1"
                 _argproc_initStatements+=("local ${requiredName}=0")
-            fi
-            if [[ ${requiredError} == '' ]]; then
                 requiredError='Missing required option from set:'
             fi
-            requiredError+=" --${name}"
+            requiredError+=" --${specName}"
         fi
 
-        if [[ ${value} == '' ]]; then
-            value="${name}"
+        if (( specHasValue )); then
+            specValue="$(_argproc:quote "${specValue}")"
         else
-            value="$(_argproc:quote "${value}")"
+            specValue="${specName}"
         fi
 
-        eval 'function _argproc:long-'"${name}"' {
+        eval 'function _argproc:long-'"${specName}"' {
             if (( $# > 0 )); then
-                echo 1>&2 "Value not allowed for option: --'"${name}"'"
+                echo 1>&2 "Value not allowed for option: --'"${specName}"'"
                 return 1
             fi
 
-            local _argproc_value='"${value}"'
+            local _argproc_value='"${specValue}"'
             '"${optCall}"'
             '"${optVar}"'
             '"${requiredSetter}"'
         }'
 
-        if [[ ${abbrev} != '' ]]; then
-            eval 'function _argproc:abbrev-'"${abbrev}"' {
-                _argproc:long-'"${name}"' "$@"
+        if [[ ${specAbbrev} != '' ]]; then
+            eval 'function _argproc:abbrev-'"${specAbbrev}"' {
+                _argproc:long-'"${specName}"' "$@"
             }'
         fi
     done
@@ -685,10 +681,10 @@ function _argproc_parse-spec {
 
     specName="${BASH_REMATCH[1]}"
     specAbbrev="${BASH_REMATCH[2]:1}" # `:1` to drop the slash.
-    local value="${BASH_REMATCH[3]}"    # not `specValue`... yet!
+    local value="${BASH_REMATCH[3]}"  # not `specValue`... yet!
 
     if (( valueOk )); then
-        specHasValue="$([[ ${value} != '' ]]; echo $?)"
+        specHasValue="$([[ ${value} == '' ]]; echo $?)"
         specValue="${value:1}" # `:1` to drop the equal sign.
     elif [[ ${value} != '' ]]; then
         echo 1>&2 "Value not allowed in spec: ${spec}"
