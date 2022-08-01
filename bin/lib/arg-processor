@@ -55,15 +55,10 @@ function opt-action {
     _argproc_janky-args call default value var \
     || return 1
 
-    local name="${args[0]}"
-
-    if ! [[ ${name} =~ ^([a-zA-Z0-9][-a-zA-Z0-9]*)(/[a-zA-Z0-9])?$ ]]; then
-        echo 1>&2 "Invalid option spec: ${name}"
-        return 1
-    fi
-
-    name="${BASH_REMATCH[1]}"
-    local abbrev="${BASH_REMATCH[2]:1}" # `:1` to drop the slash.
+    local specName=''
+    local specAbbrev=''
+    _argproc_parse-spec "${args[0]}" \
+    || return 1
 
     if [[ ${optCall} != '' ]]; then
         # Re-form as the caller code.
@@ -76,9 +71,9 @@ function opt-action {
         optVar="${optVar}=$(_argproc:quote "${optValue}")"
     fi
 
-    eval 'function _argproc:long-'"${name}"' {
+    eval 'function _argproc:long-'"${specName}"' {
         if (( $# > 0 )); then
-            echo 1>&2 "Value not allowed for option: --'"${name}"'"
+            echo 1>&2 "Value not allowed for option: --'"${specName}"'"
             return 1
         fi
 
@@ -86,9 +81,9 @@ function opt-action {
         '"${optVar}"'
     }'
 
-    if [[ ${abbrev} != '' ]]; then
-        eval 'function _argproc:abbrev-'"${abbrev}"' {
-            _argproc:long-'"${name}"' "$@"
+    if [[ ${specAbbrev} != '' ]]; then
+        eval 'function _argproc:abbrev-'"${specAbbrev}"' {
+            _argproc:long-'"${specName}"' "$@"
         }'
     fi
 }
@@ -670,6 +665,35 @@ function _argproc_janky-args {
        echo 1>&2 'Too many specifications.'
        return 1
    fi
+}
+
+# Parses a single argument / option spec. `--value` to accept a value. Sets
+# `spec<Item>` (presumed locals in the calling scope) to "returns" results.
+function _argproc_parse-spec {
+    local valueOk=0
+    if [[ $1 == '--value' ]]; then
+        valueOk=1
+        shift
+    fi
+
+    local spec="$1"
+
+    if ! [[ ${spec} =~ ^([a-zA-Z0-9][-a-zA-Z0-9]*)(/[a-zA-Z])?(=.*)?$ ]]; then
+        echo 1>&2 "Invalid spec: ${spec}"
+        return 1
+    fi
+
+    specName="${BASH_REMATCH[1]}"
+    specAbbrev="${BASH_REMATCH[2]:1}" # `:1` to drop the slash.
+    local value="${BASH_REMATCH[3]}"    # not `specValue`... yet!
+
+    if (( valueOk )); then
+        specHasValue="$([[ ${value} != '' ]]; echo $?)"
+        specValue="${value:1}" # `:1` to drop the equal sign.
+    elif [[ ${value} != '' ]]; then
+        echo 1>&2 "Value not allowed in spec: ${spec}"
+        return 1
+    fi
 }
 
 # Builds up a list of statements to evaluate, based on the given arguments. It
