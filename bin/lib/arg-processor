@@ -56,35 +56,33 @@ _argproc_preReturnStatements=()
 # are unlikely to shadow globals. ("Hooray" for dynamic scoping!)
 #
 
-# Declares an "action" option, which takes no value on a commandline. No
-# `<value>` is allowed in the argument spec. If left unspecified, the default
-# variable value for an action option is `''` (the empty string).
-#
-# --value=<value> -- The value to use when indicating that the action is taken.
-#   If not specified, the action value is `1`.
+# Declares an "action" option, which takes no value on a commandline. If left
+# unspecified, the default variable value for an action option is `''` (the
+# empty string), and the default activation value is `1`.
 function opt-action {
     local optCall=''
     local optDefault=''
-    local optValue='1'
     local optVar=''
     local args=("$@")
-    _argproc_janky-args call default value var \
+    _argproc_janky-args call default var \
     || return 1
 
     local specName=''
     local specAbbrev=''
-    _argproc_parse-spec --abbrev "${args[0]}" \
+    local specHasValue=0
+    local specValue='1'
+    _argproc_parse-spec --abbrev --value "${args[0]}" \
     || return 1
 
     if [[ ${optCall} != '' ]]; then
         # Re-form as the caller code.
-        optCall="${optCall} $(_argproc:quote "${optValue}")"' || return "$?"'
+        optCall="${optCall} $(_argproc:quote "${specValue}")"' || return "$?"'
     fi
 
     if [[ ${optVar} != '' ]]; then
         # Set up the default initializer, and then re-form as the setter code.
         _argproc_initStatements+=("${optVar}=$(_argproc:quote "${optDefault}")")
-        optVar="${optVar}=$(_argproc:quote "${optValue}")"
+        optVar="${optVar}=$(_argproc:quote "${specValue}")"
     fi
 
     eval 'function _argproc:long-'"${specName}"' {
@@ -567,11 +565,6 @@ function _argproc_janky-args {
                 required)
                     [[ ${value} == '' ]] \
                     && optRequired=1 \
-                    || argError=1
-                    ;;
-                value)
-                    [[ ${value} =~ ^=(.*)$ ]] \
-                    && optValue="${BASH_REMATCH[1]}" \
                     || argError=1
                     ;;
                 var)
