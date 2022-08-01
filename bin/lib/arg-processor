@@ -7,6 +7,12 @@
 #
 # Library for reasonably okay argument / option processing.
 #
+# Option processing is done in the common style with double-dashes to pass long
+# options, which can optionally be passed values after an `=`, e.g. `--foo` for
+# a valueless option and `--bar=zorch` for one with a value. The argument `--`
+# indicates the explicit end of options, and a single dash `-` is interpreted as
+# a non-option argument.
+#
 # The public argument-defining functions all take argument specifications of the
 # form `<name>/<abbrev>=<value>`. `<name>` is the argument (long option) name.
 # `<abbrev>` is a one-letter abbreviation for a single-dash option form.
@@ -50,20 +56,12 @@ _argproc_preReturnStatements=()
 # are unlikely to shadow globals. ("Hooray" for dynamic scoping!)
 #
 
-# Declares an "action" option, specified as `<name>/<abbrev>`, with `/<abbrev>`
-# optional. `<abbrev>` specifies a single-dash single-character abbreviation for
-# the option. At least one of `--call` or `--var` must be used to define the
-# option.
+# Declares an "action" option, which takes no value on a commandline. No
+# `<value>` is allowed in the argument spec. If left unspecified, the default
+# variable value for an action option is `''` (the empty string).
 #
-# --call=<name> -- Calls the function with the given name, passing it the
-#   configured action value. If `--var` is also used, the call is made first,
-#   and then the variable is set only if the call returned successfully.
-# --default=<value> -- The default value for the variable. If not specified, the
-#   default value is `0` (the empty string).
 # --value=<value> -- The value to use when indicating that the action is taken.
 #   If not specified, the action value is `1`.
-# --var=<name> -- Sets the global `<name>` to the configured action value, and
-#   causes it to be defaulted at the start of argument processing.
 function opt-action {
     local optCall=''
     local optDefault=''
@@ -106,22 +104,13 @@ function opt-action {
     fi
 }
 
-# Declares a "choice" option set, specified as `<name>/<abbrev>=<value>`, with
-# `<name>` required and the other two items optional. `<name>` is the full
-# option name. `<abbrev>` specifies a single-dash single-character abbreviation
-# for the option. `<value>` is the option value (which defaults to the full
-# name). At least one of `--call` or `--var` must be used to define the option
-# set.
+# Declares a "choice" option set, consisting of one or more options. On a
+# commandline, no choice option accepts a value (because the option name itself
+# implies the value). If left unspecified, the default variable value for a
+# choice option is `''` (the empty string).
 #
-# --call=<name> -- Calls the function with the given name, passing it the
-#   option value. If `--var` is also used, the call is made first, and then the
-#   variable is set only if the call returned successfully.
-# --default=<value> -- The default value for the variable. If not specified, the
-#   default value is `''` (the empty string).
 # --required -- Indicates that one of the options defined by this set must be
 #   passed.
-# --var=<name> -- Sets the global `<name>` to the option value, and causes it to
-#   be defaulted at the start of argument processing.
 function opt-choice {
     local optCall=''
     local optDefault=''
@@ -208,17 +197,12 @@ function opt-choice {
     fi
 }
 
-# Declares a "toggle" option, specified as `<name>/<abbrev>`, with the
-# `/<abbrev>` optional. `<abbrev>` specifies a single-dash single-character
-# abbreviation for turning the toggle on. In addition, the long form
-# `--no-<name>` gets defined to turn the toggle off. At least one of `--call` or
-# `--var` must be used to define the option.
-#
-# --call=<name> -- Calls the function with the given name, passing it `1` or
-#   `0`. If `--var` is also used, the call is made first, and then the variable
-#   is set only if the call returned successfully.
-# --var=<name> -- Sets the global `<name>` to `1` or `0`, and causes it to be
-#   defauled to `0` at the start of argument processing.
+# Declares a "toggle" option, which does not accept a value on the commandline.
+# No `<value>` is allowed in the argument spec. The toggle state of off or on is
+# always indicated by a value of `0` or `1` (respectively). In addition to the
+# main long-form option `--<name>`, this function also defines `--no-<name>` to
+# turn the toggle off. If left unspecified, the default variable value for an
+# action option is `0`.
 function opt-toggle {
     local optCall=''
     local optVar=''
@@ -269,22 +253,14 @@ function opt-toggle {
     fi
 }
 
-# Declares a "value" option, specified as just `<name>` (no `<abbrev>` allowed
-# for these). When parsed, value options require a value, passed in the form
-# `--<name>=<value>`. At least one of `--call` or `--var` must be used to define
-# the option.
+# Declares a "value" option, which requires a value when passed on a
+# commandline. No `<abbrev>` or `<value>` is allowed in the argument spec. If
+# left unspecified, the default variable value for a value option is `''` (the
+# empty string).
 #
-# --call=<name> -- Calls the function with the given name, passing it the option
-#   value parsed from the argument. If `--var` is also used, the call is made
-#   first, and then the variable is set only if the call returned successfully.
-# --default=<value> -- The default value for the variable. If not specified, the
-#   default value is `''` (the empty string).
 # --match=<regex> -- Regular expression matched against the entire argument
 #   value. If the value does not match, then the option gets rejected.
 # --required -- Indicates that this option must be passed.
-# --var=<name> -- Sets the global `<name>` to the value parsed from the
-#   argument. This also causes the variable to be initialized at the start of
-#   argument processing.
 function opt-value {
     local optCall=''
     local optDefault=''
@@ -345,20 +321,13 @@ function opt-value {
     }'
 }
 
-# Declares a positional argument, specified as just <name>, the name of the
-# argument to use in error messages and internal bookkeeping. At least one of
-# `--call` or `--var` must be used to define the argument.
+# Declares a positional argument. No `<abbrev>` or `<value>` is allowed in the
+# argument spec. Unlike options, a positional argument name is _only_ used for
+# error messages and internal bookkeeping.
 #
-# --call=<name> -- Calls the function with the given name, passing it the
-#   argument value. If `--var` is also used, the call is made first, and then
-#   the variable is set only if the call returned successfully.
-# --default=<value> -- The default value for the variable. If not specified, the
-#   default value is `''` (the empty string).
 # --match=<regex> -- Regular expression matched against the entire argument
 #   value. If the value does not match, then the argument gets rejected.
 # --required -- Indicates that this argument must be passed.
-# --var=<name> -- Sets the global `<name>` to the argument value. This also
-#   causes the variable to be initialized at the start of argument processing.
 function positional-arg {
     local optCall=''
     local optDefault=''
@@ -508,15 +477,7 @@ function process-args {
 
 # Declares a "rest" argument, which gets all the non-option and non-positional
 # arguments, during parsing. If this is not declared, argument processing will
-# report an error in the presence of any "rest" arguments. At least one of
-# `--call` or `--var` must be used to define this argument.
-#
-# --call=<name> -- Calls the function with the given name, passing it all the
-#   rest arguments. If `--var` is also used, the call is made first, and then
-#   the variable is set only if the call returned successfully.
-# --var=<name> -- Sets the global `<name>` to an array of all the rest
-#   arguments. This also causes the variable to be initialized to an empty
-#   array at the start of argument processing.
+# report an error in the presence of any "rest" arguments.
 function rest-arg {
     local optCall=''
     local optVar=''
