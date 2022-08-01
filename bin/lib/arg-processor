@@ -487,9 +487,9 @@ function _argproc_define-value-required-arg {
 # Adds a pre-return check which fails if none of the indicated arguments/options
 # were present on the commandline.
 function _argproc_add-required-arg-postcheck {
-    local kind='argument'
+    local isOption=0
     if [[ $1 == '--option' ]]; then
-        kind='option'
+        isOption=1
         shift
     fi
 
@@ -507,14 +507,24 @@ function _argproc_add-required-arg-postcheck {
     done
     checkClause+=' ]]'
 
-    local errorMsg="Missing required ${kind}"
+    local errorMsg='Missing required '
+    local argNames
+
+    if (( isOption )); then
+        errorMsg+='option'
+        argNames="$(printf ' --%s' "$@")"
+    else
+        errorMsg+='argument'
+        argNames="$*"
+    fi
+
     if (( $# > 1 )); then
         errorMsg+=' from set'
     fi
 
     _argproc_preReturnStatements+=(
         "$(printf $'%s || { echo 1>&2 %s %s; false; }\n' \
-            "${checkClause}" "${errorMsg}:" "$(printf ' --%s' "$@")"
+            "${checkClause}" "${errorMsg}:" "$argNames"
     )")
 }
 
