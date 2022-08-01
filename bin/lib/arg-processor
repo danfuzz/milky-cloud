@@ -170,22 +170,17 @@ function opt-toggle {
 # Declares a "value" option, which requires a value when passed on a
 # commandline. No `<abbrev>` or `<value>` is allowed in the argument spec. If
 # left unspecified, the default variable value for a value option is `''` (the
-# empty string). This definer also accepts the `--required` and `--match`
+# empty string). This definer also accepts the `--required` and `--filter`
 # options.
 function opt-value {
     local optCall=''
     local optDefault=''
     local optFilter=''
-    local optMatch=''
     local optRequired=0
     local optVar=''
     local args=("$@")
-    _argproc_janky-args call default filter match required var \
+    _argproc_janky-args call default filter required var \
     || return 1
-
-    if [[ ${optMatch} != '' ]]; then
-        optFilter="/^(${optMatch})\$/"
-    fi
 
     local specName=''
     _argproc_parse-spec "${args[0]}" \
@@ -207,21 +202,16 @@ function opt-value {
 # Declares a positional argument. No `<abbrev>` or `<value>` is allowed in the
 # argument spec. Unlike options, a positional argument name is _only_ used for
 # error messages and internal bookkeeping. This definer also accepts the
-# `--required` and `--match` options.
+# `--required` and `--filter` options.
 function positional-arg {
     local optCall=''
     local optDefault=''
     local optFilter=''
-    local optMatch=''
     local optRequired=0
     local optVar=''
     local args=("$@")
-    _argproc_janky-args call default filter match required var \
+    _argproc_janky-args call default filter required var \
     || return 1
-
-    if [[ ${optMatch} != '' ]]; then
-        optFilter="/^(${optMatch})\$/"
-    fi
 
     local specName=''
     _argproc_parse-spec "${args[0]}" \
@@ -583,11 +573,6 @@ function _argproc_janky-args {
                 filter)
                     [[ ${value} =~ ^=(/(.*)/|[_a-zA-Z][-_:a-zA-Z0-9]*)$ ]] \
                     && optFilter="${BASH_REMATCH[1]}" \
-                    || argError=1
-                    ;;
-                match)
-                    [[ ${value} =~ ^=(.*)$ ]] \
-                    && optMatch="${BASH_REMATCH[1]}" \
                     || argError=1
                     ;;
                 required)
