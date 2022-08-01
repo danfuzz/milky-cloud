@@ -96,9 +96,7 @@ function opt-action {
     }'
 
     if [[ ${specAbbrev} != '' ]]; then
-        eval 'function _argproc:abbrev-'"${specAbbrev}"' {
-            _argproc:long-'"${specName}"' "$@"
-        }'
+        _argproc_define-abbrev "${specAbbrev}" "${specName}"
     fi
 }
 
@@ -178,9 +176,7 @@ function opt-choice {
         }'
 
         if [[ ${specAbbrev} != '' ]]; then
-            eval 'function _argproc:abbrev-'"${specAbbrev}"' {
-                _argproc:long-'"${specName}"' "$@"
-            }'
+            _argproc_define-abbrev "${specAbbrev}" "${specName}"
         fi
     done
 
@@ -245,9 +241,7 @@ function opt-toggle {
     '
 
     if [[ ${specAbbrev} != '' ]]; then
-        eval 'function _argproc:abbrev-'"${specAbbrev}"' {
-            _argproc:toggle-handler-'"${specName}"' 1
-        }'
+        _argproc_define-abbrev "${specAbbrev}" "${specName}"
     fi
 }
 
@@ -504,6 +498,17 @@ function rest-arg {
 #
 # Library-internal functions
 #
+
+# Defines an "abbrev" function, which is what gets called to activate a
+# short-form option.
+function _argproc_define-abbrev {
+    local abbrevChar="$1"
+    local longName="$2"
+
+    eval 'function _argproc:abbrev-'"${abbrevChar}"' {
+        _argproc:long-'"${longName}"' "$@"
+    }'
+}
 
 # Janky yet reasonable argument parser for the commands in this library. (How
 # meta!) Takes a list of option names to accept, each of which is parsed in a
