@@ -57,7 +57,7 @@ function opt-action {
 
     local specName=''
     local specAbbrev=''
-    _argproc_parse-spec "${args[0]}" \
+    _argproc_parse-spec --abbrev "${args[0]}" \
     || return 1
 
     if [[ ${optCall} != '' ]]; then
@@ -139,7 +139,7 @@ function opt-choice {
         local specAbbrev=''
         local specHasValue=0
         local specValue=''
-        _argproc_parse-spec --value "${spec}" \
+        _argproc_parse-spec --abbrev --value "${spec}" \
         || return 1
 
         if [[ ${requiredName} != '' ]]; then
@@ -210,7 +210,7 @@ function opt-toggle {
 
     local specName=''
     local specAbbrev=''
-    _argproc_parse-spec "${args[0]}" \
+    _argproc_parse-spec --abbrev "${args[0]}" \
     || return 1
 
     if [[ ${optCall} != '' ]]; then
@@ -277,12 +277,9 @@ function opt-value {
     _argproc_janky-args call default match required var \
     || return 1
 
-    local name="${args[0]}"
-
-    if ! [[ ${name} =~ ^[a-zA-Z0-9][-a-zA-Z0-9]*$ ]]; then
-        echo 1>&2 "Invalid option spec: ${name}"
-        return 1
-    fi
+    local specName=''
+    _argproc_parse-spec "${args[0]}" \
+    || return 1
 
     if [[ ${optCall} != '' ]]; then
         # Re-form as the caller code.
@@ -299,7 +296,7 @@ function opt-value {
         # Re-form as the clause to insert to perform the check.
         optMatch='
             elif ! [[ $1 =~ ^('"${optMatch}"')$ ]]; then
-                echo 1>&2 "Invalid value for option --'"${name}"': $1"
+                echo 1>&2 "Invalid value for option --'"${specName}"': $1"
                 return 1'
     fi
 
@@ -317,9 +314,9 @@ function opt-value {
             }')
     fi
 
-    eval 'function _argproc:long-'"${name}"' {
+    eval 'function _argproc:long-'"${specName}"' {
         if (( $# < 1 )); then
-            echo 1>&2 "Value required for option: --'"${name}"'"
+            echo 1>&2 "Value required for option: --'"${specName}"'"
             return 1
         '"${optMatch}"'
         fi
@@ -651,14 +648,20 @@ function _argproc_janky-args {
    fi
 }
 
-# Parses a single argument / option spec. `--value` to accept a value. Sets
-# `spec<Item>` (presumed locals in the calling scope) to "returns" results.
+# Parses a single argument / option spec. `--abbrev` to accept an abbreviation.
+# `--value` to accept a value. Sets `spec<Item>` (presumed locals in the calling
+# scope) to "returns" results.
 function _argproc_parse-spec {
+    local abbrevOk=0
     local valueOk=0
-    if [[ $1 == '--value' ]]; then
-        valueOk=1
+    while [[ $1 =~ ^--(value|abbrev) ]]; do
+        if [[ $1 == '--abbrev' ]]; then
+            abbrevOk=1
+        else
+            valueOk=1
+        fi
         shift
-    fi
+    done
 
     local spec="$1"
 
@@ -667,9 +670,16 @@ function _argproc_parse-spec {
         return 1
     fi
 
-    specName="${BASH_REMATCH[1]}"
-    specAbbrev="${BASH_REMATCH[2]:1}" # `:1` to drop the slash.
-    local value="${BASH_REMATCH[3]}"  # not `specValue`... yet!
+    specName="${BASH_REMATCH[1]}" # Name always allowed. Others need to be checked.
+    local abbrev="${BASH_REMATCH[2]}"
+    local value="${BASH_REMATCH[3]}"
+
+    if (( abbrevOk )); then
+        specAbbrev="${abbrev:1}" # `:1` to drop the slash.
+    elif [[ ${abbrev} != '' ]]; then
+        echo 1>&2 "Abbrev not allowed in spec: ${spec}"
+        return 1
+    fi
 
     if (( valueOk )); then
         specHasValue="$([[ ${value} == '' ]]; echo $?)"
