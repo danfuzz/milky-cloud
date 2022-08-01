@@ -175,12 +175,17 @@ function opt-toggle {
 function opt-value {
     local optCall=''
     local optDefault=''
+    local optFilter=''
     local optMatch=''
     local optRequired=0
     local optVar=''
     local args=("$@")
-    _argproc_janky-args call default match required var \
+    _argproc_janky-args call default filter match required var \
     || return 1
+
+    if [[ ${optMatch} != '' ]]; then
+        optFilter="/^(${optMatch})\$/"
+    fi
 
     local specName=''
     _argproc_parse-spec "${args[0]}" \
@@ -192,7 +197,7 @@ function opt-value {
     fi
 
     _argproc_define-value-required-arg --option \
-        "${specName}" "${optCall}" "${optVar}" "${optMatch}"
+        "${specName}" "${optCall}" "${optVar}" "${optFilter}"
 
     if (( optRequired )); then
         _argproc_add-required-arg-postcheck --option "${specName}"
@@ -206,12 +211,17 @@ function opt-value {
 function positional-arg {
     local optCall=''
     local optDefault=''
+    local optFilter=''
     local optMatch=''
     local optRequired=0
     local optVar=''
     local args=("$@")
-    _argproc_janky-args call default match required var \
+    _argproc_janky-args call default filter match required var \
     || return 1
+
+    if [[ ${optMatch} != '' ]]; then
+        optFilter="/^(${optMatch})\$/"
+    fi
 
     local specName=''
     _argproc_parse-spec "${args[0]}" \
@@ -223,7 +233,7 @@ function positional-arg {
     fi
 
     _argproc_define-value-required-arg \
-        "${specName}" "${optCall}" "${optVar}" "${optMatch}"
+        "${specName}" "${optCall}" "${optVar}" "${optFilter}"
 
     if (( optRequired )); then
         _argproc_add-required-arg-postcheck "${specName}"
@@ -423,7 +433,7 @@ function _argproc_define-value-required-arg {
     local longName="$1"
     local callFunc="$2"
     local varName="$3"
-    local matchExpr="$4"
+    local filter="$4"
 
     local desc handlerName
     if (( isOption )); then
@@ -436,29 +446,34 @@ function _argproc_define-value-required-arg {
 
     if [[ ${callFunc} != '' ]]; then
         # Re-form as the caller code.
-        callFunc="${callFunc}"' "$1" || return "$?"'
+        callFunc="${callFunc}"' "${_argproc_value}" || return "$?"'
     fi
 
     if [[ ${varName} != '' ]]; then
         # Re-form as the setter code.
-        varName="${varName}"'="$1"'
+        varName="${varName}"'="${_argproc_value}"'
     fi
 
-    if [[ ${matchExpr} != '' ]]; then
-        # Re-form as the clause to insert to perform the check.
-        matchExpr='
-            elif ! [[ $1 =~ ^('"${matchExpr}"')$ ]]; then
-                echo 1>&2 "Invalid value for '"${desc}"': $1"
-                return 1'
+    if [[ ${filter} =~ ^/(.*)/$ ]]; then
+        # Re-form `filter` as the statement which performs the regex check.
+        filter="${BASH_REMATCH[1]}"
+        filter='
+            if ! [[ ${_argproc_value} =~ '"${filter}"' ]]; then
+                echo 1>&2 "Invalid value for '"${desc}"': ${_argproc_value}"
+                return 1
+            fi'
+    elif [[ ${filter} != '' ]]; then
+        # Re-form `filter` as the call to the filter function.
+        filter='_argproc_value="$('"${filter}"' "${_argproc_value}")" || return 1'
     fi
 
     eval 'function '"${handlerName}"' {
         if (( $# < 1 )); then
             echo 1>&2 "Value required for '"${desc}"'."
             return 1
-        '"${matchExpr}"'
         fi
-
+        local _argproc_value="$1"
+        '"${filter}"'
         '"${callFunc}"'
         '"${varName}"'
         _argproc_receivedArgNames+="<'"${longName}"'>"
@@ -546,13 +561,18 @@ function _argproc_janky-args {
 
             case "${name}" in
                 call)
-                    [[ ${value} =~ ^=([-_a-zA-Z][-_a-zA-Z0-9]*)$ ]] \
+                    [[ ${value} =~ ^=([_a-zA-Z][-_:a-zA-Z0-9]*)$ ]] \
                     && optCall="${BASH_REMATCH[1]}" \
                     || argError=1
                     ;;
                 default)
                     [[ ${value} =~ ^=(.*)$ ]] \
                     && optDefault="${BASH_REMATCH[1]}" \
+                    || argError=1
+                    ;;
+                filter)
+                    [[ ${value} =~ ^=(/(.*)/|[_a-zA-Z][-_:a-zA-Z0-9]*)$ ]] \
+                    && optFilter="${BASH_REMATCH[1]}" \
                     || argError=1
                     ;;
                 match)
