@@ -189,7 +189,7 @@ function opt-value {
         _argproc_initStatements+=("${optVar}=$(_argproc:quote "${optDefault}")")
     fi
 
-    _argproc_define-value-required-argument \
+    _argproc_define-value-required-arg --option \
         "${specName}" "${optCall}" "${optVar}" "${optMatch}"
 
     if (( optRequired )); then
@@ -223,7 +223,7 @@ function positional-arg {
         _argproc_initStatements+=("${optVar}=$(_argproc:quote "${optDefault}")")
     fi
 
-    _argproc_define-value-required-argument --arg \
+    _argproc_define-value-required-arg \
         "${specName}" "${optCall}" "${optVar}" "${optMatch}"
 
     if (( optRequired )); then
@@ -404,10 +404,10 @@ function _argproc_define-no-value-option {
 }
 
 # Defines an argument/option activation function which requires passing a value.
-function _argproc_define-value-required-argument {
-    local isArg=0
-    if [[ $1 == '--arg' ]]; then
-        isArg=1
+function _argproc_define-value-required-arg {
+    local isOption=0
+    if [[ $1 == '--option' ]]; then
+        isOption=1
         shift
     fi
 
@@ -417,12 +417,12 @@ function _argproc_define-value-required-argument {
     local matchExpr="$4"
 
     local desc handlerName
-    if (( isArg )); then
-        desc="argument <${longName}>"
-        handlerName="_argproc:positional-${longName}"
-    else
+    if (( isOption )); then
         desc="option --${longName}"
         handlerName="_argproc:long-${longName}"
+    else
+        desc="argument <${longName}>"
+        handlerName="_argproc:positional-${longName}"
     fi
 
     if [[ ${callFunc} != '' ]]; then
