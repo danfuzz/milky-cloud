@@ -269,16 +269,14 @@ function opt-value {
                 return 1'
     fi
 
-    local requiredSetter=''
+    local gotOption=''
     if (( ${optRequired} )); then
-        # Replace `optRequired` with a variable name based on the option name,
-        # and use it to form all the dependant bits.
-        optRequired="_argproc_gotOption_${name/-/_}"
-        requiredSetter="${optRequired}=1"
-        _argproc_initStatements+=("local ${optRequired}=0")
+        # Set up `gotOption` to indicate that the option was received, and add
+        # a pre-return statement to check if it in fact happened.
+        gotOption='_argproc_receivedOptionNames+="<'"${specName}"'>"'
         _argproc_preReturnStatements+=('
-            (( '"${optRequired}"' )) || {
-                echo 1>&2 "Missing required option: --'"${name}"'"
+            [[ ${_argproc_receivedOptionNames} =~ "<'"${specName}"'>" ]] || {
+                echo 1>&2 "Missing required option: --'"${specName}"'"
                 false
             }')
     fi
@@ -292,7 +290,7 @@ function opt-value {
 
         '"${optCall}"'
         '"${optVar}"'
-        '"${requiredSetter}"'
+        '"${gotOption}"'
     }'
 }
 
@@ -522,6 +520,7 @@ function _argproc_define-no-value-option {
 
         '"${callFunc}"'
         '"${varName}"'
+        _argproc_receivedOptionNames+="<'"${longName}"'>"
     }'
 
     if [[ ${abbrevChar} != '' ]]; then
@@ -697,6 +696,9 @@ function _argproc_parse-spec {
 function _argproc:statements-from-args {
     local argError=0
     local arg handler name statement value
+
+    # This is used for required-argument checking.
+    _argproc_statements+=($'local _argproc_receivedOptionNames=\'\'')
 
     while (( $# > 0 )); do
         arg="$1"
