@@ -659,7 +659,9 @@ function _argproc_parse-spec {
 
     if (( valueOk )); then
         specHasValue="$([[ ${value} == '' ]]; echo $?)"
-        specValue="${value:1}" # `:1` to drop the equal sign.
+        if (( specHasValue )); then
+            specValue="${value:1}" # `:1` to drop the equal sign.
+        fi
     elif [[ ${value} != '' ]]; then
         echo 1>&2 "Value not allowed in spec: ${spec}"
         return 1
