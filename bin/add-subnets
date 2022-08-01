@@ -130,7 +130,7 @@ fi
 
 tagSpec="$(lib name-tag-spec 'subnet' "${name}")"
 
-progressArg=($(progress-msg-switch --print-option))
+progressArg="$(progress-msg-switch --print-option)"
 
 results=()
 error=0
@@ -183,7 +183,7 @@ for (( n = 0; n < azCount && !error; n++ )); do
     # * PrivateDnsHostnameTypeOnLaunch: Private DNS name is based on the
     #   instance ID (not private DNS address).
     lib set-attributes \
-        --in="${inRegion}" --id="${result}" "${progressArg[@]}" \
+        --in="${inRegion}" --id="${result}" "${progressArg}" \
         AssignIpv6AddressOnCreation=true \
         EnableResourceNameDnsARecordOnLaunch=true \
         EnableResourceNameDnsAAAARecordOnLaunch=true \

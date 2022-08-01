@@ -145,9 +145,8 @@ progress-msg "  name: ${name}"
 
 error=0
 
-progressArg=($(progress-msg-switch --print-option))
 lib configure-security-group \
-    "${progressArg[@]}" \
+    "$(progress-msg-switch --print-option)" \
     --in="${inRegion}" --security-group="${groupId}" \
 || error="$?"
 
