@@ -75,22 +75,22 @@ opt-value --required --var=inLocation in
 opt-value --var=instanceType --default='t3.nano' instance-type
 
 # Name for the SSH keypair that allows for login access.
-opt-value --var=keyName --match='.*' key-name
+opt-value --var=keyName --filter='/./' key-name
 
 # Name for the instance.
-opt-value --var=name --match='.+' name
+opt-value --var=name --filter='/./' name
 
 # Name or ID of the security group to be in.
-opt-value --var=groupNameOrId --match='.+' security-group
+opt-value --var=groupNameOrId --filter='/./' security-group
 
 # Actual user data (first-boot script).
-opt-value --var=userData --match='.*' user-data
+opt-value --var=userData --filter='/./' user-data
 
 # Name of file containing user data.
-opt-value --var=userDataFile --match='.*' user-data-file
+opt-value --var=userDataFile --filter='/./' user-data-file
 
 # Name or ID of the VPC to be in.
-opt-value --var=vpcNameOrId --match='.+' vpc
+opt-value --var=vpcNameOrId --filter='/./' vpc
 
 process-args "$@" || usage "$?"
 

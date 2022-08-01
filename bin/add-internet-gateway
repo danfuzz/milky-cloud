@@ -51,13 +51,13 @@ opt-action --call=usage help/h=0
 opt-value --required --var=inLocation in
 
 # Name of the resulting gateway.
-opt-value --var=name --match='.+' name
+opt-value --var=name --filter='/./' name
 
 # Progress messages?
 opt-toggle --call=progress-msg-switch progress
 
 # Name or ID of the VPC.
-opt-value --required --var=vpcNameOrId --match='.+' vpc
+opt-value --required --var=vpcNameOrId --filter='/./' vpc
 
 process-args "$@" || usage "$?"
 

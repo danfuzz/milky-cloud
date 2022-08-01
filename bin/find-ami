@@ -53,7 +53,8 @@ opt-action --call=usage help/h=0
 opt-value --required --var=inLocation in
 
 # Instance type.
-opt-value --required --var=instanceType --match='[a-z0-9]+\.[a-z0-9]+' instance-type
+opt-value --required --var=instanceType \
+    --filter='/^[a-z0-9]+\.[a-z0-9]+$/' instance-type
 
 process-args "$@" || usage "$?"
 

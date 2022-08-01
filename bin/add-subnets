@@ -53,7 +53,7 @@ opt-action --call=usage help/h=0
 opt-value --required --var=inLocation in
 
 # Name for the subnets.
-opt-value --var=name --match='.+' name
+opt-value --var=name --filter='/./' name
 
 # Progress messages?
 opt-toggle --call=progress-msg-switch progress
@@ -62,7 +62,7 @@ opt-toggle --call=progress-msg-switch progress
 opt-toggle --var=quiet quiet
 
 # Name or ID of the VPC.
-opt-value --required --var=vpcNameOrId --match='.+' vpc
+opt-value --required --var=vpcNameOrId --filter='/./' vpc
 
 process-args "$@" || usage "$?"
 

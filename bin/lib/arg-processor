@@ -29,6 +29,15 @@
 # itself optionally specified via `--default=<value>`. If `--default` isn't
 # used, then the default-for-the-default depends on the specific function.
 #
+# Definers for value-accepting arguments take an option `--filter=<spec>`, which
+# specifies either a function to call or a regular expression to match against
+# the argument value. If the call or match fails, the argument isn't accepted.
+# In addition, the function form is expected to output the value to use on
+# success (e.g. a replacement for what was directly passed on the commandline).
+#
+# Some argument-definers also accept `--required`, to indicate that the argument
+# or option is required (mandatory).
+#
 # Beyond the above, see the docs for the functions for restrictions and
 # additional options.
 
@@ -86,10 +95,8 @@ function opt-action {
 # Declares a "choice" option set, consisting of one or more options. On a
 # commandline, no choice option accepts a value (because the option name itself
 # implies the value). If left unspecified, the default variable value for a
-# choice option is `''` (the empty string).
-#
-# --required -- Indicates that one of the options defined by this set must be
-#   passed.
+# choice option is `''` (the empty string). This definer also accepts the
+# `--required` option.
 function opt-choice {
     local optCall=''
     local optDefault=''
@@ -165,19 +172,16 @@ function opt-toggle {
 # Declares a "value" option, which requires a value when passed on a
 # commandline. No `<abbrev>` or `<value>` is allowed in the argument spec. If
 # left unspecified, the default variable value for a value option is `''` (the
-# empty string).
-#
-# --match=<regex> -- Regular expression matched against the entire argument
-#   value. If the value does not match, then the option gets rejected.
-# --required -- Indicates that this option must be passed.
+# empty string). This definer also accepts the `--required` and `--filter`
+# options.
 function opt-value {
     local optCall=''
     local optDefault=''
-    local optMatch=''
+    local optFilter=''
     local optRequired=0
     local optVar=''
     local args=("$@")
-    _argproc_janky-args call default match required var \
+    _argproc_janky-args call default filter required var \
     || return 1
 
     local specName=''
@@ -190,7 +194,7 @@ function opt-value {
     fi
 
     _argproc_define-value-required-arg --option \
-        "${specName}" "${optCall}" "${optVar}" "${optMatch}"
+        "${specName}" "${optCall}" "${optVar}" "${optFilter}"
 
     if (( optRequired )); then
         _argproc_add-required-arg-postcheck --option "${specName}"
@@ -199,19 +203,16 @@ function opt-value {
 
 # Declares a positional argument. No `<abbrev>` or `<value>` is allowed in the
 # argument spec. Unlike options, a positional argument name is _only_ used for
-# error messages and internal bookkeeping.
-#
-# --match=<regex> -- Regular expression matched against the entire argument
-#   value. If the value does not match, then the argument gets rejected.
-# --required -- Indicates that this argument must be passed.
+# error messages and internal bookkeeping. This definer also accepts the
+# `--required` and `--filter` options.
 function positional-arg {
     local optCall=''
     local optDefault=''
-    local optMatch=''
+    local optFilter=''
     local optRequired=0
     local optVar=''
     local args=("$@")
-    _argproc_janky-args call default match required var \
+    _argproc_janky-args call default filter required var \
     || return 1
 
     local specName=''
@@ -224,7 +225,7 @@ function positional-arg {
     fi
 
     _argproc_define-value-required-arg \
-        "${specName}" "${optCall}" "${optVar}" "${optMatch}"
+        "${specName}" "${optCall}" "${optVar}" "${optFilter}"
 
     if (( optRequired )); then
         _argproc_add-required-arg-postcheck "${specName}"
@@ -424,7 +425,7 @@ function _argproc_define-value-required-arg {
     local longName="$1"
     local callFunc="$2"
     local varName="$3"
-    local matchExpr="$4"
+    local filter="$4"
 
     local desc handlerName
     if (( isOption )); then
@@ -437,29 +438,34 @@ function _argproc_define-value-required-arg {
 
     if [[ ${callFunc} != '' ]]; then
         # Re-form as the caller code.
-        callFunc="${callFunc}"' "$1" || return "$?"'
+        callFunc="${callFunc}"' "${_argproc_value}" || return "$?"'
     fi
 
     if [[ ${varName} != '' ]]; then
         # Re-form as the setter code.
-        varName="${varName}"'="$1"'
+        varName="${varName}"'="${_argproc_value}"'
     fi
 
-    if [[ ${matchExpr} != '' ]]; then
-        # Re-form as the clause to insert to perform the check.
-        matchExpr='
-            elif ! [[ $1 =~ ^('"${matchExpr}"')$ ]]; then
-                echo 1>&2 "Invalid value for '"${desc}"': $1"
-                return 1'
+    if [[ ${filter} =~ ^/(.*)/$ ]]; then
+        # Re-form `filter` as the statement which performs the regex check.
+        filter="${BASH_REMATCH[1]}"
+        filter='
+            if ! [[ ${_argproc_value} =~ '"${filter}"' ]]; then
+                echo 1>&2 "Invalid value for '"${desc}"': ${_argproc_value}"
+                return 1
+            fi'
+    elif [[ ${filter} != '' ]]; then
+        # Re-form `filter` as the call to the filter function.
+        filter='_argproc_value="$('"${filter}"' "${_argproc_value}")" || return 1'
     fi
 
     eval 'function '"${handlerName}"' {
         if (( $# < 1 )); then
             echo 1>&2 "Value required for '"${desc}"'."
             return 1
-        '"${matchExpr}"'
         fi
-
+        local _argproc_value="$1"
+        '"${filter}"'
         '"${callFunc}"'
         '"${varName}"'
         _argproc_receivedArgNames+="<'"${longName}"'>"
@@ -473,9 +479,9 @@ function _argproc_define-value-required-arg {
 # Adds a pre-return check which fails if none of the indicated arguments/options
 # were present on the commandline.
 function _argproc_add-required-arg-postcheck {
-    local kind='argument'
+    local isOption=0
     if [[ $1 == '--option' ]]; then
-        kind='option'
+        isOption=1
         shift
     fi
 
@@ -493,14 +499,24 @@ function _argproc_add-required-arg-postcheck {
     done
     checkClause+=' ]]'
 
-    local errorMsg="Missing required ${kind}"
+    local errorMsg='Missing required '
+    local argNames
+
+    if (( isOption )); then
+        errorMsg+='option'
+        argNames="$(printf ' --%s' "$@")"
+    else
+        errorMsg+='argument'
+        argNames="$*"
+    fi
+
     if (( $# > 1 )); then
         errorMsg+=' from set'
     fi
 
     _argproc_preReturnStatements+=(
         "$(printf $'%s || { echo 1>&2 %s %s; false; }\n' \
-            "${checkClause}" "${errorMsg}:" "$(printf ' --%s' "$@")"
+            "${checkClause}" "${errorMsg}:" "$argNames"
     )")
 }
 
@@ -547,7 +563,7 @@ function _argproc_janky-args {
 
             case "${name}" in
                 call)
-                    [[ ${value} =~ ^=([-_a-zA-Z][-_a-zA-Z0-9]*)$ ]] \
+                    [[ ${value} =~ ^=([_a-zA-Z][-_:a-zA-Z0-9]*)$ ]] \
                     && optCall="${BASH_REMATCH[1]}" \
                     || argError=1
                     ;;
@@ -556,9 +572,9 @@ function _argproc_janky-args {
                     && optDefault="${BASH_REMATCH[1]}" \
                     || argError=1
                     ;;
-                match)
-                    [[ ${value} =~ ^=(.*)$ ]] \
-                    && optMatch="${BASH_REMATCH[1]}" \
+                filter)
+                    [[ ${value} =~ ^=(/(.*)/|[_a-zA-Z][-_:a-zA-Z0-9]*)$ ]] \
+                    && optFilter="${BASH_REMATCH[1]}" \
                     || argError=1
                     ;;
                 required)

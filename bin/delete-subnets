@@ -54,7 +54,7 @@ opt-action --call=usage help/h=0
 opt-value --required --var=inLocation in
 
 # Name or ID of the VPC.
-opt-value --required --var=vpcNameOrId --match='.+' vpc
+opt-value --required --var=vpcNameOrId --filter='/./' vpc
 
 # Simple filter for `--all` (degenerate choice option).
 opt-choice --var=simpleFilter \

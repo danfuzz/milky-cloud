@@ -47,7 +47,7 @@ opt-action --call=usage help/h=0
 opt-value --required --var=inLocation in
 
 # ID of the gateway.
-opt-value --required --var=gatewayId --match='.+' gateway
+opt-value --required --var=gatewayId --filter='/./' gateway
 
 # Progress messages?
 opt-toggle --call=progress-msg-switch progress

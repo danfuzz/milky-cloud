@@ -37,7 +37,7 @@ function usage {
 opt-action --call=usage help/h=0
 
 # Suffix text.
-positional-arg --var=suffix --match='[-_:./a-zA-Z0-9]+' suffix
+positional-arg --var=suffix --filter='/^[-_:./a-zA-Z0-9]+$/' suffix
 
 process-args "$@" || usage "$?"
 
