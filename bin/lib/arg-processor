@@ -125,7 +125,7 @@ function opt-choice {
     done
 
     if (( optRequired )); then
-        # Set up the post-parse check.
+        # Set up the post-parse check for a required choice.
         _argproc_preReturnStatements+=(
             "$(printf $'%s || { echo 1>&2 %s %s; false; }\n' \
                 "$(_argproc_code-to-check-for-options "${allNames[@]}")" \
@@ -230,18 +230,6 @@ function opt-value {
                 return 1'
     fi
 
-    local gotOption=''
-    if (( ${optRequired} )); then
-        # Set up `gotOption` to indicate that the option was received, and add
-        # a pre-return statement to check if it in fact happened.
-        gotOption='_argproc_receivedOptionNames+="<'"${specName}"'>"'
-        _argproc_preReturnStatements+=('
-            [[ ${_argproc_receivedOptionNames} =~ "<'"${specName}"'>" ]] || {
-                echo 1>&2 "Missing required option: --'"${specName}"'"
-                false
-            }')
-    fi
-
     eval 'function _argproc:long-'"${specName}"' {
         if (( $# < 1 )); then
             echo 1>&2 "Value required for option: --'"${specName}"'"
@@ -251,8 +239,17 @@ function opt-value {
 
         '"${optCall}"'
         '"${optVar}"'
-        '"${gotOption}"'
+        _argproc_receivedOptionNames+="<'"${specName}"'>"
     }'
+
+    if (( optRequired )); then
+        # Set up the post-parse check for a required option.
+        _argproc_preReturnStatements+=(
+            "$(printf $'%s || { echo 1>&2 %s; false; }\n' \
+                "$(_argproc_code-to-check-for-options "${specName}")" \
+                "'Missing required option: --${specName}'"
+        )")
+    fi
 }
 
 # Declares a positional argument. No `<abbrev>` or `<value>` is allowed in the
