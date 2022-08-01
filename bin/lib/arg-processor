@@ -351,12 +351,9 @@ function positional-arg {
     _argproc_janky-args call default match required var \
     || return 1
 
-    local name="${args[0]}"
-
-    if ! [[ ${name} =~ ^[a-zA-Z0-9][-a-zA-Z0-9]*$ ]]; then
-        echo 1>&2 "Invalid argument spec: ${name}"
-        return 1
-    fi
+    local specName=''
+    _argproc_parse-spec "${args[0]}" \
+    || return 1
 
     if [[ ${optCall} != '' ]]; then
         # Re-form as the caller code.
@@ -373,7 +370,7 @@ function positional-arg {
         # Re-form as the clause to insert to perform the check.
         optMatch='
             elif ! [[ $1 =~ ^('"${optMatch}"')$ ]]; then
-                echo 1>&2 "Invalid value for argument <'"${name}"'>."
+                echo 1>&2 "Invalid value for argument <'"${specName}"'>."
                 echo 1>&2 "Value: $1"
                 return 1'
     fi
@@ -382,13 +379,13 @@ function positional-arg {
     if (( ${optRequired} )); then
         # Code to issue a complaint about the missing argument.
         ifMissing='
-            echo 1>&2 "Missing required argument: <'"${name}"'>"
+            echo 1>&2 "Missing required argument: <'"${specName}"'>"
             return 1'
     else
         ifMissing='return'
     fi
 
-    eval 'function _argproc:positional-'"${name}"' {
+    eval 'function _argproc:positional-'"${specName}"' {
         if (( $# < 1 )); then
             '"${ifMissing}"'
         '"${optMatch}"'
@@ -398,7 +395,7 @@ function positional-arg {
         '"${optVar}"'
     }'
 
-    _argproc_positionalFuncs+=("_argproc:positional-${name}")
+    _argproc_positionalFuncs+=("_argproc:positional-${specName}")
 }
 
 # Prints a usage message. This is just a convenient shorthand to do just a few
