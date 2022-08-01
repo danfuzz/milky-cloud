@@ -423,7 +423,7 @@ function _argproc_define-no-value-option {
 
         '"${callFunc}"'
         '"${varName}"'
-        _argproc_receivedOptionNames+="<'"${longName}"'>"
+        _argproc_receivedArgNames+="<'"${longName}"'>"
     }'
 
     if [[ ${abbrevChar} != '' ]]; then
@@ -481,7 +481,7 @@ function _argproc_define-value-required-argument {
 
         '"${callFunc}"'
         '"${varName}"'
-        _argproc_receivedOptionNames+="<'"${longName}"'>"
+        _argproc_receivedArgNames+="<'"${longName}"'>"
     }'
 
     if [[ ${abbrevChar} != '' ]]; then
@@ -502,7 +502,7 @@ function _argproc_add-required-option-postcheck {
             checkClause+=' || '
         fi
         checkClause+="$(
-            printf '${_argproc_receivedOptionNames} =~ "<%s>"' "${longName}")"
+            printf '${_argproc_receivedArgNames} =~ "<%s>"' "${longName}")"
     done
     checkClause+=' ]]'
 
@@ -688,7 +688,7 @@ function _argproc:statements-from-args {
     local arg handler name statement value
 
     # This is used for required-argument checking.
-    _argproc_statements+=($'local _argproc_receivedOptionNames=\'\'')
+    _argproc_statements+=($'local _argproc_receivedArgNames=\'\'')
 
     while (( $# > 0 )); do
         arg="$1"
