@@ -29,9 +29,11 @@
 # itself optionally specified via `--default=<value>`. If `--default` isn't
 # used, then the default-for-the-default depends on the specific function.
 #
-# Definers for value-accepting arguments take an option `--match=<regex>`, which
-# specifies a regular expression matched against the entire argument value. If
-# the match fails, the argument isn't accepted.
+# Definers for value-accepting arguments take an option `--filter=<spec>`, which
+# specifies either a function to call or a regular expression to match against
+# the argument value. If the call or match fails, the argument isn't accepted.
+# In addition, the function form is expected to output the value to use on
+# success (e.g. a replacement for what was directly passed on the commandline).
 #
 # Some argument-definers also accept `--required`, to indicate that the argument
 # or option is required (mandatory).
