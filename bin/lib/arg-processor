@@ -147,36 +147,15 @@ function opt-toggle {
     _argproc_parse-spec --abbrev "${args[0]}" \
     || return 1
 
-    if [[ ${optCall} != '' ]]; then
-        # Re-form as the caller code.
-        optCall="${optCall}"' "$1" || return "$?"'
-    fi
-
     if [[ ${optVar} != '' ]]; then
-        # Set up the default initializer, and then re-form as the setter code.
+        # Set up the default initializer.
         _argproc_initStatements+=("${optVar}=0")
-        optVar="${optVar}"'="$1"'
     fi
 
-    eval '
-        function _argproc:toggle-handler-'"${specName}"' {
-            if (( $# > 1 )); then
-                echo 1>&2 "Value not allowed for option: --'"${specName}"'"
-                return 1
-            fi
-
-            '"${optCall}"'
-            '"${optVar}"'
-        }
-
-        function _argproc:long-'"${specName}"' {
-            _argproc:toggle-handler-'"${specName}"' 1 "$@"
-        }
-
-        function _argproc:long-no-'"${specName}"' {
-            _argproc:toggle-handler-'"${specName}"' 0 "$@"
-        }
-    '
+    _argproc_define-no-value-option \
+        "${specName}" "${optCall}" "${optVar}" "${specAbbrev}" '1'
+    _argproc_define-no-value-option \
+        "no-${specName}" "${optCall}" "${optVar}" '' '0'
 
     if [[ ${specAbbrev} != '' ]]; then
         _argproc_define-abbrev "${specAbbrev}" "${specName}"
