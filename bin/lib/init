@@ -86,25 +86,6 @@ _milky_cloud_progressEnabled=0
 # `progress-msg-switch` to change or check the enabled status of progress
 # messages.
 function progress-msg {
-    if (( $# == 1 )); then
-        case "$1" in
-            --enable|--set=1)
-                _milky_cloud_progressEnabled=1
-                return
-                ;;
-            --disable|--set=0)
-                _milky_cloud_progressEnabled=0
-                return
-                ;;
-            --print-option)
-                if (( _milky_cloud_progressEnabled )); then
-                    echo '--progress'
-                fi
-                return
-                ;;
-        esac
-    fi
-
     if (( _milky_cloud_progressEnabled )); then
         echo 1>&2 "$@"
     fi
