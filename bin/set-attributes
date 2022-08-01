@@ -50,7 +50,7 @@ opt-action --call=usage help/h=0
 opt-value --required --var=inLocation in
 
 # ID of the thing to operate on.
-opt-value --required --var=id --match='.*' id
+opt-value --required --var=id --match='/^[-a-z0-9]+$/' id
 
 # Progress messages?
 opt-toggle --call=progress-msg-switch progress
