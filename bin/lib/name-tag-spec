@@ -47,7 +47,7 @@ opt-action --call=usage help/h=0
 opt-choice --var=outputStyle --default=json compact json
 
 # Resource type.
-positional-arg --required --var=resourceType --match='[-a-z0-9]+' resource-type
+positional-arg --required --var=resourceType --filter='/^[-a-z0-9]+$/' resource-type
 
 # Name for the resource.
 positional-arg --required --var=name --filter='/./' name
