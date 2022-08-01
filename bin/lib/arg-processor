@@ -125,13 +125,7 @@ function opt-choice {
     done
 
     if (( optRequired )); then
-        # Set up the post-parse check for a required choice.
-        _argproc_preReturnStatements+=(
-            "$(printf $'%s || { echo 1>&2 %s %s; false; }\n' \
-                "$(_argproc_code-to-check-for-options "${allNames[@]}")" \
-                "'Missing required option from set:'" \
-                "$(printf ' --%s' "${allNames[@]}")"
-        )")
+        _argproc_add-required-option-postcheck "${allNames[@]}"
     fi
 }
 
@@ -243,12 +237,7 @@ function opt-value {
     }'
 
     if (( optRequired )); then
-        # Set up the post-parse check for a required option.
-        _argproc_preReturnStatements+=(
-            "$(printf $'%s || { echo 1>&2 %s; false; }\n' \
-                "$(_argproc_code-to-check-for-options "${specName}")" \
-                "'Missing required option: --${specName}'"
-        )")
+        _argproc_add-required-option-postcheck "${specName}"
     fi
 }
 
@@ -486,22 +475,34 @@ function _argproc_define-no-value-option {
     fi
 }
 
-# Test clause which evaluates to true when any of the named options is present
-# on the commandline.
-function _argproc_code-to-check-for-options {
+# Adds a pre-return check which fails if none of the indicated options were
+# present on the commandline.
+function _argproc_add-required-option-postcheck {
+    local checkClause='[[ '
     local longName
     local first=1
     for longName in "$@"; do
         if (( first )); then
             first=0
-            printf '[[ '
         else
-            printf $' || '
+            checkClause+=' || '
         fi
-        printf $'${_argproc_receivedOptionNames} =~ "<%s>"' "${longName}"
+        checkClause+="$(
+            printf '${_argproc_receivedOptionNames} =~ "<%s>"' "${longName}")"
     done
+    checkClause+=' ]]'
 
-    printf $' ]]\n'
+    local errorMsg
+    if (( $# == 1 )); then
+        errorMsg='Missing required option'
+    else
+        errorMsg='Missing required option from set'
+    fi
+
+    _argproc_preReturnStatements+=(
+        "$(printf $'%s || { echo 1>&2 %s %s; false; }\n' \
+            "${checkClause}" "${errorMsg}:" "$(printf ' --%s' "$@")"
+    )")
 }
 
 # Janky yet reasonable argument parser for the commands in this library. (How
