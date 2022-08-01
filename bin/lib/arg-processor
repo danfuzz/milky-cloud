@@ -125,7 +125,7 @@ function opt-choice {
     done
 
     if (( optRequired )); then
-        _argproc_add-required-option-postcheck "${allNames[@]}"
+        _argproc_add-required-argument-postcheck "${allNames[@]}"
     fi
 }
 
@@ -193,7 +193,7 @@ function opt-value {
         "${specName}" "${optCall}" "${optVar}" "${optMatch}"
 
     if (( optRequired )); then
-        _argproc_add-required-option-postcheck "${specName}"
+        _argproc_add-required-argument-postcheck "${specName}"
     fi
 }
 
@@ -227,7 +227,7 @@ function positional-arg {
         "${specName}" "${optCall}" "${optVar}" "${optMatch}"
 
     if (( optRequired )); then
-        _argproc_add-required-option-postcheck --arg "${specName}"
+        _argproc_add-required-argument-postcheck --arg "${specName}"
     fi
 
     _argproc_positionalFuncs+=("_argproc:positional-${specName}")
@@ -460,9 +460,9 @@ function _argproc_define-value-required-argument {
     fi
 }
 
-# Adds a pre-return check which fails if none of the indicated options were
-# present on the commandline.
-function _argproc_add-required-option-postcheck {
+# Adds a pre-return check which fails if none of the indicated arguments/options
+# were present on the commandline.
+function _argproc_add-required-argument-postcheck {
     local kind='option'
     if [[ $1 == '--arg' ]]; then
         kind='argument'
