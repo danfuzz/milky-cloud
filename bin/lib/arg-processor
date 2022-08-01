@@ -115,7 +115,7 @@ function opt-choice {
     local optRequired=0
     local optVar=''
     local args=("$@")
-    _argproc_janky-args call default required var \
+    _argproc_janky-args --multi-spec call default required var \
     || return 1
 
     local requiredName=''
@@ -566,7 +566,16 @@ function rest-arg {
 # (presumed to be a local variable declared in the calling scope) for each
 # parsed option. Assumes the variable `args` (again presumed local to the
 # caller) contains all the arguments, which gets updates by this function.
+# After option parsing, this expects there to be one argument remaining, except
+# if `--multi-spec` is passed to this function, in which case there must be at
+# least one.
 function _argproc_janky-args {
+    multiSpec=0
+    if [[ $1 == '--multi-spec' ]]; then
+        multiSpec=1
+        shift
+    fi
+
     local argError=0
     local argSpecs=" $* " # Spaces on the ends to make the match code work.
     local optsDone=0
@@ -657,6 +666,14 @@ function _argproc_janky-args {
            echo 1>&2 'Must use at least one of --call or --var.'
            return 1
        fi
+   fi
+
+   if (( ${#args[@]} == 0 )); then
+       echo 1>&2 'Missing specification.'
+       return 1
+   elif (( ${#args[@]} > 1 && !multiSpec )); then
+       echo 1>&2 'Too many specifications.'
+       return 1
    fi
 }
 
