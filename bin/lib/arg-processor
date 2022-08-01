@@ -7,10 +7,24 @@
 #
 # Library for reasonably okay argument / option processing.
 #
-# Note: In places where this code expects to set global variables and call back
-# to client code, care is taken to only define local variables with names that
-# are unlikely to shadow globals. ("Hooray" for dynamic scoping!)
+# The public argument-defining functions all take argument specifications of the
+# form `<name>/<abbrev>=<value>`. `<name>` is the argument (long option) name.
+# `<abbrev>` is a one-letter abbreviation for a single-dash option form.
+# `<value>` is a (string) value to associate with the argument. `<abbrev>` and
+# `<value>` are always optional and (independently) sometimes prohibited,
+# depending on the definition function.
 #
+# The public argument-defining functions also all take two options,
+# `--call=<name>` and `--var=<name>`, at least one of which must be passed.
+# `--call` specifies a function to be called when parsing an argument, and
+# `--var` specifies a variable to set. If both are used, then the call is made
+# first, and the variable is only set if the call returns successfully. The
+# variable, if specified, is always initialized to a default value, which is
+# itself optionally specified via `--default=<value>`. If `--default` isn't
+# used, then the default-for-the-default depends on the specific function.
+#
+# Beyond the above, see the docs for the functions for restrictions and
+# additional options.
 
 # List of statements to run just before parsing. This includes:
 #
@@ -30,6 +44,10 @@ _argproc_preReturnStatements=()
 
 #
 # Public functions
+#
+# Note: In places where this code expects to set global variables and call back
+# to client code, care is taken to only define local variables with names that
+# are unlikely to shadow globals. ("Hooray" for dynamic scoping!)
 #
 
 # Declares an "action" option, specified as `<name>/<abbrev>`, with `/<abbrev>`
