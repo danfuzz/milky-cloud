@@ -57,11 +57,11 @@ _argproc_preReturnStatements=()
 #
 
 # Declares an "action" option, which takes no value on a commandline. If left
-# unspecified, the default variable value for an action option is `''` (the
-# empty string), and the default activation value is `1`.
+# unspecified, the default variable value for an action option is `0`, and the
+# default activation value is `1`.
 function opt-action {
     local optCall=''
-    local optDefault=''
+    local optDefault='0'
     local optVar=''
     local args=("$@")
     _argproc_janky-args call default var \
@@ -199,8 +199,8 @@ function opt-choice {
 # No `<value>` is allowed in the argument spec. The toggle state of off or on is
 # always indicated by a value of `0` or `1` (respectively). In addition to the
 # main long-form option `--<name>`, this function also defines `--no-<name>` to
-# turn the toggle off. If left unspecified, the default variable value for an
-# action option is `0`.
+# turn the toggle off. If left unspecified, the default variable value for a
+# toggle option is `0`.
 function opt-toggle {
     local optCall=''
     local optVar=''
