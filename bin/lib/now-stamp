@@ -34,7 +34,7 @@ function usage {
 }
 
 # Want help?
-opt-action --call=usage --value=0 help/h
+opt-action --call=usage help/h=0
 
 # Suffix text.
 positional-arg --var=suffix --match='[-_:./a-zA-Z0-9]+' suffix
