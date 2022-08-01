@@ -184,36 +184,13 @@ function opt-value {
     _argproc_parse-spec "${args[0]}" \
     || return 1
 
-    if [[ ${optCall} != '' ]]; then
-        # Re-form as the caller code.
-        optCall="${optCall}"' "${value}" || return "$?"'
-    fi
-
     if [[ ${optVar} != '' ]]; then
-        # Set up the default initializer, and then re-form as the setter code.
+        # Set up the default initializer.
         _argproc_initStatements+=("${optVar}=$(_argproc:quote "${optDefault}")")
-        optVar="${optVar}"'="$1"'
     fi
 
-    if [[ ${optMatch} != '' ]]; then
-        # Re-form as the clause to insert to perform the check.
-        optMatch='
-            elif ! [[ $1 =~ ^('"${optMatch}"')$ ]]; then
-                echo 1>&2 "Invalid value for option --'"${specName}"': $1"
-                return 1'
-    fi
-
-    eval 'function _argproc:long-'"${specName}"' {
-        if (( $# < 1 )); then
-            echo 1>&2 "Value required for option: --'"${specName}"'"
-            return 1
-        '"${optMatch}"'
-        fi
-
-        '"${optCall}"'
-        '"${optVar}"'
-        _argproc_receivedOptionNames+="<'"${specName}"'>"
-    }'
+    _argproc_define-value-required-argument \
+        "${specName}" "${optCall}" "${optVar}" "${optMatch}"
 
     if (( optRequired )); then
         _argproc_add-required-option-postcheck "${specName}"
@@ -243,7 +220,7 @@ function positional-arg {
 
     if [[ ${optCall} != '' ]]; then
         # Re-form as the caller code.
-        optCall="${optCall}"' "${value}" || return "$?"'
+        optCall="${optCall}"' "$1" || return "$?"'
     fi
 
     if [[ ${optVar} != '' ]]; then
@@ -442,6 +419,64 @@ function _argproc_define-no-value-option {
         if (( $# > 0 )); then
             echo 1>&2 "Value not allowed for option: --'"${longName}"'"
             return 1
+        fi
+
+        '"${callFunc}"'
+        '"${varName}"'
+        _argproc_receivedOptionNames+="<'"${longName}"'>"
+    }'
+
+    if [[ ${abbrevChar} != '' ]]; then
+        _argproc_define-abbrev "${abbrevChar}" "${longName}"
+    fi
+}
+
+# Defines an argument/option activation function which requires passing a value.
+function _argproc_define-value-required-argument {
+    local isArg=0
+
+    if [[ $1 == '--arg' ]]; then
+        isArg=1
+        shift
+    fi
+
+    local longName="$1"
+    local callFunc="$2"
+    local varName="$3"
+    local matchExpr="$4"
+
+    local desc handlerName
+    if (( isArg )); then
+        desc="argument <${longName}>"
+        handlerName="_argproc:positional-${longName}"
+    else
+        desc="option --${longName}"
+        handlerName="_argproc:long-${longName}"
+    fi
+
+    if [[ ${callFunc} != '' ]]; then
+        # Re-form as the caller code.
+        callFunc="${callFunc}"' "$1" || return "$?"'
+    fi
+
+    if [[ ${varName} != '' ]]; then
+        # Re-form as the setter code.
+        varName="${varName}"'="$1"'
+    fi
+
+    if [[ ${matchExpr} != '' ]]; then
+        # Re-form as the clause to insert to perform the check.
+        matchExpr='
+            elif ! [[ $1 =~ ^('"${matchExpr}"')$ ]]; then
+                echo 1>&2 "Invalid value for '"${desc}"': $1"
+                return 1'
+    fi
+
+    eval 'function '"${handlerName}"' {
+        if (( $# < 1 )); then
+            echo 1>&2 "Value required for '"${desc}"'."
+            return 1
+        '"${matchExpr}"'
         fi
 
         '"${callFunc}"'
