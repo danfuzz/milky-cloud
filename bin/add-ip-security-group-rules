@@ -74,10 +74,10 @@ opt-value --required --var=inLocation in
 opt-value --var=name --filter='/./' name
 
 # Port of the rule.
-opt-value --required --var=port --match='[0-9]+|all' port
+opt-value --required --var=port --filter='/^([0-9]+|all)$/' port
 
 # Protocol of the rule.
-opt-value --required --var=protocol --match='all|tcp|udp' protocol
+opt-value --required --var=protocol --filter='/^(all|tcp|udp)$/' protocol
 
 # Quiet?
 opt-toggle --var=quiet quiet
