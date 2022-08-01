@@ -65,13 +65,13 @@ opt-action --call=usage help/h=0
 opt-choice --required --var=direction egress ingress
 
 # Name or ID of the security group.
-opt-value --required --var=groupNameOrId --match='.+' security-group
+opt-value --required --var=groupNameOrId --filter='/./' security-group
 
 # Location (region or availability zone).
 opt-value --required --var=inLocation in
 
 # Name of the rule.
-opt-value --var=name --match='.+' name
+opt-value --var=name --filter='/./' name
 
 # Port of the rule.
 opt-value --required --var=port --match='[0-9]+|all' port

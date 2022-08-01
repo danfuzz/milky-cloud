@@ -64,7 +64,7 @@ opt-value --var=name --match='.*' name
 opt-toggle --call=progress-msg-switch progress
 
 # Name or ID of VPC to look up.
-opt-value --required --var=vpcNameOrId --match='.+' vpc
+opt-value --required --var=vpcNameOrId --filter='/./' vpc
 
 process-args "$@" || usage "$?"
 

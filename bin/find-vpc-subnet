@@ -44,7 +44,7 @@ opt-action --call=usage help/h=0
 opt-value --required --var=inLocation in
 
 # Name or ID of VPC to look up.
-opt-value --required --var=nameOrId --match='.+' vpc
+opt-value --required --var=nameOrId --filter='/./' vpc
 
 process-args "$@" || usage "$?"
 

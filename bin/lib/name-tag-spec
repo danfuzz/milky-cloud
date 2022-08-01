@@ -50,7 +50,7 @@ opt-choice --var=outputStyle --default=json compact json
 positional-arg --required --var=resourceType --match='[-a-z0-9]+' resource-type
 
 # Name for the resource.
-positional-arg --required --var=name --match='.+' name
+positional-arg --required --var=name --filter='/./' name
 
 process-args "$@" || usage "$?"
 

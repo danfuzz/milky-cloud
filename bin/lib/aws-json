@@ -80,7 +80,7 @@ opt-action --call=usage help/h=0
 opt-value --match='[a-z][-a-z0-9]*' --var=inLocation in
 
 # File to print the constructed command to.
-opt-value --match='.+' --var=printCommandTo print-command-to
+opt-value --filter='/./' --var=printCommandTo print-command-to
 
 # Just print argument "skeleton" ?
 opt-action --var=skeleton skeleton

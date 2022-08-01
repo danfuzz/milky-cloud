@@ -60,7 +60,7 @@ opt-action --call=usage help/h=0
 opt-value --required --var=inLocation in
 
 # Name or ID of the security group.
-opt-value --required --var=groupNameOrId --match='.+' security-group
+opt-value --required --var=groupNameOrId --filter='/./' security-group
 
 # Simple filter.
 opt-choice --var=simpleFilter \
