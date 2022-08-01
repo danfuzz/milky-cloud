@@ -127,11 +127,6 @@ function opt-choice {
         requiredName='?'
     fi
 
-    if (( ${#args[@]} < 1 )); then
-        echo 1>&2 'Need at least one option spec for a choice.'
-        return 1
-    fi
-
     if [[ ${optCall} != '' ]]; then
         # Re-form as the caller code.
         optCall="${optCall}"' "${_approc_value}" || return "$?"'
