@@ -190,11 +190,11 @@ function opt-choice {
     fi
 }
 
-# Declares a "toggle" option, specified as `<name>/<abbrev>/<abbrev>`, with the
-# two `/<abbrev>`s optional. `<abbrev>` specifies a single-dash single-character
-# abbreviation for turning the toggle on (first one) or off (second one). In
-# addition the long form `--no-<name>` gets defined to turn the toggle off. At
-# least one of `--call` or `--var` must be used to define the option.
+# Declares a "toggle" option, specified as `<name>/<abbrev>`, with the
+# `/<abbrev>` optional. `<abbrev>` specifies a single-dash single-character
+# abbreviation for turning the toggle on. In addition, the long form
+# `--no-<name>` gets defined to turn the toggle off. At least one of `--call` or
+# `--var` must be used to define the option.
 #
 # --call=<name> -- Calls the function with the given name, passing it `1` or
 #   `0`. If `--var` is also used, the call is made first, and then the variable
@@ -208,16 +208,10 @@ function opt-toggle {
     _argproc_janky-args call var \
     || return 1
 
-    local name="${args[0]}"
-
-    if ! [[ ${name} =~ ^([a-zA-Z0-9][-a-zA-Z0-9]*)(/[a-zA-Z0-9]?)?(/[a-zA-Z0-9])?$ ]]; then
-        echo 1>&2 "Invalid option spec: ${name}"
-        return 1
-    fi
-
-    name="${BASH_REMATCH[1]}"
-    local abbrevOn="${BASH_REMATCH[2]:1}"  # `:1` to drop the slash.
-    local abbrevOff="${BASH_REMATCH[3]:1}" # Likewise.
+    local specName=''
+    local specAbbrev=''
+    _argproc_parse-spec "${args[0]}" \
+    || return 1
 
     if [[ ${optCall} != '' ]]; then
         # Re-form as the caller code.
@@ -231,9 +225,9 @@ function opt-toggle {
     fi
 
     eval '
-        function _argproc:toggle-handler-'"${name}"' {
+        function _argproc:toggle-handler-'"${specName}"' {
             if (( $# > 1 )); then
-                echo 1>&2 "Value not allowed for option: --'"${name}"'"
+                echo 1>&2 "Value not allowed for option: --'"${specName}"'"
                 return 1
             fi
 
@@ -241,24 +235,18 @@ function opt-toggle {
             '"${optVar}"'
         }
 
-        function _argproc:long-'"${name}"' {
-            _argproc:toggle-handler-'"${name}"' 1 "$@"
+        function _argproc:long-'"${specName}"' {
+            _argproc:toggle-handler-'"${specName}"' 1 "$@"
         }
 
-        function _argproc:long-no-'"${name}"' {
-            _argproc:toggle-handler-'"${name}"' 0 "$@"
+        function _argproc:long-no-'"${specName}"' {
+            _argproc:toggle-handler-'"${specName}"' 0 "$@"
         }
     '
 
-    if [[ ${abbrevOn} != '' ]]; then
-        eval 'function _argproc:abbrev-'"${abbrevOn}"' {
-            _argproc:toggle-handler-'"${name}"' 1
-        }'
-    fi
-
-    if [[ ${abbrevOff} != '' ]]; then
-        eval 'function _argproc:abbrev-'"${abbrevOff}"' {
-            _argproc:toggle-handler-'"${name}"' 0
+    if [[ ${specAbbrev} != '' ]]; then
+        eval 'function _argproc:abbrev-'"${specAbbrev}"' {
+            _argproc:toggle-handler-'"${specName}"' 1
         }'
     fi
 }
