@@ -29,6 +29,13 @@
 # itself optionally specified via `--default=<value>`. If `--default` isn't
 # used, then the default-for-the-default depends on the specific function.
 #
+# Definers for value-accepting arguments take an option `--match=<regex>`, which
+# specifies a regular expression matched against the entire argument value. If
+# the match fails, the argument isn't accepted.
+#
+# Some argument-definers also accept `--required`, to indicate that the argument
+# or option is required (mandatory).
+#
 # Beyond the above, see the docs for the functions for restrictions and
 # additional options.
 
@@ -86,10 +93,8 @@ function opt-action {
 # Declares a "choice" option set, consisting of one or more options. On a
 # commandline, no choice option accepts a value (because the option name itself
 # implies the value). If left unspecified, the default variable value for a
-# choice option is `''` (the empty string).
-#
-# --required -- Indicates that one of the options defined by this set must be
-#   passed.
+# choice option is `''` (the empty string). This definer also accepts the
+# `--required` option.
 function opt-choice {
     local optCall=''
     local optDefault=''
@@ -165,11 +170,8 @@ function opt-toggle {
 # Declares a "value" option, which requires a value when passed on a
 # commandline. No `<abbrev>` or `<value>` is allowed in the argument spec. If
 # left unspecified, the default variable value for a value option is `''` (the
-# empty string).
-#
-# --match=<regex> -- Regular expression matched against the entire argument
-#   value. If the value does not match, then the option gets rejected.
-# --required -- Indicates that this option must be passed.
+# empty string). This definer also accepts the `--required` and `--match`
+# options.
 function opt-value {
     local optCall=''
     local optDefault=''
@@ -199,11 +201,8 @@ function opt-value {
 
 # Declares a positional argument. No `<abbrev>` or `<value>` is allowed in the
 # argument spec. Unlike options, a positional argument name is _only_ used for
-# error messages and internal bookkeeping.
-#
-# --match=<regex> -- Regular expression matched against the entire argument
-#   value. If the value does not match, then the argument gets rejected.
-# --required -- Indicates that this argument must be passed.
+# error messages and internal bookkeeping. This definer also accepts the
+# `--required` and `--match` options.
 function positional-arg {
     local optCall=''
     local optDefault=''
