@@ -69,36 +69,17 @@ function opt-action {
 
     local specName=''
     local specAbbrev=''
-    local specHasValue=0
+    local specHasValue=0 # Ignored, but needed because `parse-spec` will set it.
     local specValue='1'
     _argproc_parse-spec --abbrev --value "${args[0]}" \
     || return 1
 
-    if [[ ${optCall} != '' ]]; then
-        # Re-form as the caller code.
-        optCall="${optCall} $(_argproc:quote "${specValue}")"' || return "$?"'
-    fi
+    _argproc_define-no-value-arg --option \
+        "${specName}" "${optCall}" "${optVar}" "${specAbbrev}" "${specValue}"
 
     if [[ ${optVar} != '' ]]; then
-        # Set up the default initializer, and then re-form as the setter code.
+        # Set up the default initializer.
         _argproc_initStatements+=("${optVar}=$(_argproc:quote "${optDefault}")")
-        optVar="${optVar}=$(_argproc:quote "${specValue}")"
-    fi
-
-    eval 'function _argproc:long-'"${specName}"' {
-        if (( $# > 0 )); then
-            echo 1>&2 "Value not allowed for option: --'"${specName}"'"
-            return 1
-        fi
-
-        '"${optCall}"'
-        '"${optVar}"'
-    }'
-
-    if [[ ${specAbbrev} != '' ]]; then
-        eval 'function _argproc:abbrev-'"${specAbbrev}"' {
-            _argproc:long-'"${specName}"' "$@"
-        }'
     fi
 }
 
@@ -118,26 +99,12 @@ function opt-choice {
     _argproc_janky-args --multi-spec call default required var \
     || return 1
 
-    if [[ ${optCall} != '' ]]; then
-        # Re-form as the caller code.
-        optCall="${optCall}"' "${_approc_value}" || return "$?"'
-    fi
-
     if [[ ${optVar} != '' ]]; then
-        # Set up the default initializer, and then re-form as the setter code.
+        # Set up the default initializer.
         _argproc_initStatements+=("${optVar}=$(_argproc:quote "${optDefault}")")
-        optVar="${optVar}"'="${_argproc_value}"'
     fi
 
-    local requiredName=''
-    local requiredSetter=''
-    local requiredError=''
-
-    if (( optRequired )); then
-        # Gets replaced with a valid long name.
-        requiredName='?'
-    fi
-
+    local allNames=()
     local spec
     for spec in "${args[@]}"; do
         local specName=''
@@ -147,51 +114,18 @@ function opt-choice {
         _argproc_parse-spec --abbrev --value "${spec}" \
         || return 1
 
-        if [[ ${requiredName} != '' ]]; then
-            if [[ ${requiredName} == '?' ]]; then
-                # Replace `requiredName` with a variable name based on the first
-                # option, and use it to form all the dependant bits.
-                requiredName="_argproc_gotOption_${specName/-/_}"
-                requiredSetter="${requiredName}=1"
-                _argproc_initStatements+=("local ${requiredName}=0")
-                requiredError='Missing required option from set:'
-            fi
-            requiredError+=" --${specName}"
-        fi
-
-        if (( specHasValue )); then
-            specValue="$(_argproc:quote "${specValue}")"
-        else
+        if (( !specHasValue )); then
             specValue="${specName}"
         fi
 
-        eval 'function _argproc:long-'"${specName}"' {
-            if (( $# > 0 )); then
-                echo 1>&2 "Value not allowed for option: --'"${specName}"'"
-                return 1
-            fi
+        _argproc_define-no-value-arg --option \
+            "${specName}" "${optCall}" "${optVar}" "${specAbbrev}" "${specValue}"
 
-            local _argproc_value='"${specValue}"'
-            '"${optCall}"'
-            '"${optVar}"'
-            '"${requiredSetter}"'
-        }'
-
-        if [[ ${specAbbrev} != '' ]]; then
-            eval 'function _argproc:abbrev-'"${specAbbrev}"' {
-                _argproc:long-'"${specName}"' "$@"
-            }'
-        fi
+        allNames+=("${specName}")
     done
 
-    if [[ ${requiredName} != '' ]]; then
-        # Set up the post-parse check for a required option.
-        requiredError="$(_argproc:quote "${requiredError}")"
-        _argproc_preReturnStatements+=('
-            (( '"${requiredName}"' )) || {
-                echo 1>&2 '"${requiredError}"'
-                false
-            }')
+    if (( optRequired )); then
+        _argproc_add-required-arg-postcheck --option "${allNames[@]}"
     fi
 }
 
@@ -213,41 +147,18 @@ function opt-toggle {
     _argproc_parse-spec --abbrev "${args[0]}" \
     || return 1
 
-    if [[ ${optCall} != '' ]]; then
-        # Re-form as the caller code.
-        optCall="${optCall}"' "$1" || return "$?"'
-    fi
-
     if [[ ${optVar} != '' ]]; then
-        # Set up the default initializer, and then re-form as the setter code.
+        # Set up the default initializer.
         _argproc_initStatements+=("${optVar}=0")
-        optVar="${optVar}"'="$1"'
     fi
 
-    eval '
-        function _argproc:toggle-handler-'"${specName}"' {
-            if (( $# > 1 )); then
-                echo 1>&2 "Value not allowed for option: --'"${specName}"'"
-                return 1
-            fi
-
-            '"${optCall}"'
-            '"${optVar}"'
-        }
-
-        function _argproc:long-'"${specName}"' {
-            _argproc:toggle-handler-'"${specName}"' 1 "$@"
-        }
-
-        function _argproc:long-no-'"${specName}"' {
-            _argproc:toggle-handler-'"${specName}"' 0 "$@"
-        }
-    '
+    _argproc_define-no-value-arg --option \
+        "${specName}" "${optCall}" "${optVar}" "${specAbbrev}" '1'
+    _argproc_define-no-value-arg --option \
+        "no-${specName}" "${optCall}" "${optVar}" '' '0'
 
     if [[ ${specAbbrev} != '' ]]; then
-        eval 'function _argproc:abbrev-'"${specAbbrev}"' {
-            _argproc:toggle-handler-'"${specName}"' 1
-        }'
+        _argproc_define-abbrev "${specAbbrev}" "${specName}"
     fi
 }
 
@@ -273,50 +184,17 @@ function opt-value {
     _argproc_parse-spec "${args[0]}" \
     || return 1
 
-    if [[ ${optCall} != '' ]]; then
-        # Re-form as the caller code.
-        optCall="${optCall}"' "${value}" || return "$?"'
-    fi
-
     if [[ ${optVar} != '' ]]; then
-        # Set up the default initializer, and then re-form as the setter code.
+        # Set up the default initializer.
         _argproc_initStatements+=("${optVar}=$(_argproc:quote "${optDefault}")")
-        optVar="${optVar}"'="$1"'
     fi
 
-    if [[ ${optMatch} != '' ]]; then
-        # Re-form as the clause to insert to perform the check.
-        optMatch='
-            elif ! [[ $1 =~ ^('"${optMatch}"')$ ]]; then
-                echo 1>&2 "Invalid value for option --'"${specName}"': $1"
-                return 1'
+    _argproc_define-value-required-arg --option \
+        "${specName}" "${optCall}" "${optVar}" "${optMatch}"
+
+    if (( optRequired )); then
+        _argproc_add-required-arg-postcheck --option "${specName}"
     fi
-
-    local requiredSetter=''
-    if (( ${optRequired} )); then
-        # Replace `optRequired` with a variable name based on the option name,
-        # and use it to form all the dependant bits.
-        optRequired="_argproc_gotOption_${name/-/_}"
-        requiredSetter="${optRequired}=1"
-        _argproc_initStatements+=("local ${optRequired}=0")
-        _argproc_preReturnStatements+=('
-            (( '"${optRequired}"' )) || {
-                echo 1>&2 "Missing required option: --'"${name}"'"
-                false
-            }')
-    fi
-
-    eval 'function _argproc:long-'"${specName}"' {
-        if (( $# < 1 )); then
-            echo 1>&2 "Value required for option: --'"${specName}"'"
-            return 1
-        '"${optMatch}"'
-        fi
-
-        '"${optCall}"'
-        '"${optVar}"'
-        '"${requiredSetter}"'
-    }'
 }
 
 # Declares a positional argument. No `<abbrev>` or `<value>` is allowed in the
@@ -340,45 +218,17 @@ function positional-arg {
     _argproc_parse-spec "${args[0]}" \
     || return 1
 
-    if [[ ${optCall} != '' ]]; then
-        # Re-form as the caller code.
-        optCall="${optCall}"' "${value}" || return "$?"'
-    fi
-
     if [[ ${optVar} != '' ]]; then
-        # Set up the default initializer, and then re-form as the setter code.
+        # Set up the default initializer.
         _argproc_initStatements+=("${optVar}=$(_argproc:quote "${optDefault}")")
-        optVar="${optVar}"'="$1"'
     fi
 
-    if [[ ${optMatch} != '' ]]; then
-        # Re-form as the clause to insert to perform the check.
-        optMatch='
-            elif ! [[ $1 =~ ^('"${optMatch}"')$ ]]; then
-                echo 1>&2 "Invalid value for argument <'"${specName}"'>."
-                echo 1>&2 "Value: $1"
-                return 1'
+    _argproc_define-value-required-arg \
+        "${specName}" "${optCall}" "${optVar}" "${optMatch}"
+
+    if (( optRequired )); then
+        _argproc_add-required-arg-postcheck "${specName}"
     fi
-
-    local ifMissing=''
-    if (( ${optRequired} )); then
-        # Code to issue a complaint about the missing argument.
-        ifMissing='
-            echo 1>&2 "Missing required argument: <'"${specName}"'>"
-            return 1'
-    else
-        ifMissing='return'
-    fi
-
-    eval 'function _argproc:positional-'"${specName}"' {
-        if (( $# < 1 )); then
-            '"${ifMissing}"'
-        '"${optMatch}"'
-        fi
-
-        '"${optCall}"'
-        '"${optVar}"'
-    }'
 
     _argproc_positionalFuncs+=("_argproc:positional-${specName}")
 }
@@ -504,6 +354,155 @@ function rest-arg {
 #
 # Library-internal functions
 #
+
+# Defines an "abbrev" function, which is what gets called to activate a
+# short-form option.
+function _argproc_define-abbrev {
+    local abbrevChar="$1"
+    local longName="$2"
+
+    eval 'function _argproc:abbrev-'"${abbrevChar}"' {
+        _argproc:long-'"${longName}"' "$@"
+    }'
+}
+
+# Defines an argument activation function which prohibits passing a value, as
+# the value is "built into" the argument spec.
+function _argproc_define-no-value-arg {
+    local isOption=0
+    if [[ $1 == '--option' ]]; then
+        isOption=1
+        shift
+    else
+        # `--option` is really defined here for parallel structure, not utility.
+        echo 1>&2 'Not supported.'
+        return 1
+    fi
+
+    local longName="$1"
+    local callFunc="$2"
+    local varName="$3"
+    local abbrevChar="$4"
+    local value="$5"
+
+    value="$(_argproc:quote "${value}")"
+
+    if [[ ${callFunc} != '' ]]; then
+        # Re-form as the caller code.
+        callFunc="${callFunc} ${value}"' || return "$?"'
+    fi
+
+    if [[ ${varName} != '' ]]; then
+        # Re-form as the setter code.
+        varName="${varName}=${value}"
+    fi
+
+    eval 'function _argproc:long-'"${longName}"' {
+        if (( $# > 0 )); then
+            echo 1>&2 "Value not allowed for option: --'"${longName}"'"
+            return 1
+        fi
+
+        '"${callFunc}"'
+        '"${varName}"'
+        _argproc_receivedArgNames+="<'"${longName}"'>"
+    }'
+
+    if [[ ${abbrevChar} != '' ]]; then
+        _argproc_define-abbrev "${abbrevChar}" "${longName}"
+    fi
+}
+
+# Defines an argument/option activation function which requires passing a value.
+function _argproc_define-value-required-arg {
+    local isOption=0
+    if [[ $1 == '--option' ]]; then
+        isOption=1
+        shift
+    fi
+
+    local longName="$1"
+    local callFunc="$2"
+    local varName="$3"
+    local matchExpr="$4"
+
+    local desc handlerName
+    if (( isOption )); then
+        desc="option --${longName}"
+        handlerName="_argproc:long-${longName}"
+    else
+        desc="argument <${longName}>"
+        handlerName="_argproc:positional-${longName}"
+    fi
+
+    if [[ ${callFunc} != '' ]]; then
+        # Re-form as the caller code.
+        callFunc="${callFunc}"' "$1" || return "$?"'
+    fi
+
+    if [[ ${varName} != '' ]]; then
+        # Re-form as the setter code.
+        varName="${varName}"'="$1"'
+    fi
+
+    if [[ ${matchExpr} != '' ]]; then
+        # Re-form as the clause to insert to perform the check.
+        matchExpr='
+            elif ! [[ $1 =~ ^('"${matchExpr}"')$ ]]; then
+                echo 1>&2 "Invalid value for '"${desc}"': $1"
+                return 1'
+    fi
+
+    eval 'function '"${handlerName}"' {
+        if (( $# < 1 )); then
+            echo 1>&2 "Value required for '"${desc}"'."
+            return 1
+        '"${matchExpr}"'
+        fi
+
+        '"${callFunc}"'
+        '"${varName}"'
+        _argproc_receivedArgNames+="<'"${longName}"'>"
+    }'
+
+    if [[ ${abbrevChar} != '' ]]; then
+        _argproc_define-abbrev "${abbrevChar}" "${longName}"
+    fi
+}
+
+# Adds a pre-return check which fails if none of the indicated arguments/options
+# were present on the commandline.
+function _argproc_add-required-arg-postcheck {
+    local kind='argument'
+    if [[ $1 == '--option' ]]; then
+        kind='option'
+        shift
+    fi
+
+    local checkClause='[[ '
+    local longName
+    local first=1
+    for longName in "$@"; do
+        if (( first )); then
+            first=0
+        else
+            checkClause+=' || '
+        fi
+        checkClause+="$(
+            printf '${_argproc_receivedArgNames} =~ "<%s>"' "${longName}")"
+    done
+    checkClause+=' ]]'
+
+    local errorMsg="Missing required ${kind}"
+    if (( $# > 1 )); then
+        errorMsg+=' from set'
+    fi
+
+    _argproc_preReturnStatements+=(
+        "$(printf $'%s || { echo 1>&2 %s %s; false; }\n' \
+            "${checkClause}" "${errorMsg}:" "$(printf ' --%s' "$@")"
+    )")
+}
 
 # Janky yet reasonable argument parser for the commands in this library. (How
 # meta!) Takes a list of option names to accept, each of which is parsed in a
@@ -673,6 +672,9 @@ function _argproc:statements-from-args {
     local argError=0
     local arg handler name statement value
 
+    # This is used for required-argument checking.
+    _argproc_statements+=($'local _argproc_receivedArgNames=\'\'')
+
     while (( $# > 0 )); do
         arg="$1"
 
@@ -724,11 +726,12 @@ function _argproc:statements-from-args {
     done
 
     for statement in "${_argproc_positionalFuncs[@]}"; do
-        if (( $# > 0 )); then
-            statement="${statement} $(_argproc:quote "$1")"
-            shift
+        if (( $# == 0 )); then
+            break
         fi
-        _argproc_statements+=("${statement}")
+
+        _argproc_statements+=("${statement} $(_argproc:quote "$1")")
+        shift
     done
 
     if declare -F _argproc:rest >/dev/null; then
