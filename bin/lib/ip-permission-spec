@@ -25,7 +25,8 @@ function usage {
     Constructs and prints a JSON object suitable for use as an
     `IpPermissions` entry to one of the security group rule addition
     commands. <protocol> must be one of `all`, `tcp`, or `udp`. The resulting
-    specification contains both IPv4 and IPv6 entries.
+    specification contains both IPv4 and IPv6 entries. <port> must be a valid
+    port number or `all`.
 
     --compact
       Output in compact (not multiline) JSON form.
