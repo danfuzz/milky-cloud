@@ -69,34 +69,17 @@ function opt-action {
 
     local specName=''
     local specAbbrev=''
-    local specHasValue=0
+    local specHasValue=0 # Ignored, but needed because `parse-spec` will set it.
     local specValue='1'
     _argproc_parse-spec --abbrev --value "${args[0]}" \
     || return 1
 
-    if [[ ${optCall} != '' ]]; then
-        # Re-form as the caller code.
-        optCall="${optCall} $(_argproc:quote "${specValue}")"' || return "$?"'
-    fi
+    _argproc_define-no-value-option \
+        "${specName}" "${optCall}" "${optVar}" "${specAbbrev}" "${specValue}"
 
     if [[ ${optVar} != '' ]]; then
-        # Set up the default initializer, and then re-form as the setter code.
+        # Set up the default initializer.
         _argproc_initStatements+=("${optVar}=$(_argproc:quote "${optDefault}")")
-        optVar="${optVar}=$(_argproc:quote "${specValue}")"
-    fi
-
-    eval 'function _argproc:long-'"${specName}"' {
-        if (( $# > 0 )); then
-            echo 1>&2 "Value not allowed for option: --'"${specName}"'"
-            return 1
-        fi
-
-        '"${optCall}"'
-        '"${optVar}"'
-    }'
-
-    if [[ ${specAbbrev} != '' ]]; then
-        _argproc_define-abbrev "${specAbbrev}" "${specName}"
     fi
 }
 
@@ -509,6 +492,43 @@ function _argproc_define-abbrev {
         _argproc:long-'"${longName}"' "$@"
     }'
 }
+
+# Defines an option activation function which prohibits passing a value, as the
+# value is "built into" the option.
+function _argproc_define-no-value-option {
+    local longName="$1"
+    local callFunc="$2"
+    local varName="$3"
+    local abbrevChar="$4"
+    local value="$5"
+
+    value="$(_argproc:quote "${value}")"
+
+    if [[ ${callFunc} != '' ]]; then
+        # Re-form as the caller code.
+        callFunc="${callFunc} ${value}"' || return "$?"'
+    fi
+
+    if [[ ${varName} != '' ]]; then
+        # Re-form as the setter code.
+        varName="${varName}=${value}"
+    fi
+
+    eval 'function _argproc:long-'"${longName}"' {
+        if (( $# > 0 )); then
+            echo 1>&2 "Value not allowed for option: --'"${longName}"'"
+            return 1
+        fi
+
+        '"${callFunc}"'
+        '"${varName}"'
+    }'
+
+    if [[ ${abbrevChar} != '' ]]; then
+        _argproc_define-abbrev "${abbrevChar}" "${longName}"
+    fi
+}
+
 
 # Janky yet reasonable argument parser for the commands in this library. (How
 # meta!) Takes a list of option names to accept, each of which is parsed in a
