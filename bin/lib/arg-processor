@@ -74,7 +74,7 @@ function opt-action {
     _argproc_parse-spec --abbrev --value "${args[0]}" \
     || return 1
 
-    _argproc_define-no-value-option \
+    _argproc_define-no-value-arg --option \
         "${specName}" "${optCall}" "${optVar}" "${specAbbrev}" "${specValue}"
 
     if [[ ${optVar} != '' ]]; then
@@ -118,7 +118,7 @@ function opt-choice {
             specValue="${specName}"
         fi
 
-        _argproc_define-no-value-option \
+        _argproc_define-no-value-arg --option \
             "${specName}" "${optCall}" "${optVar}" "${specAbbrev}" "${specValue}"
 
         allNames+=("${specName}")
@@ -152,9 +152,9 @@ function opt-toggle {
         _argproc_initStatements+=("${optVar}=0")
     fi
 
-    _argproc_define-no-value-option \
+    _argproc_define-no-value-arg --option \
         "${specName}" "${optCall}" "${optVar}" "${specAbbrev}" '1'
-    _argproc_define-no-value-option \
+    _argproc_define-no-value-arg --option \
         "no-${specName}" "${optCall}" "${optVar}" '' '0'
 
     if [[ ${specAbbrev} != '' ]]; then
@@ -366,9 +366,19 @@ function _argproc_define-abbrev {
     }'
 }
 
-# Defines an option activation function which prohibits passing a value, as the
-# value is "built into" the option.
-function _argproc_define-no-value-option {
+# Defines an argument activation function which prohibits passing a value, as
+# the value is "built into" the argument spec.
+function _argproc_define-no-value-arg {
+    local isOption=0
+    if [[ $1 == '--option' ]]; then
+        isOption=1
+        shift
+    else
+        # `--option` is really defined here for parallel structure, not utility.
+        echo 1>&2 'Not supported.'
+        return 1
+    fi
+
     local longName="$1"
     local callFunc="$2"
     local varName="$3"
