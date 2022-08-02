@@ -66,7 +66,7 @@ argError=0
 # AWS command and subcommand. These are expected before any dashed options.
 if ! ( (( $# >= 2 )) && [[ $1 =~ ^[a-z] ]] && [[ $2 =~ ^[a-z] ]] ); then
     echo 1>&2 'Missing AWS command and/or subcommand.'
-    argError=1
+    usage 1
 else
     command="$1"
     subcommand="$2"
@@ -84,6 +84,8 @@ opt-value --filter='/./' --var=printCommandTo print-command-to
 
 # Just print argument "skeleton" ?
 opt-action --var=skeleton skeleton
+
+require-exactly-one-arg-of in skeleton
 
 # Output style (result post-processor option).
 outputStyle=normal
@@ -147,13 +149,6 @@ function parse-rest {
 }
 
 process-args "$@" || usage "$?"
-
-if [[ ${inRegion} == '' ]] && (( !skeleton )); then
-    # TODO: Maybe there should be something like `opt-require-one skeleton in`
-    # which could be called to declare this kind of requirement.
-    echo 1>&2 'Missing option: --in or --skeleton'
-    usage 1
-fi
 
 
 #
