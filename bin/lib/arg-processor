@@ -44,10 +44,14 @@
 # Beyond the above, see the docs for the functions for restrictions and
 # additional options.
 
+# Note: Regular internal functions and variables use the naming convention
+# `_argproc_<name>`, where `<name>` is an otherwise normal function or variable
+# name. Generated functions use the convention `_argproc:<name>`, to make the
+# origin clear and to avoid collisions.
+
 # List of statements to run just before parsing. This includes:
 #
 # * global variable assignment statements
-# * required option "got the option" initializers
 _argproc_initStatements=()
 
 # List of functions to run to parse positional arguments.
@@ -56,7 +60,7 @@ _argproc_positionalFuncs=()
 # List of statements to run after parsing, to do pre-return validation. This
 # includes:
 #
-# * required option "got the option" checkers
+# * required argument checkers
 _argproc_preReturnStatements=()
 
 
@@ -91,7 +95,7 @@ function opt-action {
 
     if [[ ${optVar} != '' ]]; then
         # Set up the default initializer.
-        _argproc_initStatements+=("${optVar}=$(_argproc:quote "${optDefault}")")
+        _argproc_initStatements+=("${optVar}=$(_argproc_quote "${optDefault}")")
     fi
 }
 
@@ -111,7 +115,7 @@ function opt-choice {
 
     if [[ ${optVar} != '' ]]; then
         # Set up the default initializer.
-        _argproc_initStatements+=("${optVar}=$(_argproc:quote "${optDefault}")")
+        _argproc_initStatements+=("${optVar}=$(_argproc_quote "${optDefault}")")
     fi
 
     local allNames=()
@@ -193,7 +197,7 @@ function opt-value {
 
     if [[ ${optVar} != '' ]]; then
         # Set up the default initializer.
-        _argproc_initStatements+=("${optVar}=$(_argproc:quote "${optDefault}")")
+        _argproc_initStatements+=("${optVar}=$(_argproc_quote "${optDefault}")")
     fi
 
     _argproc_define-value-required-arg --option \
@@ -224,7 +228,7 @@ function positional-arg {
 
     if [[ ${optVar} != '' ]]; then
         # Set up the default initializer.
-        _argproc_initStatements+=("${optVar}=$(_argproc:quote "${optDefault}")")
+        _argproc_initStatements+=("${optVar}=$(_argproc_quote "${optDefault}")")
     fi
 
     _argproc_define-value-required-arg \
@@ -305,7 +309,7 @@ function process-args {
 
     # Build up the statements to evaluate, and evaluate them.
     local _argproc_statements=()
-    _argproc:statements-from-args "$@" \
+    _argproc_statements-from-args "$@" \
     || _argproc_error="$?"
 
     for _argproc_s in "${_argproc_statements[@]}"; do
@@ -378,6 +382,58 @@ function rest-arg {
 # Library-internal functions
 #
 
+# Adds a pre-return check which fails if none of the indicated arguments/options
+# was present on the commandline, and optionally if more than exactly one was
+# present.
+function _argproc_add-required-arg-postcheck {
+    local exactlyOne=0
+    if [[ $1 == '--exactly-one' ]]; then
+        exactlyOne=1
+        shift
+    fi
+
+    _argproc_preReturnStatements+=('local _argproc_count=0')
+
+    local argNoun='option'
+    local allNames=''
+
+    local longName
+    for longName in "$@"; do
+        _argproc_preReturnStatements+=("$(
+            printf '[[ ${_argproc_receivedArgNames} =~ "<%s>" ]] && (( _argproc_count++ )) || true' \
+                "${longName}"
+        )")
+
+        local desc="$(_argproc_arg-description --short "${longName}")"
+        if ! [[ ${desc} =~ - ]]; then
+            argNoun='argument'
+        fi
+
+        allNames+=" ${desc}"
+    done
+
+    local errorMsg
+
+    if (( exactlyOne )); then
+        errorMsg="Too many ${argNoun}s from set:${allNames}"
+        _argproc_preReturnStatements+=("$(
+            printf '(( _argproc_count <= 1 )) || { echo 1>&2 %q; false; }' \
+                "${errorMsg}"
+        )")
+    fi
+
+    if (( $# == 1 )); then
+        errorMsg="Missing required ${argNoun}${allNames}."
+    else
+        errorMsg="Missing required ${argNoun} from set:${allNames}"
+    fi
+
+    _argproc_preReturnStatements+=(
+        "$(printf $'(( _argproc_count != 0 )) || { echo 1>&2 %q; false; }\n' \
+            "${errorMsg}"
+    )")
+}
+
 # Gets the description of the named argument.
 function _argproc_arg-description {
     local short=0
@@ -428,7 +484,7 @@ function _argproc_define-no-value-arg {
     local abbrevChar="$4"
     local value="$5"
 
-    value="$(_argproc:quote "${value}")"
+    value="$(_argproc_quote "${value}")"
 
     _argproc_set-arg-description "${longName}" option \
     || return 1
@@ -521,58 +577,6 @@ function _argproc_define-value-required-arg {
     if [[ ${abbrevChar} != '' ]]; then
         _argproc_define-abbrev "${abbrevChar}" "${longName}"
     fi
-}
-
-# Adds a pre-return check which fails if none of the indicated arguments/options
-# was present on the commandline, and optionally if more than exactly one was
-# present.
-function _argproc_add-required-arg-postcheck {
-    local exactlyOne=0
-    if [[ $1 == '--exactly-one' ]]; then
-        exactlyOne=1
-        shift
-    fi
-
-    _argproc_preReturnStatements+=('local _argproc_count=0')
-
-    local argNoun='option'
-    local allNames=''
-
-    local longName
-    for longName in "$@"; do
-        _argproc_preReturnStatements+=("$(
-            printf '[[ ${_argproc_receivedArgNames} =~ "<%s>" ]] && (( _argproc_count++ )) || true' \
-                "${longName}"
-        )")
-
-        local desc="$(_argproc_arg-description --short "${longName}")"
-        if ! [[ ${desc} =~ - ]]; then
-            argNoun='argument'
-        fi
-
-        allNames+=" ${desc}"
-    done
-
-    local errorMsg
-
-    if (( exactlyOne )); then
-        errorMsg="Too many ${argNoun}s from set:${allNames}"
-        _argproc_preReturnStatements+=("$(
-            printf '(( _argproc_count <= 1 )) || { echo 1>&2 %q; false; }' \
-                "${errorMsg}"
-        )")
-    fi
-
-    if (( $# == 1 )); then
-        errorMsg="Missing required ${argNoun}${allNames}."
-    else
-        errorMsg="Missing required ${argNoun} from set:${allNames}"
-    fi
-
-    _argproc_preReturnStatements+=(
-        "$(printf $'(( _argproc_count != 0 )) || { echo 1>&2 %q; false; }\n' \
-            "${errorMsg}"
-    )")
 }
 
 # Janky yet reasonable argument parser for the commands in this library. (How
@@ -759,7 +763,7 @@ function _argproc_set-arg-description {
     esac
 
     eval 'function '"${funcName}"' {
-        echo '"$(_argproc:quote "${desc}")"'
+        echo '"$(_argproc_quote "${desc}")"'
     }'
 }
 
@@ -771,7 +775,7 @@ function _argproc_set-arg-description {
 # function and as a separate pass from evaluation, makes it possible to use
 # non-mangled local variables in the more tricky code, so it's a bit nicer to
 # read.
-function _argproc:statements-from-args {
+function _argproc_statements-from-args {
     local argError=0
     local arg handler name statement value
 
@@ -800,7 +804,7 @@ function _argproc:statements-from-args {
                 _argproc_statements+=("${handler}")
             else
                 # `:1` to drop the `=` from the start of `value`
-                _argproc_statements+=("${handler} $(_argproc:quote "${value:1}")")
+                _argproc_statements+=("${handler} $(_argproc_quote "${value:1}")")
             fi
         elif [[ $arg =~ ^-([a-zA-Z0-9]+)$ ]]; then
             # Short-form argument.
@@ -833,12 +837,12 @@ function _argproc:statements-from-args {
             break
         fi
 
-        _argproc_statements+=("${statement} $(_argproc:quote "$1")")
+        _argproc_statements+=("${statement} $(_argproc_quote "$1")")
         shift
     done
 
     if declare -F _argproc:rest >/dev/null; then
-        statement="_argproc:rest $(_argproc:quote "$@")"
+        statement="_argproc:rest $(_argproc_quote "$@")"
         _argproc_statements+=("${statement}")
     elif (( $# > 0 )); then
         if (( ${#_argproc_positionalFuncs[@]} == 0 )); then
@@ -855,7 +859,7 @@ function _argproc:statements-from-args {
 # Quotes one or more literal strings, space separated, so they can be safely
 # used in evaluated code. This (successfully) prints nothing if no arguments are
 # given.
-function _argproc:quote {
+function _argproc_quote {
     case "$#" in
         0)
             : # Nothing to print.
