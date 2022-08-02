@@ -52,7 +52,6 @@
 # List of statements to run just before parsing. This includes:
 #
 # * global variable assignment statements
-# * required option "got the option" initializers
 _argproc_initStatements=()
 
 # List of functions to run to parse positional arguments.
@@ -61,7 +60,7 @@ _argproc_positionalFuncs=()
 # List of statements to run after parsing, to do pre-return validation. This
 # includes:
 #
-# * required option "got the option" checkers
+# * required argument checkers
 _argproc_preReturnStatements=()
 
 
