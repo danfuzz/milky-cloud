@@ -49,6 +49,11 @@ function jval {
     lib json-val "$@"
 }
 
+# Calls `lib parse-location --input-zone`.
+function parse-zone {
+    lib parse-location --input-zone "$@"
+}
+
 # Calls `lib region-from-location`.
 function region-from-location {
     lib region-from-location "$@"

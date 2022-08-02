@@ -49,8 +49,8 @@ function usage {
 # Want help?
 opt-action --call=usage help/h=0
 
-# Location (availability zone).
-opt-value --required --var=inLocation in
+# Availability zone.
+opt-value --required --var=inZone --call=parse-zone in
 
 # Instance type.
 opt-value --required --var=instanceType \
@@ -63,20 +63,17 @@ process-args "$@" || usage "$?"
 # Main script
 #
 
-inRegion="$(lib region-from-zone "${inLocation}")" \
-|| exit "$?"
-
 # Check to see if the indicated instance type is available in the availability
 # zone.
 
 filterSpec="$(lib filter-spec \
-    location="${inLocation}" \
+    location="${inZone}" \
     instance-type="${instanceType}"
 )"
 
 foundInstanceType="$(
 ec2-json describe-instance-type-offerings \
-    --in="${inRegion}" \
+    --in="${inZone}" \
     filterSpec:json="${filterSpec}" \
     '$filterSpec + { LocationType: "availability-zone" }' \
     :: '.InstanceTypeOfferings | length'
@@ -84,7 +81,7 @@ ec2-json describe-instance-type-offerings \
 || exit "$?"
 
 if (( !foundInstanceType )); then
-    echo 1>&2 "No such instance type: ${instanceType} in ${inLocation}"
+    echo 1>&2 "No such instance type: ${instanceType} in ${inZone}"
     exit 1
 fi
 
@@ -93,7 +90,7 @@ fi
 
 architecture="$(
 ec2-json describe-instance-types \
-    --in="${inRegion}" \
+    --in="${inZone}" \
     instanceType="${instanceType}" \
     '{ InstanceTypes: [$instanceType] }' \
     :: --raw '
@@ -105,7 +102,7 @@ ec2-json describe-instance-types \
 || exit "$?"
 
 if [[ ${architecture} == 'error' ]]; then
-    echo 1>&2 "Unsupported instance type: ${instanceType} in ${inLocation}"
+    echo 1>&2 "Unsupported instance type: ${instanceType} in ${inZone}"
     exit 1
 fi
 
@@ -122,7 +119,7 @@ filterSpec="$(lib filter-spec \
 )"
 
 ec2-json describe-images \
-    --in="${inRegion}" \
+    --in="${inZone}" \
     filterSpec:json="${filterSpec}" \
     '$filterSpec +
     {
