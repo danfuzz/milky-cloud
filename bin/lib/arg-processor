@@ -400,7 +400,7 @@ function _argproc_define-no-value-arg {
 
     eval 'function _argproc:long-'"${longName}"' {
         if (( $# > 0 )); then
-            echo 1>&2 "Value not allowed for option: --'"${longName}"'"
+            echo 1>&2 "Value not allowed for option --'"${longName}"'."
             return 1
         fi
 
