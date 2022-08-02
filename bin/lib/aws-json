@@ -76,8 +76,8 @@ fi
 # Want help?
 opt-action --call=usage help/h=0
 
-# Location (region or availability zone).
-opt-value --filter='/^[a-z][-a-z0-9]*$/' --var=inLocation in
+# Region, passed as either region per se or availability zone.
+opt-value --var=inRegion --filter=region-from-location in
 
 # File to print the constructed command to.
 opt-value --filter='/./' --var=printCommandTo print-command-to
@@ -148,7 +148,7 @@ function parse-rest {
 
 process-args "$@" || usage "$?"
 
-if [[ ${inLocation} == '' ]] && (( !skeleton )); then
+if [[ ${inRegion} == '' ]] && (( !skeleton )); then
     # TODO: Maybe there should be something like `opt-require-one skeleton in`
     # which could be called to declare this kind of requirement.
     echo 1>&2 'Missing option: --in or --skeleton'
@@ -188,8 +188,6 @@ dashArgs=(--no-cli-pager --output=json)
 if (( skeleton )); then
     dashArgs+=(--generate-cli-skeleton)
 else
-    inRegion="$(lib region-from-location "${inLocation}")" \
-    || exit "$?"
     dashArgs+=(--region="${inRegion}")
 fi
 

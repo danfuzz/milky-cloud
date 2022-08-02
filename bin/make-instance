@@ -68,8 +68,8 @@ function usage {
 # Want help?
 opt-action --call=usage help/h=0
 
-# Location (region or availability zone).
-opt-value --required --var=inLocation in
+# Availability zone.
+opt-value --required --var=inZone --call=parse-zone in
 
 # Instance type.
 opt-value --var=instanceType --default='t3.nano' instance-type
@@ -115,24 +115,14 @@ if [[ ${userDataFile} != '' ]]; then
     || exit 1
 fi
 
-# Figure out the region.
-
-inRegion="$(lib region-from-zone "${inLocation}")" \
-|| exit "$?"
-
 echo 1>&2 "type: ${instanceType}"
-echo 1>&2 "in:   ${inRegion} / ${inLocation}"
+echo 1>&2 "in:   ${inZone}"
 
 # Figure out the correct AMI.
 
 amiInfo="$(
-${progDir}/find-ami \
-    --in="${inLocation}" --instance-type="${instanceType}"
-)"
-
-if (( $? != 0 )); then
-    exit "$?"
-fi
+    ${progDir}/find-ami --in="${inZone}" --instance-type="${instanceType}")" \
+|| exit "$?"
 
 jget 1>&2 --raw "${amiInfo}" '
     "Using AMI:",
@@ -148,20 +138,20 @@ groupId=''
 subnetId=''
 if [[ ${groupNameOrId} != '' ]]; then
     # Resolve the security group ID, and then use it to find the VPC ID.
-    groupId="$(lib find-security-group --in="${inLocation}" "${groupNameOrId}")" \
+    groupId="$(lib find-security-group --in="${inZone}" "${groupNameOrId}")" \
     || exit 1
-    vpcId="$(lib find-vpc --in="${inLocation}" "${groupId}")" \
+    vpcId="$(lib find-vpc --in="${inZone}" "${groupId}")" \
     || exit 1
 elif [[ ${vpcNameOrId} != '' ]]; then
     # Resolve the VPC ID, and then use it to find the security group ID.
-    vpcId="$(lib find-vpc --in="${inLocation}" "${vpcNameOrId}")" \
+    vpcId="$(lib find-vpc --in="${inZone}" "${vpcNameOrId}")" \
     || exit 1
-    groupId="$(lib find-security-group --in="${inLocation}" "${vpcId}")" \
+    groupId="$(lib find-security-group --in="${inZone}" "${vpcId}")" \
     || exit 1
 fi
 
 if [[ ${vpcId} != '' ]]; then
-    subnetId="$(lib find-vpc-subnet --in="${inLocation}" --vpc="${vpcId}")" \
+    subnetId="$(lib find-vpc-subnet --in="${inZone}" --vpc="${vpcId}")" \
     || exit 1
 fi
 
@@ -184,9 +174,9 @@ echo 1>&2 'Launching...'
 # output from `ec2 run-instances`, that is, they aren't known at the moment of
 # launch.
 result="$(ec2-json run-instances \
-    --in="${inRegion}" \
+    --in="${inZone}" \
     amiInfo:json="${amiInfo}" \
-    inLocation="${inLocation}" \
+    inZone="${inZone}" \
     instanceType="${instanceType}" \
     keyName="${keyName}" \
     groupId="${groupId}" \
@@ -198,7 +188,7 @@ result="$(ec2-json run-instances \
             ImageId:      $amiInfo.ImageId,
             InstanceType: $instanceType,
             MaxCount:     1,
-            Placement:    { AvailabilityZone: $inLocation }
+            Placement:    { AvailabilityZone: $inZone }
         }
         + $tagSpec
         + if $keyName == "" then {} else { KeyName: $keyName } end

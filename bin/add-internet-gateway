@@ -47,8 +47,8 @@ function usage {
 # Want help?
 opt-action --call=usage help/h=0
 
-# Location (region or availability zone).
-opt-value --required --var=inLocation in
+# Region, passed as either region per se or availability zone.
+opt-value --required --var=inRegion --filter=region-from-location in
 
 # Name of the resulting gateway.
 opt-value --var=name --filter='/./' name
@@ -89,9 +89,6 @@ function figure-out-name {
 #
 # Main script
 #
-
-inRegion="$(lib region-from-location "${inLocation}")" \
-|| exit "$?"
 
 # Validate the VPC name/id and get its info, extracting a couple useful bits.
 vpcInfo="$(lib find-vpc --print-all --in="${inRegion}" "${vpcNameOrId}")" \

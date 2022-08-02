@@ -67,8 +67,8 @@ opt-choice --required --var=direction egress ingress
 # Name or ID of the security group.
 opt-value --required --var=groupNameOrId --filter='/./' security-group
 
-# Location (region or availability zone).
-opt-value --required --var=inLocation in
+# Region, passed as either region per se or availability zone.
+opt-value --required --var=inRegion --filter=region-from-location in
 
 # Name of the rule.
 opt-value --var=name --filter='/./' name
@@ -88,9 +88,6 @@ process-args "$@" || usage "$?"
 #
 # Main script
 #
-
-inRegion="$(lib region-from-location "${inLocation}")" \
-|| exit "$?"
 
 # Validate or find the ID of the security group.
 groupId="$(lib find-security-group --in="${inRegion}" "${groupNameOrId}")" \

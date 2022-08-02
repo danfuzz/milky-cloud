@@ -29,24 +29,34 @@ fi
 # require a simple function name.
 #
 
-# Calls `aws-json ec2`.
+# Calls `lib aws-json ec2`.
 function ec2-json {
     lib aws-json ec2 "$@"
 }
 
-# Calls `json-array`.
+# Calls `lib json-array`.
 function jarray {
     lib json-array "$@"
 }
 
-# Calls `json-get`.
+# Calls `lib json-get`.
 function jget {
     lib json-get "$@"
 }
 
-# Calls `json-val`.
+# Calls `lib json-val`.
 function jval {
     lib json-val "$@"
+}
+
+# Calls `lib parse-location --input-zone`.
+function parse-zone {
+    lib parse-location --input-zone "$@"
+}
+
+# Calls `lib parse-location --print-region`.
+function region-from-location {
+    lib parse-location --print-region "$@"
 }
 
 
