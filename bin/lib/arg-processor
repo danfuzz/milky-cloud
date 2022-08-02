@@ -777,7 +777,7 @@ function _argproc_set-arg-description {
 # read.
 function _argproc_statements-from-args {
     local argError=0
-    local arg handler name statement value
+    local arg handler name value
 
     # This is used for required-argument checking.
     _argproc_statements+=($'local _argproc_receivedArgNames=\'\'')
@@ -832,6 +832,7 @@ function _argproc_statements-from-args {
         shift
     done
 
+    local statement
     for statement in "${_argproc_positionalFuncs[@]}"; do
         if (( $# == 0 )); then
             break
@@ -842,8 +843,7 @@ function _argproc_statements-from-args {
     done
 
     if declare -F _argproc:rest >/dev/null; then
-        statement="_argproc:rest $(_argproc_quote "$@")"
-        _argproc_statements+=("${statement}")
+        _argproc_statements+=("_argproc:rest $(_argproc_quote "$@")")
     elif (( $# > 0 )); then
         if (( ${#_argproc_positionalFuncs[@]} == 0 )); then
             echo 1>&2 'Non-option arguments are not allowed.'
