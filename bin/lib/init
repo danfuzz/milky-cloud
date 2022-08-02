@@ -24,29 +24,27 @@ fi
 
 
 #
-# Library functions: Convenience callers for external scripts.
+# Library functions: Convenience callers for external scripts. These are for
+# items that are used often enough to be shorter to name, or in contexts that
+# require a simple function name.
 #
 
-# Calls `aws-json ec2`. This combination is used enough to warrant having it be
-# easier to say than `lib aws-json ec2 ...`.
+# Calls `aws-json ec2`.
 function ec2-json {
     lib aws-json ec2 "$@"
 }
 
-# Calls `json-array`. This script is used enough to warrant having it be easier
-# to say than `lib json-array ...`.
+# Calls `json-array`.
 function jarray {
     lib json-array "$@"
 }
 
-# Calls `json-get`. This script is used enough to warrant having it be easier to
-# say than `lib json-get ...`.
+# Calls `json-get`.
 function jget {
     lib json-get "$@"
 }
 
-# Calls `json-val`. This script is used enough to warrant having it be easier to
-# say than `lib json-val ...`.
+# Calls `json-val`.
 function jval {
     lib json-val "$@"
 }
