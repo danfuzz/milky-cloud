@@ -327,6 +327,25 @@ function process-args {
     return "${_argproc_error}"
 }
 
+# Requires that exactly one of the indicated arguments / options is present.
+function require-exactly-one-arg-of {
+    local args=("$@")
+    _argproc_janky-args --multi-spec \
+    || return 1
+
+    local allNames=()
+    local spec
+    for spec in "${args[@]}"; do
+        local specName=''
+        _argproc_parse-spec "${spec}" \
+        || return 1
+
+        allNames+=("${specName}")
+    done
+
+    _argproc_add-required-arg-postcheck --exactly-one "${allNames[@]}"
+}
+
 # Declares a "rest" argument, which gets all the non-option and non-positional
 # arguments, during parsing. If this is not declared, argument processing will
 # report an error in the presence of any "rest" arguments.
@@ -505,45 +524,54 @@ function _argproc_define-value-required-arg {
 }
 
 # Adds a pre-return check which fails if none of the indicated arguments/options
-# were present on the commandline.
+# was present on the commandline, and optionally if more than exactly one was
+# present.
 function _argproc_add-required-arg-postcheck {
-    local checkClause='[[ '
+    local exactlyOne=0
+    if [[ $1 == '--exactly-one' ]]; then
+        exactlyOne=1
+        shift
+    fi
+
+    _argproc_preReturnStatements+=('local _argproc_count=0')
+
+    local argNoun='option'
+    local allNames=''
+
     local longName
-    local first=1
     for longName in "$@"; do
-        if (( first )); then
-            first=0
-        else
-            checkClause+=' || '
+        _argproc_preReturnStatements+=("$(
+            printf '[[ ${_argproc_receivedArgNames} =~ "<%s>" ]] && (( _argproc_count++ )) || true' \
+                "${longName}"
+        )")
+
+        local desc="$(_argproc_arg-description --short "${longName}")"
+        if ! [[ ${desc} =~ - ]]; then
+            argNoun='argument'
         fi
-        checkClause+="$(
-            printf '${_argproc_receivedArgNames} =~ "<%s>"' "${longName}")"
+
+        allNames+=" ${desc}"
     done
-    checkClause+=' ]]'
 
     local errorMsg
+
+    if (( exactlyOne )); then
+        errorMsg="Too many ${argNoun}s from set:${allNames}"
+        _argproc_preReturnStatements+=("$(
+            printf '(( _argproc_count <= 1 )) || { echo 1>&2 %q; false; }' \
+                "${errorMsg}"
+        )")
+    fi
+
     if (( $# == 1 )); then
-        errorMsg="Missing required $(_argproc_arg-description "$1")."
+        errorMsg="Missing required ${argNoun}${allNames}."
     else
-        local allOptions=1
-        errorMsg=''
-        for longName in "$@"; do
-            local desc="$(_argproc_arg-description --short "${longName}")"
-            if ! [[ ${desc} =~ - ]]; then
-                allOptions=0
-            fi
-            errorMsg+=" ${desc}"
-        done
-        if (( allOptions )); then
-            errorMsg="Missing required option from set:${errorMsg}"
-        else
-            errorMsg="Missing required argument from set:${errorMsg}"
-        fi
+        errorMsg="Missing required ${argNoun} from set:${allNames}"
     fi
 
     _argproc_preReturnStatements+=(
-        "$(printf $'%s || { echo 1>&2 %q; false; }\n' \
-            "${checkClause}" "${errorMsg}"
+        "$(printf $'(( _argproc_count != 0 )) || { echo 1>&2 %q; false; }\n' \
+            "${errorMsg}"
     )")
 }
 
