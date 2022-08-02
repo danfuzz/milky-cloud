@@ -305,7 +305,7 @@ function process-args {
 
     # Build up the statements to evaluate, and evaluate them.
     local _argproc_statements=()
-    _argproc:statements-from-args "$@" \
+    _argproc_statements-from-args "$@" \
     || _argproc_error="$?"
 
     for _argproc_s in "${_argproc_statements[@]}"; do
@@ -771,7 +771,7 @@ function _argproc_set-arg-description {
 # function and as a separate pass from evaluation, makes it possible to use
 # non-mangled local variables in the more tricky code, so it's a bit nicer to
 # read.
-function _argproc:statements-from-args {
+function _argproc_statements-from-args {
     local argError=0
     local arg handler name statement value
 
