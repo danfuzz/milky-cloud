@@ -46,8 +46,8 @@ function usage {
 # Want help?
 opt-action --call=usage help/h=0
 
-# Location (region or availability zone).
-opt-value --required --var=inLocation in
+# Region, passed as either region per se or availability zone.
+opt-value --required --var=inRegion --filter=region-from-location in
 
 # What to print.
 opt-choice --var=outputStyle --default=print-id print-all print-id
@@ -61,9 +61,6 @@ process-args "$@" || usage "$?"
 #
 # Main script
 #
-
-inRegion="$(lib region-from-location "${inLocation}")" \
-|| exit "$?"
 
 filterSpec=''
 if [[ ${nameOrId} =~ ^sg- ]]; then

@@ -50,8 +50,8 @@ function usage {
 # Want help?
 opt-action --call=usage help/h=0
 
-# Location (region or availability zone).
-opt-value --required --var=inLocation in
+# Region, passed as either region per se or availability zone.
+opt-value --required --var=inRegion --filter=region-from-location in
 
 # Name or ID of the VPC.
 opt-value --required --var=vpcNameOrId --filter='/./' vpc
@@ -83,9 +83,6 @@ fi
 #
 # Main script
 #
-
-inRegion="$(lib region-from-location "${inLocation}")" \
-|| exit "$?"
 
 # Validate or find the ID of the VPC.
 vpcId="$(lib find-vpc --in="${inRegion}" "${vpcNameOrId}")" \
