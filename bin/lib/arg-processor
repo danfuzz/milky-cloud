@@ -378,6 +378,58 @@ function rest-arg {
 # Library-internal functions
 #
 
+# Adds a pre-return check which fails if none of the indicated arguments/options
+# was present on the commandline, and optionally if more than exactly one was
+# present.
+function _argproc_add-required-arg-postcheck {
+    local exactlyOne=0
+    if [[ $1 == '--exactly-one' ]]; then
+        exactlyOne=1
+        shift
+    fi
+
+    _argproc_preReturnStatements+=('local _argproc_count=0')
+
+    local argNoun='option'
+    local allNames=''
+
+    local longName
+    for longName in "$@"; do
+        _argproc_preReturnStatements+=("$(
+            printf '[[ ${_argproc_receivedArgNames} =~ "<%s>" ]] && (( _argproc_count++ )) || true' \
+                "${longName}"
+        )")
+
+        local desc="$(_argproc_arg-description --short "${longName}")"
+        if ! [[ ${desc} =~ - ]]; then
+            argNoun='argument'
+        fi
+
+        allNames+=" ${desc}"
+    done
+
+    local errorMsg
+
+    if (( exactlyOne )); then
+        errorMsg="Too many ${argNoun}s from set:${allNames}"
+        _argproc_preReturnStatements+=("$(
+            printf '(( _argproc_count <= 1 )) || { echo 1>&2 %q; false; }' \
+                "${errorMsg}"
+        )")
+    fi
+
+    if (( $# == 1 )); then
+        errorMsg="Missing required ${argNoun}${allNames}."
+    else
+        errorMsg="Missing required ${argNoun} from set:${allNames}"
+    fi
+
+    _argproc_preReturnStatements+=(
+        "$(printf $'(( _argproc_count != 0 )) || { echo 1>&2 %q; false; }\n' \
+            "${errorMsg}"
+    )")
+}
+
 # Gets the description of the named argument.
 function _argproc_arg-description {
     local short=0
@@ -521,58 +573,6 @@ function _argproc_define-value-required-arg {
     if [[ ${abbrevChar} != '' ]]; then
         _argproc_define-abbrev "${abbrevChar}" "${longName}"
     fi
-}
-
-# Adds a pre-return check which fails if none of the indicated arguments/options
-# was present on the commandline, and optionally if more than exactly one was
-# present.
-function _argproc_add-required-arg-postcheck {
-    local exactlyOne=0
-    if [[ $1 == '--exactly-one' ]]; then
-        exactlyOne=1
-        shift
-    fi
-
-    _argproc_preReturnStatements+=('local _argproc_count=0')
-
-    local argNoun='option'
-    local allNames=''
-
-    local longName
-    for longName in "$@"; do
-        _argproc_preReturnStatements+=("$(
-            printf '[[ ${_argproc_receivedArgNames} =~ "<%s>" ]] && (( _argproc_count++ )) || true' \
-                "${longName}"
-        )")
-
-        local desc="$(_argproc_arg-description --short "${longName}")"
-        if ! [[ ${desc} =~ - ]]; then
-            argNoun='argument'
-        fi
-
-        allNames+=" ${desc}"
-    done
-
-    local errorMsg
-
-    if (( exactlyOne )); then
-        errorMsg="Too many ${argNoun}s from set:${allNames}"
-        _argproc_preReturnStatements+=("$(
-            printf '(( _argproc_count <= 1 )) || { echo 1>&2 %q; false; }' \
-                "${errorMsg}"
-        )")
-    fi
-
-    if (( $# == 1 )); then
-        errorMsg="Missing required ${argNoun}${allNames}."
-    else
-        errorMsg="Missing required ${argNoun} from set:${allNames}"
-    fi
-
-    _argproc_preReturnStatements+=(
-        "$(printf $'(( _argproc_count != 0 )) || { echo 1>&2 %q; false; }\n' \
-            "${errorMsg}"
-    )")
 }
 
 # Janky yet reasonable argument parser for the commands in this library. (How
