@@ -46,8 +46,8 @@ function usage {
 # Want help?
 opt-action --call=usage help/h=0
 
-# Location (region or availability zone).
-opt-value --required --var=inLocation in
+# Region, passed as either region per se or availability zone.
+opt-value --required --var=inRegion --filter=region-from-location in
 
 # ID of the thing to operate on.
 opt-value --required --var=id --filter='/^[-a-z0-9]+$/' id
@@ -88,9 +88,6 @@ process-args "$@" || usage "$?"
 #
 # Main script
 #
-
-inRegion="$(lib region-from-location "${inLocation}")" \
-|| exit "$?"
 
 if ! [[ ${id} =~ ^([a-z]+)-([a-f0-9]+)$ ]]; then
     echo 1>&2 "Unparseable ID: ${id}"

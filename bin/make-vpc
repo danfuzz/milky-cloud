@@ -41,8 +41,8 @@ function usage {
 # Want help?
 opt-action --call=usage help/h=0
 
-# Location (region or availability zone).
-opt-value --required --var=inLocation in
+# Region, passed as either region per se or availability zone.
+opt-value --required --var=inRegion --filter=region-from-location in
 
 # Name for the resulting VPC.
 opt-value --required --var=name --filter='/^[-_a-zA-Z0-9]+$/' name
@@ -152,9 +152,6 @@ function make-vpc-per-se {
 
 # Name to use for all the sub-resources.
 resourceName="standard-for-${name}"
-
-inRegion="$(lib region-from-location "${inLocation}")" \
-|| exit "$?"
 
 # Create the actual VPC.
 vpcInfo="$(make-vpc-per-se)" \
