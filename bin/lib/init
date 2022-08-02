@@ -54,9 +54,9 @@ function parse-zone {
     lib parse-location --input-zone "$@"
 }
 
-# Calls `lib region-from-location`.
+# Calls `lib parse-location --print-region`.
 function region-from-location {
-    lib region-from-location "$@"
+    lib parse-location --print-region "$@"
 }
 
 
