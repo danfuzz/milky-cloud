@@ -135,7 +135,7 @@ function opt-choice {
     done
 
     if (( optRequired )); then
-        _argproc_add-required-arg-postcheck --option "${allNames[@]}"
+        _argproc_add-required-arg-postcheck "${allNames[@]}"
     fi
 }
 
@@ -200,7 +200,7 @@ function opt-value {
         "${specName}" "${optCall}" "${optVar}" "${optFilter}"
 
     if (( optRequired )); then
-        _argproc_add-required-arg-postcheck --option "${specName}"
+        _argproc_add-required-arg-postcheck "${specName}"
     fi
 }
 
@@ -507,12 +507,6 @@ function _argproc_define-value-required-arg {
 # Adds a pre-return check which fails if none of the indicated arguments/options
 # were present on the commandline.
 function _argproc_add-required-arg-postcheck {
-    local isOption=0
-    if [[ $1 == '--option' ]]; then
-        isOption=1
-        shift
-    fi
-
     local checkClause='[[ '
     local longName
     local first=1
