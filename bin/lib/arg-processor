@@ -846,9 +846,9 @@ function _argproc_statements-from-args {
         _argproc_statements+=("_argproc:rest $(_argproc_quote "$@")")
     elif (( $# > 0 )); then
         if (( ${#_argproc_positionalFuncs[@]} == 0 )); then
-            echo 1>&2 'Non-option arguments are not allowed.'
+            echo 1>&2 'Positional arguments are not allowed.'
         else
-            echo 1>&2 'Too many arguments for command.'
+            echo 1>&2 'Too many positional arguments.'
         fi
         argError=1
     fi
