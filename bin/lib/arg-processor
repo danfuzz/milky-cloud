@@ -359,6 +359,28 @@ function rest-arg {
 # Library-internal functions
 #
 
+# Gets the description of the named argument.
+function _argproc_arg-description {
+    local short=0
+    if [[ $1 == '--short' ]]; then
+        short=1
+        shift
+    fi
+
+    local longName="$1"
+    local funcName="_argproc:arg-description-${longName}"
+    local desc
+
+    desc="$("${funcName}")" \
+    || return 1
+
+    if (( short )); then
+        echo "${desc/* /}"
+    else
+        echo "${desc}"
+    fi
+}
+
 # Defines an "abbrev" function, which is what gets called to activate a
 # short-form option.
 function _argproc_define-abbrev {
@@ -388,6 +410,9 @@ function _argproc_define-no-value-arg {
     local value="$5"
 
     value="$(_argproc:quote "${value}")"
+
+    _argproc_set-arg-description "${longName}" option \
+    || return 1
 
     if [[ ${callFunc} != '' ]]; then
         # Re-form as the caller code.
@@ -430,9 +455,11 @@ function _argproc_define-value-required-arg {
 
     local desc handlerName
     if (( isOption )); then
+        _argproc_set-arg-description "${longName}" option || return 1
         desc="option --${longName}"
         handlerName="_argproc:long-${longName}"
     else
+        _argproc_set-arg-description "${longName}" argument || return 1
         desc="argument <${longName}>"
         handlerName="_argproc:positional-${longName}"
     fi
@@ -500,24 +527,29 @@ function _argproc_add-required-arg-postcheck {
     done
     checkClause+=' ]]'
 
-    local errorMsg='Missing required '
-    local argNames
-
-    if (( isOption )); then
-        errorMsg+='option'
-        argNames="$(printf ' --%s' "$@")"
+    local errorMsg
+    if (( $# == 1 )); then
+        errorMsg="Missing required $(_argproc_arg-description "$1")."
     else
-        errorMsg+='argument'
-        argNames="$*"
-    fi
-
-    if (( $# > 1 )); then
-        errorMsg+=' from set'
+        local allOptions=1
+        errorMsg=''
+        for longName in "$@"; do
+            local desc="$(_argproc_arg-description --short "${longName}")"
+            if ! [[ ${desc} =~ - ]]; then
+                allOptions=0
+            fi
+            errorMsg+=" ${desc}"
+        done
+        if (( allOptions )); then
+            errorMsg="Missing required option from set:${errorMsg}"
+        else
+            errorMsg="Missing required argument from set:${errorMsg}"
+        fi
     fi
 
     _argproc_preReturnStatements+=(
-        "$(printf $'%s || { echo 1>&2 %s %s; false; }\n' \
-            "${checkClause}" "${errorMsg}:" "$argNames"
+        "$(printf $'%s || { echo 1>&2 %q; false; }\n' \
+            "${checkClause}" "${errorMsg}"
     )")
 }
 
@@ -675,6 +707,38 @@ function _argproc_parse-spec {
         echo 1>&2 "Value not allowed in spec: ${spec}"
         return 1
     fi
+}
+
+# Sets the description of the named argument based on its type. This function
+# will fail if an argument with the given name was already defined.
+function _argproc_set-arg-description {
+    local longName="$1"
+    local typeName="$2"
+
+    local funcName="_argproc:arg-description-${longName}"
+
+    if declare -F "${funcName}" >/dev/null; then
+        echo 1>&2 "Duplicate argument: ${longName}"
+        return 1
+    fi
+
+    local desc
+    case "${typeName}" in
+        argument)
+            desc="argument <${longName}>"
+            ;;
+        option)
+            desc="option --${longName}"
+            ;;
+        *)
+            echo 1>&2 "Unknown type: ${typeName}"
+            return 1
+            ;;
+    esac
+
+    eval 'function '"${funcName}"' {
+        echo '"$(_argproc:quote "${desc}")"'
+    }'
 }
 
 # Builds up a list of statements to evaluate, based on the given arguments. It
