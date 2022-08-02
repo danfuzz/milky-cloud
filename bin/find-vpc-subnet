@@ -40,8 +40,8 @@ function usage {
 # Want help?
 opt-action --call=usage help/h=0
 
-# Location (availability zone).
-opt-value --required --var=inLocation in
+# Availability zone.
+opt-value --required --var=inZone --call=parse-zone in
 
 # Name or ID of VPC to look up.
 opt-value --required --var=nameOrId --filter='/./' vpc
@@ -53,19 +53,16 @@ process-args "$@" || usage "$?"
 # Main script
 #
 
-inRegion="$(lib region-from-zone "${inLocation}")" \
-|| exit "$?"
-
-vpcId="$(lib find-vpc --in="${inRegion}" "${nameOrId}")" \
+vpcId="$(lib find-vpc --in="${inZone}" "${nameOrId}")" \
 || exit "$?"
 
 filterSpec="$(lib filter-spec \
-    availability-zone="${inLocation}" \
+    availability-zone="${inZone}" \
     vpc-id="${vpcId}"
 )"
 
 result="$(ec2-json describe-subnets \
-    --in="${inRegion}" \
+    --in="${inZone}" \
     "${filterSpec}" \
     :: '.Subnets | map(.SubnetId)' \
 )" \
