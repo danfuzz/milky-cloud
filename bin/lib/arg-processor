@@ -370,9 +370,7 @@ function _argproc_define-abbrev {
 # Defines an argument activation function which prohibits passing a value, as
 # the value is "built into" the argument spec.
 function _argproc_define-no-value-arg {
-    local isOption=0
     if [[ $1 == '--option' ]]; then
-        isOption=1
         shift
     else
         # `--option` is really defined here for parallel structure, not utility.
