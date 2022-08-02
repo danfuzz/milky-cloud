@@ -59,11 +59,6 @@ function region-from-location {
     lib region-from-location "$@"
 }
 
-# Calls `lib region-from-zone`.
-function region-from-zone {
-    lib region-from-zone "$@"
-}
-
 
 #
 # Library functions: Others
