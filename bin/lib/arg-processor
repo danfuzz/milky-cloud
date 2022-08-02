@@ -34,6 +34,9 @@
 # the argument value. If the call or match fails, the argument isn't accepted.
 # In addition, the function form is expected to output the value to use on
 # success (e.g. a replacement for what was directly passed on the commandline).
+# Note: Because a filter function's output is captured, it runs in a subshell,
+# and as such it cannot be used to affect the global environment of the main
+# script.
 #
 # Some argument-definers also accept `--required`, to indicate that the argument
 # or option is required (mandatory).
