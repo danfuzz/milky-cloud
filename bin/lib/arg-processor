@@ -634,7 +634,7 @@ function _argproc_janky-args {
 
 # Parses a single argument / option spec. `--abbrev` to accept an abbreviation.
 # `--value` to accept a value. Sets `spec<Item>` (presumed locals in the calling
-# scope) to "returns" results.
+# scope) to "return" results.
 function _argproc_parse-spec {
     local abbrevOk=0
     local valueOk=0
