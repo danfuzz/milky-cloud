@@ -24,11 +24,8 @@ fi
 
 
 #
-# Library functions
+# Library functions: Convenience callers for external scripts.
 #
-
-# Load the argument processor library.
-. "${_milky_cloud_libDir}/arg-processor"
 
 # Calls `aws-json ec2`. This combination is used enough to warrant having it be
 # easier to say than `lib aws-json ec2 ...`.
@@ -53,6 +50,14 @@ function jget {
 function jval {
     lib json-val "$@"
 }
+
+
+#
+# Library functions: Others
+#
+
+# Load the argument processor library.
+. "${_milky_cloud_libDir}/arg-processor"
 
 # Calls through to an arbitrary library script.
 function lib {
