@@ -55,8 +55,8 @@ function usage {
 # Want help?
 opt-action --call=usage help/h=0
 
-# Location (region or availability zone).
-opt-value --required --var=inLocation in
+# Region, passed as either region per se or availability zone.
+opt-value --required --var=inRegion --filter=region-from-location in
 
 # Name for the security group.
 opt-value --var=name --filter='/./' name
@@ -73,9 +73,6 @@ process-args "$@" || usage "$?"
 #
 # Main script
 #
-
-inRegion="$(lib region-from-location "${inLocation}")" \
-|| exit "$?"
 
 # Validate or find the ID of the security group.
 groupInfo="$(

@@ -43,8 +43,8 @@ function usage {
 # Want help?
 opt-action --call=usage help/h=0
 
-# Location (region or availability zone).
-opt-value --required --var=inLocation in
+# Region, passed as either region per se or availability zone.
+opt-value --required --var=inRegion --filter=region-from-location in
 
 # ID of the gateway.
 opt-value --required --var=gatewayId --filter='/./' gateway
@@ -58,9 +58,6 @@ process-args "$@" || usage "$?"
 #
 # Main script
 #
-
-inRegion="$(lib region-from-location "${inLocation}")" \
-|| exit "$?"
 
 # Get info on the gateway (which also validates the ID).
 gatewayInfo="$(ec2-json describe-internet-gateways \
