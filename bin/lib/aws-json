@@ -34,15 +34,16 @@ function usage {
       The AWS command and subcommand to call, e.g. `ec2 run-instances`.
 
     --in=<region-or-zone>
-      What region to make the call in. Must be specified. If specified as
-      an availability zone, only the region portion matters.
+      What region to make the call in. If specified as an availability zone,
+      only the region portion matters. Either this option or `--skeleton` must
+      be specified.
     --print-command-to=<file>
       Name of a file to print the fully-constructed command to. It is
       emitted as a JSON value including both split-out components and
       the actual commandline.
     --skeleton
-      Print out a JSON "skeleton" of parameters. This can be filtered just
-      like any other result.
+      Instead of making a regular call, just print out a JSON "skeleton" of the
+      parameters to the command. This can be filtered just like any other result.
 
     Output options:
 
