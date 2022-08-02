@@ -44,6 +44,11 @@
 # Beyond the above, see the docs for the functions for restrictions and
 # additional options.
 
+# Note: Regular internal functions and variables use the naming convention
+# `_argproc_<name>`, where `<name>` is an otherwise normal function or variable
+# name. Generated functions use the convention `_argproc:<name>`, to make the
+# origin clear and to avoid collisions.
+
 # List of statements to run just before parsing. This includes:
 #
 # * global variable assignment statements
