@@ -51,7 +51,7 @@ opt-value --required --var=inRegion --filter=region-from-location in
 opt-choice --var=outputStyle --default=print-id print-all print-id
 
 # Name or ID to look up.
-positional-arg --var=nameOrId name-or-id
+positional-arg --required --var=nameOrId name-or-id
 
 process-args "$@" || usage "$?"
 
