@@ -53,17 +53,12 @@ process-args "$@" || usage "$?"
 # Main script
 #
 
-cmd=(ec2-json describe-availability-zones --loc="${region}" ::)
-suffix=()
+cmd=(ec2-json describe-availability-zones
+    --loc="${region}"
+    :: --output="${outputStyle}" '.AvailabilityZones | map(.ZoneName) | sort')
 
-case "${outputStyle}" in
-    compact)
-        cmd+=(--output=compact)
-        ;;
-    lines)
-        cmd+=(--output=raw)
-        suffix=('| .[]')
-        ;;
-esac
+if [[ "${outputStyle}" == 'lines' ]]; then
+    cmd+=('| .[]')
+fi
 
-"${cmd[@]}" '.AvailabilityZones | map(.ZoneName) | sort' "${suffix[@]}"
+"${cmd[@]}"
