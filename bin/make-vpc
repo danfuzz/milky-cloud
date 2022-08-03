@@ -68,7 +68,7 @@ function make-vpc-per-se {
             # Create the actual VPC.
             vpcInfo="$(ec2-json create-vpc \
                 --loc="${region}" \
-                tagSpec:json="$(lib name-tag-spec vpc "${name}")" \
+                tagSpec:json="$(lib name-tag-spec 'vpc' "${name}")" \
                 '
                     $tagSpec +
                     {

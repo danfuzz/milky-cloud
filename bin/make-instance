@@ -178,7 +178,7 @@ result="$(ec2-json run-instances \
     keyName="${keyName}" \
     groupId="${groupId}" \
     subnetId="${subnetId}" \
-    tagSpec:json="$(lib name-tag-spec instance "${name}")" \
+    tagSpec:json="$(lib name-tag-spec 'instance' "${name}")" \
     userData="${userData}" \
     '
         {
