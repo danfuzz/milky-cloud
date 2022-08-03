@@ -45,7 +45,7 @@ function usage {
 opt-action --call=usage help/h=0
 
 # Region, passed as either region per se or availability zone.
-opt-value --required --var=inRegion --filter=region-from-location loc
+opt-value --required --var=region --filter=region-from-location loc
 
 # What to print.
 opt-choice --var=outputStyle --default=print-id print-all print-id
@@ -73,7 +73,7 @@ function do-find {
 
     local result
     result="$(ec2-json "${commandName}" \
-        --loc="${inRegion}" \
+        --loc="${region}" \
         "$(lib filter-spec "${filterName}=${nameOrId}")"
     )" \
     || return "$?"
@@ -112,7 +112,7 @@ function do-find {
             # and we've been asked for full info. So we need to actually get
             # that info!
             result="$(ec2-json describe-vpcs \
-                --loc="${inRegion}" \
+                --loc="${region}" \
                 vpcId="${vpcId}" \
                 '{ VpcIds: [$vpcId] }'
             )" \

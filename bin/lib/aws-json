@@ -78,7 +78,7 @@ fi
 opt-action --call=usage help/h=0
 
 # Region, passed as either region per se or availability zone.
-opt-value --var=inRegion --filter=region-from-location loc
+opt-value --var=region --filter=region-from-location loc
 
 # File to print the constructed command to.
 opt-value --filter='/./' --var=printCommandTo print-command-to
@@ -184,7 +184,7 @@ dashArgs=(--no-cli-pager --output=json)
 if (( skeleton )); then
     dashArgs+=(--generate-cli-skeleton)
 else
-    dashArgs+=(--region="${inRegion}")
+    dashArgs+=(--region="${region}")
 fi
 
 jsonArg='{}'

@@ -47,7 +47,7 @@ function usage {
 opt-action --call=usage help/h=0
 
 # Region, passed as either region per se or availability zone.
-opt-value --required --var=inRegion --filter=region-from-location loc
+opt-value --required --var=region --filter=region-from-location loc
 
 # What to print.
 opt-choice --var=outputStyle --default=print-id print-all print-id
@@ -76,7 +76,7 @@ fi
 
 result="$(
 ec2-json describe-security-groups \
-    --loc="${inRegion}" \
+    --loc="${region}" \
     "${filterSpec}" \
     :: \
     '

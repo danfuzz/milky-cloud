@@ -50,7 +50,7 @@ function usage {
 opt-action --call=usage help/h=0
 
 # Region, passed as either region per se or availability zone.
-opt-value --required --var=inRegion --filter=region-from-location loc
+opt-value --required --var=region --filter=region-from-location loc
 
 # Name for the subnets.
 opt-value --var=name --filter='/./' name
@@ -71,11 +71,11 @@ process-args "$@" || usage "$?"
 # Main script
 #
 
-azList=($(lib list-availability-zones --loc="${inRegion}")) \
+azList=($(lib list-availability-zones --loc="${region}")) \
 || exit "$?"
 
 # Get all the VPC info.
-vpcInfo="$(lib find-vpc --loc="${inRegion}" --print-all "${vpcNameOrId}")" \
+vpcInfo="$(lib find-vpc --loc="${region}" --print-all "${vpcNameOrId}")" \
 || exit "$?"
 
 vpcId="$(jget --raw "${vpcInfo}" '.VpcId')"
@@ -137,7 +137,7 @@ for (( n = 0; n < azCount && !error; n++ )); do
     v4Subnet="${v4Subnets[${n}]}"
     v6Subnet="${v6Subnets[${n}]}"
     result="$(ec2-json create-subnet \
-        --loc="${inRegion}" \
+        --loc="${region}" \
         az="${azList[${n}]}" \
         tagSpec:json="${tagSpec}" \
         v4Subnet="${v4Subnets[${n}]}" \
@@ -180,7 +180,7 @@ for (( n = 0; n < azCount && !error; n++ )); do
     # * PrivateDnsHostnameTypeOnLaunch: Private DNS name is based on the
     #   instance ID (not private DNS address).
     lib set-attributes \
-        --loc="${inRegion}" --id="${result}" "${progressArg}" \
+        --loc="${region}" --id="${result}" "${progressArg}" \
         AssignIpv6AddressOnCreation=true \
         EnableResourceNameDnsARecordOnLaunch=true \
         EnableResourceNameDnsAAAARecordOnLaunch=true \
@@ -198,7 +198,7 @@ if (( error )); then
         progress-msg "Removing subnet: ${id}"
 
         ec2-json delete-subnet \
-            --loc="${inRegion}" \
+            --loc="${region}" \
             id="${id}" \
             '{
                 SubnetId: $id
