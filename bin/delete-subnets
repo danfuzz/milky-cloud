@@ -101,7 +101,8 @@ selectedSubnets="$(
 || exit "$?"
 
 subnetIds=($(
-    jval <<<"${selectedSubnets}" --words --slurp-stdin 'map(.SubnetId) | sort | .[]'
+    jval <<<"${selectedSubnets}" --output=words --slurp-stdin \
+        'map(.SubnetId) | sort | .[]'
 )) \
 || exit "$?"
 

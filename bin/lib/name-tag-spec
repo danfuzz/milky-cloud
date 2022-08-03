@@ -59,7 +59,7 @@ process-args "$@" || usage "$?"
 # Main script
 #
 
-jval --"${outputStyle}" \
+jval --output="${outputStyle}" \
     name="${name}" \
     resourceType="${resourceType}" \
     '{

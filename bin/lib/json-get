@@ -72,4 +72,4 @@ if (( ${#exprArgs[@]} == 0 )); then
     exprArgs=('.')
 fi
 
-lib json-val <<< "${value}" --"${outputStyle}" --input=read -- "${exprArgs[@]}"
+lib json-val <<< "${value}" --output="${outputStyle}" --input=read -- "${exprArgs[@]}"
