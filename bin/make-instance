@@ -69,7 +69,7 @@ function usage {
 opt-action --call=usage help/h=0
 
 # Availability zone.
-opt-value --required --var=inZone --call=parse-zone loc
+opt-value --required --var=zone --call=parse-zone loc
 
 # Instance type.
 opt-value --var=instanceType --default='t3.nano' instance-type
@@ -116,12 +116,12 @@ if [[ ${userDataFile} != '' ]]; then
 fi
 
 echo 1>&2 "type: ${instanceType}"
-echo 1>&2 "in:   ${inZone}"
+echo 1>&2 "in:   ${zone}"
 
 # Figure out the correct AMI.
 
 amiInfo="$(
-    ${progDir}/find-ami --loc="${inZone}" --instance-type="${instanceType}")" \
+    ${progDir}/find-ami --loc="${zone}" --instance-type="${instanceType}")" \
 || exit "$?"
 
 jget 1>&2 --raw "${amiInfo}" '
@@ -138,20 +138,20 @@ groupId=''
 subnetId=''
 if [[ ${groupNameOrId} != '' ]]; then
     # Resolve the security group ID, and then use it to find the VPC ID.
-    groupId="$(lib find-security-group --loc="${inZone}" "${groupNameOrId}")" \
+    groupId="$(lib find-security-group --loc="${zone}" "${groupNameOrId}")" \
     || exit 1
-    vpcId="$(lib find-vpc --loc="${inZone}" "${groupId}")" \
+    vpcId="$(lib find-vpc --loc="${zone}" "${groupId}")" \
     || exit 1
 elif [[ ${vpcNameOrId} != '' ]]; then
     # Resolve the VPC ID, and then use it to find the security group ID.
-    vpcId="$(lib find-vpc --loc="${inZone}" "${vpcNameOrId}")" \
+    vpcId="$(lib find-vpc --loc="${zone}" "${vpcNameOrId}")" \
     || exit 1
-    groupId="$(lib find-security-group --loc="${inZone}" "${vpcId}")" \
+    groupId="$(lib find-security-group --loc="${zone}" "${vpcId}")" \
     || exit 1
 fi
 
 if [[ ${vpcId} != '' ]]; then
-    subnetId="$(lib find-vpc-subnet --loc="${inZone}" --vpc="${vpcId}")" \
+    subnetId="$(lib find-vpc-subnet --loc="${zone}" --vpc="${vpcId}")" \
     || exit 1
 fi
 
@@ -174,9 +174,9 @@ echo 1>&2 'Launching...'
 # output from `ec2 run-instances`, that is, they aren't known at the moment of
 # launch.
 result="$(ec2-json run-instances \
-    --loc="${inZone}" \
+    --loc="${zone}" \
     amiInfo:json="${amiInfo}" \
-    inZone="${inZone}" \
+    zone="${zone}" \
     instanceType="${instanceType}" \
     keyName="${keyName}" \
     groupId="${groupId}" \
@@ -188,7 +188,7 @@ result="$(ec2-json run-instances \
             ImageId:      $amiInfo.ImageId,
             InstanceType: $instanceType,
             MaxCount:     1,
-            Placement:    { AvailabilityZone: $inZone }
+            Placement:    { AvailabilityZone: $zone }
         }
         + $tagSpec
         + if $keyName == "" then {} else { KeyName: $keyName } end
