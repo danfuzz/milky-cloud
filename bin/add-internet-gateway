@@ -73,7 +73,7 @@ function figure-out-name {
     name=$(ec2-json describe-vpcs \
         --loc="${region}" \
         "$(lib filter-spec vpc-id="${vpcId}")" \
-        :: --raw \
+        :: --output=raw \
         '.Vpcs[0].Tags[] | select(.Key == "Name") | .Value'
     ) \
     || return "$?"
@@ -110,7 +110,7 @@ fi
 gatewayId="$(ec2-json create-internet-gateway \
     --loc="${region}" \
     "$(lib name-tag-spec internet-gateway "${name}")" \
-    :: --raw '.InternetGateway.InternetGatewayId'
+    :: --output=raw '.InternetGateway.InternetGatewayId'
 )" \
 || exit "$?"
 
@@ -126,7 +126,7 @@ rtId="$(ec2-json describe-route-tables \
     --loc="${region}" \
     filters:json="$(lib filter-spec vpc-id="${vpcId}" association.main=true)" \
     '$filters' \
-    :: --raw '.RouteTables[0].RouteTableId'
+    :: --output=raw '.RouteTables[0].RouteTableId'
 )" \
 && progress-msg "Default VPC route table: ${rtId}" \
 || error=1

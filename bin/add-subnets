@@ -161,7 +161,7 @@ for (( n = 0; n < azCount && !error; n++ )); do
             else { Ipv6CidrBlock: $v6Subnet }
         end
         ' \
-        :: --raw '.Subnet.SubnetId' \
+        :: --output=raw '.Subnet.SubnetId' \
     )" \
     || error=1
 

@@ -61,7 +61,7 @@ case "${outputStyle}" in
         cmd+=(--compact)
         ;;
     lines)
-        cmd+=(--raw)
+        cmd+=(--output=raw)
         suffix=('| .[]')
         ;;
 esac
