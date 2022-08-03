@@ -143,7 +143,7 @@ if (( !error )); then
                 }]
             }]
         }' \
-        :: --none \
+        :: --output=none \
     && progress-msg "Added within-group rule." \
     || error="$?"
 fi

@@ -85,7 +85,7 @@ if [[ ${vpcId} != 'null' ]]; then
         --loc="${region}" \
         filters:json="$(lib filter-spec vpc-id="${vpcId}" association.main=true)" \
         '$filters' \
-        :: --raw '.RouteTables[0]'
+        :: --output=raw '.RouteTables[0]'
     )" \
     || exit "$?"
 

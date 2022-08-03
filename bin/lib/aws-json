@@ -47,12 +47,10 @@ function usage {
 
     Output options:
 
-    --compact
-      Output in compact form (not multiline JSON).
-    --none
-      Do not produce (non-error) output.
-    --raw
-      Output raw strings (and other values compactly).
+    --output=<style> :: `compact` `json` `lines` `none` `raw` `words`
+      How to process the final output. All options are as with `json-val`, with
+      the addition of `none` which means that nothing should be output. The
+      default is `json`.
 
     ${name} [--help | -h]
       Displays this message.
@@ -89,7 +87,7 @@ opt-action --var=skeleton skeleton
 require-exactly-one-arg-of loc skeleton
 
 # Output style (result post-processor option).
-outputStyle=normal
+outputStyle=json
 
 # Assignments and expression arguments to use to construct the value to pass to
 # the AWS command.
@@ -119,14 +117,12 @@ function parse-rest {
     # Process result post-processor arguments.
     while (( $# > 0 )); do
         case "$1" in
-            --compact)
-                outputStyle=compact
-                ;;
-            --none)
-                outputStyle=none
-                ;;
-            --raw)
-                outputStyle=raw
+            --output=*)
+                outputStyle="${1#*=}"
+                if ! [[ "${outputStyle}" =~ ^(compact|json|lines|none|raw|words)$ ]]; then
+                    echo 1>&2 "Invalid result output style: ${outputStyle}"
+                    return 1
+                fi
                 ;;
             --)
                 # Explicit end of options.
@@ -275,11 +271,8 @@ fi
 if [[ ${outputStyle} != 'none' ]]; then
     jgetOpts=()
     case "${outputStyle}" in
-        compact)
-            jgetOpts+=('--output=compact')
-            ;;
-        raw)
-            jgetOpts+=('--output=raw')
+        compact|json|raw)
+            jgetOpts+=(--output="${outputStyle}")
             ;;
     esac
 

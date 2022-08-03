@@ -93,7 +93,7 @@ ec2-json describe-instance-types \
     --loc="${zone}" \
     instanceType="${instanceType}" \
     '{ InstanceTypes: [$instanceType] }' \
-    :: --raw '
+    :: --output=raw '
         .InstanceTypes[0].ProcessorInfo.SupportedArchitectures
         | map(select(. != "i386"))
         | .[0] // "error"

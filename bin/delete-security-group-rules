@@ -130,7 +130,7 @@ if [[ ${egressRuleIds} != '[]' ]]; then
             GroupId: $groupId,
             SecurityGroupRuleIds: $ruleIds
         }' \
-        :: --none \
+        :: --output=none \
     || exit "$?"
 fi
 
@@ -144,7 +144,7 @@ if [[ ${ingressRuleIds} != '[]' ]]; then
             GroupId: $groupId,
             SecurityGroupRuleIds: $ruleIds
         }' \
-        :: --none \
+        :: --output=none \
     || exit "$?"
 fi
 
