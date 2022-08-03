@@ -105,7 +105,7 @@ ipSpec="$(lib ip-permission-spec "${protocol}" "${port}")" \
 
 filterArg='.SecurityGroupRules | map(.SecurityGroupRuleId)'
 if (( quiet )); then
-    filterArg='--none'
+    filterArg='--output=none'
 fi
 
 ec2-json "${command}" \
