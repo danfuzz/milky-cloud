@@ -24,13 +24,12 @@ function usage {
       Constructs and prints a JSON array of values, of all of the value
       arguments passed to this command.
 
-      --compact
-        Output in compact (not multiline) JSON form.
-      --json
-        Output in JSON form. This is the default.
-      --input=<type>
+      --input=<style>
         `json` -- Treat arguments as JSON values. This is the default.
         `strings` -- Treat arguments as literal strings.
+      --output=<style>
+        `compact` -- Output in compact (single line) JSON form.
+        `json` -- Output in multiline JSON form. This is the default.
 
     ${name} [--help | -h]
       Displays this message.
@@ -43,7 +42,7 @@ function usage {
 opt-action --call=usage help/h=0
 
 # Output style.
-opt-choice --var=outputStyle --default=json compact json
+opt-enum --var=outputStyle --default=json output compact json
 
 # Input style.
 opt-enum --var=inputStyle --default=json input json strings
@@ -88,5 +87,4 @@ for (( n = 0; n < ${#args[@]}; n++ )); do
     expr+='$a'"${n}"
 done
 
-echo 1>&2 '#######' "${inputStyle}"
 exec jq "${jqArgs[@]}" "[${expr}]"
