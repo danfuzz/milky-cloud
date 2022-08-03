@@ -347,7 +347,8 @@ function require-exactly-one-arg-of {
         allNames+=("${specName}")
     done
 
-    _argproc_add-required-arg-postcheck --exactly-one "${allNames[@]}"
+    _argproc_add-required-arg-postcheck --exactly-one "${allNames[@]}" \
+    || return 1
 }
 
 # Declares a "rest" argument, which gets all the non-option and non-positional
@@ -397,14 +398,14 @@ function _argproc_add-required-arg-postcheck {
     local argNoun='option'
     local allNames=''
 
-    local longName
+    local longName desc
     for longName in "$@"; do
         _argproc_preReturnStatements+=("$(
             printf '[[ ${_argproc_receivedArgNames} =~ "<%s>" ]] && (( _argproc_count++ )) || true' \
                 "${longName}"
         )")
 
-        local desc="$(_argproc_arg-description --short "${longName}")"
+        desc="$(_argproc_arg-description --short "${longName}")" || return 1
         if ! [[ ${desc} =~ - ]]; then
             argNoun='argument'
         fi
@@ -445,6 +446,11 @@ function _argproc_arg-description {
     local longName="$1"
     local funcName="_argproc:arg-description-${longName}"
     local desc
+
+    if ! declare -F "${funcName}" >/dev/null; then
+        echo 1>&2 "No such argument: <${longName}>"
+        return 1
+    fi
 
     desc="$("${funcName}")" \
     || return 1
