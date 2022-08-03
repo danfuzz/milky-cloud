@@ -45,7 +45,6 @@ opt-value --required --var=region --filter=region-from-location loc
 
 # Output style.
 opt-enum --var=outputStyle --default=lines output :: compact json lines
-opt-enum --var=x
 
 process-args "$@" || usage "$?"
 
