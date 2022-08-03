@@ -86,7 +86,7 @@ opt-value --filter='/./' --var=printCommandTo print-command-to
 # Just print argument "skeleton" ?
 opt-action --var=skeleton skeleton
 
-require-exactly-one-arg-of in skeleton
+require-exactly-one-arg-of loc skeleton
 
 # Output style (result post-processor option).
 outputStyle=normal
