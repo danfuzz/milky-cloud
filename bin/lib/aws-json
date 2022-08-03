@@ -124,15 +124,6 @@ function parse-rest {
                     return 1
                 fi
                 ;;
-            --compact)
-                outputStyle=compact
-                ;;
-            --none)
-                outputStyle=none
-                ;;
-            --raw)
-                outputStyle=raw
-                ;;
             --)
                 # Explicit end of options.
                 shift
