@@ -58,7 +58,7 @@ suffix=()
 
 case "${outputStyle}" in
     compact)
-        cmd+=(--compact)
+        cmd+=(--output=compact)
         ;;
     lines)
         cmd+=(--output=raw)
