@@ -63,7 +63,7 @@ process-args "$@" || usage "$?"
 # much simpler. Unfortunately, because `jq` doesn't actually do the usual shell
 # command behavior of not attempting to interpret things that look like options
 # but are positioned after non-option arguments, it's not actually possible to
-# use `--args` or `--json-args`, especially if we want to be resilient to errant
+# use `--args` or `--jsonargs`, especially if we want to be resilient to errant
 # input to this script (and not blithely pass it into a `jq` which will do
 # who-knows-what with it).
 
