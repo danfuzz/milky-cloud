@@ -60,10 +60,10 @@ function usage {
 opt-action --call=usage help/h=0
 
 # Input style.
-opt-enum --var=inputStyle --default=none input none read slurp
+opt-enum --var=inputStyle --default=none input :: none read slurp
 
 # Output style.
-opt-enum --var=outputStyle --default=json output compact json lines raw words
+opt-enum --var=outputStyle --default=json output :: compact json lines raw words
 
 # List of variable assignments, as parallel arrays of type, name, and value.
 varTypes=()

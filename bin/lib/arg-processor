@@ -158,15 +158,16 @@ function opt-enum {
     _argproc_janky-args --multi-spec call default required var \
     || return 1
 
-    if (( ${#args[@]} < 2 )); then
-        echo 1>&2 'Missing enumerated values.'
-        return 1
-    fi
-
     local specName=''
     _argproc_parse-spec "${args[0]}" \
     || return 1
     unset args[0]
+
+    if (( ${#args[@]} < 2 )) || [[ ${args[1]} != '::' ]]; then
+        echo 1>&2 'Missing enumerated values after `::` marker.'
+        return 1
+    fi
+    unset args[1]
 
     local filterExpr=''
     local value

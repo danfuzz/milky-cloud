@@ -42,10 +42,10 @@ function usage {
 opt-action --call=usage help/h=0
 
 # Output style.
-opt-enum --var=outputStyle --default=json output compact json
+opt-enum --var=outputStyle --default=json output :: compact json
 
 # Input style.
-opt-enum --var=inputStyle --default=json input json strings
+opt-enum --var=inputStyle --default=json input :: json strings
 
 # The array elements.
 rest-arg --var=args
