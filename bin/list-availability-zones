@@ -28,7 +28,8 @@ function usage {
         What region to look in. Must be specified. If specified as an
         availability zone, only the region portion matters.
       --output=<style> :: `compact` `json` `lines`
-        Output style, as with `json-val`. Defaults to `lines`.
+        Output style, as with `json-val`. Defaults to `lines`, which indicates
+        _raw_ lines (no JSON decoration).
 
     ${name} [--help | -h]
       Displays this message.
@@ -53,11 +54,15 @@ process-args "$@" || usage "$?"
 # Main script
 #
 
+if [[ ${outputStyle} == 'lines' ]]; then
+    outputStyle='raw'
+fi
+
 cmd=(ec2-json describe-availability-zones
     --loc="${region}"
     :: --output="${outputStyle}" '.AvailabilityZones | map(.ZoneName) | sort')
 
-if [[ "${outputStyle}" == 'lines' ]]; then
+if [[ "${outputStyle}" == 'raw' ]]; then
     cmd+=('| .[]')
 fi
 
