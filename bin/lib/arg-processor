@@ -30,13 +30,18 @@
 # used, then the default-for-the-default depends on the specific function.
 #
 # Definers for value-accepting arguments take an option `--filter=<spec>`, which
-# specifies either a function to call or a regular expression to match against
-# the argument value. If the call or match fails, the argument isn't accepted.
-# In addition, the function form is expected to output the value to use on
-# success (e.g. a replacement for what was directly passed on the commandline).
-# Note: Because a filter function's output is captured, it runs in a subshell,
-# and as such it cannot be used to affect the global environment of the main
-# script.
+# can take three possible forms:
+# * `/<regex>/` -- A regular expression to match against the value. If there is
+#   no match, then the argument isn't accepted.
+# * `<name>` -- The name of a function to call, passed the value as a single
+#   argument. If the function fails, then the argument isn't accepted. If the
+#   function succeeds, then its output becomes the argument value. Note: The
+#   filter function runs in a subshell, and as such it cannot be used to affect
+#   the global environment of the main script.
+# * `{<code>}` -- A snippet of code to run, in which `$1` is the argument value.
+#   Relatedly, the argument value can be replaced with `set <value>`. If the
+#   code fails (that is, the final command returns a non-zero exit status), then
+#   the argument isn't accepted.
 #
 # Some argument-definers also accept `--required`, to indicate that the argument
 # or option is required (mandatory).
@@ -597,25 +602,34 @@ function _argproc_define-value-required-arg {
 
     if [[ ${callFunc} != '' ]]; then
         # Re-form as the caller code.
-        callFunc="${callFunc}"' "${_argproc_value}" || return "$?"'
+        callFunc="${callFunc}"' "$1" || return "$?"'
     fi
 
     if [[ ${varName} != '' ]]; then
         # Re-form as the setter code.
-        varName="${varName}"'="${_argproc_value}"'
+        varName="${varName}"'="$1"'
     fi
 
     if [[ ${filter} =~ ^/(.*)/$ ]]; then
         # Re-form `filter` as the statement which performs the regex check.
         filter="${BASH_REMATCH[1]}"
         filter='
-            if ! [[ ${_argproc_value} =~ '"${filter}"' ]]; then
+            if ! [[ $1 =~ '"${filter}"' ]]; then
                 echo 1>&2 "Invalid value for '"${desc}"': ${_argproc_value}"
                 return 1
             fi'
+    elif [[ ${filter} =~ ^\{(.*)\}$ ]]; then
+        # Re-form `filter` as the code block to run.
+        filter="$(printf '{\n%s\n} || return "$?"\n' "${BASH_REMATCH[1]}")"
     elif [[ ${filter} != '' ]]; then
-        # Re-form `filter` as the call to the filter function.
-        filter='_argproc_value="$('"${filter}"' "${_argproc_value}")" || return 1'
+        # Re-form `filter` as the call to the filter function. Note: We can't
+        # do `set "$(...)"` or assign on the `local` line, because either of
+        # those will swallow a failure from the call.
+        filter="$(printf '
+            local _argproc_value
+            _argproc_value="$(%s "$1")" || return 1
+            set "${_argproc_value}"
+            ' "${filter}")"
     fi
 
     eval 'function '"${handlerName}"' {
@@ -623,7 +637,6 @@ function _argproc_define-value-required-arg {
             echo 1>&2 "Value required for '"${desc}"'."
             return 1
         fi
-        local _argproc_value="$1"
         '"${filter}"'
         '"${callFunc}"'
         '"${varName}"'
@@ -688,7 +701,7 @@ function _argproc_janky-args {
                     || argError=1
                     ;;
                 filter)
-                    [[ ${value} =~ ^=(/(.*)/|[_a-zA-Z][-_:a-zA-Z0-9]*)$ ]] \
+                    [[ ${value} =~ ^=(/.*/|\{.*\}|[_a-zA-Z][-_:a-zA-Z0-9]*)$ ]] \
                     && optFilter="${BASH_REMATCH[1]}" \
                     || argError=1
                     ;;
