@@ -26,7 +26,7 @@ function usage {
       all necessary routing rules to the default route table for the VPC. On
       success, prints the ID of the created gateway.
 
-      --in=<region-or-zone>
+      --loc=<region-or-zone>
         What region to make the gateway in. Must be specified. If specified
         as an availability zone, only the region portion matters.
       --name=<name>
@@ -48,7 +48,7 @@ function usage {
 opt-action --call=usage help/h=0
 
 # Region, passed as either region per se or availability zone.
-opt-value --required --var=inRegion --filter=region-from-location in
+opt-value --required --var=inRegion --filter=region-from-location loc
 
 # Name of the resulting gateway.
 opt-value --var=name --filter='/./' name
@@ -71,7 +71,7 @@ process-args "$@" || usage "$?"
 function figure-out-name {
     local name
     name=$(ec2-json describe-vpcs \
-        --in="${inRegion}" \
+        --loc="${inRegion}" \
         "$(lib filter-spec vpc-id="${vpcId}")" \
         :: --raw \
         '.Vpcs[0].Tags[] | select(.Key == "Name") | .Value'
@@ -91,7 +91,7 @@ function figure-out-name {
 #
 
 # Validate the VPC name/id and get its info, extracting a couple useful bits.
-vpcInfo="$(lib find-vpc --print-all --in="${inRegion}" "${vpcNameOrId}")" \
+vpcInfo="$(lib find-vpc --print-all --loc="${inRegion}" "${vpcNameOrId}")" \
 || exit "$?"
 
 vpcId="$(jget --raw "${vpcInfo}" '.VpcId')"
@@ -108,7 +108,7 @@ fi
 
 # Make the actual gateway.
 gatewayId="$(ec2-json create-internet-gateway \
-    --in="${inRegion}" \
+    --loc="${inRegion}" \
     "$(lib name-tag-spec internet-gateway "${name}")" \
     :: --raw '.InternetGateway.InternetGatewayId'
 )" \
@@ -123,7 +123,7 @@ error=0
 
 # Find the default route table.
 rtId="$(ec2-json describe-route-tables \
-    --in="${inRegion}" \
+    --loc="${inRegion}" \
     filters:json="$(lib filter-spec vpc-id="${vpcId}" association.main=true)" \
     '$filters' \
     :: --raw '.RouteTables[0].RouteTableId'
@@ -135,7 +135,7 @@ rtId="$(ec2-json describe-route-tables \
 attached=0
 if (( !error )); then
     ec2-json attach-internet-gateway \
-        --in="${inRegion}" \
+        --loc="${inRegion}" \
         gatewayId="${gatewayId}" \
         vpcId="${vpcId}" \
         '{
@@ -151,7 +151,7 @@ fi
 v4RouteAdded=0
 if (( !error && usesIpv4 )); then
     ec2-json create-route \
-        --in="${inRegion}" \
+        --loc="${inRegion}" \
         gatewayId="${gatewayId}" \
         rtId="${rtId}" \
         '{
@@ -169,7 +169,7 @@ fi
 v6RouteAdded=0
 if (( !error && usesIpv6 )); then
     ec2-json create-route \
-        --in="${inRegion}" \
+        --loc="${inRegion}" \
         gatewayId="${gatewayId}" \
         rtId="${rtId}" \
         '{
@@ -188,7 +188,7 @@ fi
 if (( error )); then
     progress-msg 'Error(s) after gateway creation. Attempting cleanup!'
     lib delete-internet-gateway "$(progress-msg-switch --print-option)" \
-        --in="${inRegion}" --gateway="${gatewayId}"
+        --loc="${inRegion}" --gateway="${gatewayId}"
     progress-msg 'Done with post-error gateway cleanup.'
     exit "${error}"
 fi

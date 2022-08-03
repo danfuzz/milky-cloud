@@ -26,7 +26,7 @@ function usage {
       is one zone name per line (by default), or a JSON array (given the
       appropriate option).
 
-      --in=<region-or-zone>
+      --loc=<region-or-zone>
         What region to look in. Must be specified. If specified as an
         availability zone, only the region portion matters.
       --json
@@ -45,7 +45,7 @@ function usage {
 opt-action --call=usage help/h=0
 
 # Region, passed as either region per se or availability zone.
-opt-value --required --var=inRegion --filter=region-from-location in
+opt-value --required --var=inRegion --filter=region-from-location loc
 
 # What to print.
 opt-choice --var=outputStyle --default=strings json strings
@@ -57,7 +57,7 @@ process-args "$@" || usage "$?"
 # Main script
 #
 
-cmd=(ec2-json describe-availability-zones --in="${inRegion}" ::)
+cmd=(ec2-json describe-availability-zones --loc="${inRegion}" ::)
 suffix=()
 
 if [[ ${outputStyle} == 'strings' ]]; then

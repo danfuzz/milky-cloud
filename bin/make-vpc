@@ -25,7 +25,7 @@ function usage {
       Makes a new VPC, plus associated accouterments. On success, prints
       the ID of the created VPC.
 
-      --in=<region-or-zone>
+      --loc=<region-or-zone>
         What region to make the VPC in. Must be specified. If specified as
         an availability zone, only the region portion matters.
       --name=<name>
@@ -42,7 +42,7 @@ function usage {
 opt-action --call=usage help/h=0
 
 # Region, passed as either region per se or availability zone.
-opt-value --required --var=inRegion --filter=region-from-location in
+opt-value --required --var=inRegion --filter=region-from-location loc
 
 # Name for the resulting VPC.
 opt-value --required --var=name --filter='/^[-_a-zA-Z0-9]+$/' name
@@ -67,7 +67,7 @@ function make-vpc-per-se {
         if [[ ${vpcId} == '' ]]; then
             # Create the actual VPC.
             vpcInfo="$(ec2-json create-vpc \
-                --in="${inRegion}" \
+                --loc="${inRegion}" \
                 tagSpec:json="$(lib name-tag-spec vpc "${name}")" \
                 '
                     $tagSpec +
@@ -86,7 +86,7 @@ function make-vpc-per-se {
         else
             # Re-fetch the VPC info.
             vpcInfo="$(ec2-json describe-vpcs \
-                --in="${inRegion}" \
+                --loc="${inRegion}" \
                 vpcId="${vpcId}" \
                 '{ VpcIds: [$vpcId] }' \
                 :: '.Vpcs[0]'
@@ -175,7 +175,7 @@ error=0
 # one depends on the other, and AWS will reject an invalid intermediate state.
 if (( !error )); then
     lib set-attributes \
-        --progress --in="${inRegion}" --id="${vpcId}" \
+        --progress --loc="${inRegion}" --id="${vpcId}" \
         EnableDnsSupport=true \
         EnableDnsHostnames=true \
     || error=1
@@ -184,7 +184,7 @@ fi
 # Configure the default security group.
 if (( !error )); then
     lib configure-security-group \
-        --progress --in="${inRegion}" --security-group="${vpcId}" \
+        --progress --loc="${inRegion}" --security-group="${vpcId}" \
         --name="default-for-${vpcId}" \
     || error=1
 fi
@@ -192,7 +192,7 @@ fi
 # Create a subnet per availability zone.
 if (( !error )); then
     lib add-subnets \
-        --progress --quiet --in="${inRegion}" --vpc="${vpcId}" \
+        --progress --quiet --loc="${inRegion}" --vpc="${vpcId}" \
         --name="${resourceName}" \
     || error=1
 fi
@@ -202,7 +202,7 @@ gatewayAdded=0
 if (( !error )); then
     gatewayId="$(
         lib add-internet-gateway \
-            --progress --in="${inRegion}" \
+            --progress --loc="${inRegion}" \
             --vpc="${vpcId}" --name="${resourceName}" \
     )" \
     && gatewayAdded=1 \
@@ -217,15 +217,15 @@ if (( error )); then
     if (( gatewayAdded )); then
         echo 1>&2 'Deleting internet gateway...'
         lib delete-internet-gateway \
-            --in="${inRegion}" --gateway="${gatewayId}"
+            --loc="${inRegion}" --gateway="${gatewayId}"
     fi
 
     echo 1>&2 'Deleting subnets...'
-    lib delete-subnets --quiet --in="${inRegion}" --vpc="${vpcId}" --all
+    lib delete-subnets --quiet --loc="${inRegion}" --vpc="${vpcId}" --all
 
     echo 1>&2 'Deleting VPC...'
     ec2-json delete-vpc \
-        --in="${inRegion}" \
+        --loc="${inRegion}" \
         vpcId="${vpcId}" \
         '{ VpcId: $vpcId }'
 

@@ -34,7 +34,7 @@ function usage {
       Finds an AMI to use when launching an instance. On success, prints
       a JSON object of the salient info.
 
-      --in=<availability-zone>
+      --loc=<availability-zone>
         Where the AMI is to be launched. Must be specified.
       --instance-type=<type>
         What type of instance is to be launched. Must be specified.
@@ -50,7 +50,7 @@ function usage {
 opt-action --call=usage help/h=0
 
 # Availability zone.
-opt-value --required --var=inZone --call=parse-zone in
+opt-value --required --var=inZone --call=parse-zone loc
 
 # Instance type.
 opt-value --required --var=instanceType \
@@ -73,7 +73,7 @@ filterSpec="$(lib filter-spec \
 
 foundInstanceType="$(
 ec2-json describe-instance-type-offerings \
-    --in="${inZone}" \
+    --loc="${inZone}" \
     filterSpec:json="${filterSpec}" \
     '$filterSpec + { LocationType: "availability-zone" }' \
     :: '.InstanceTypeOfferings | length'
@@ -90,7 +90,7 @@ fi
 
 architecture="$(
 ec2-json describe-instance-types \
-    --in="${inZone}" \
+    --loc="${inZone}" \
     instanceType="${instanceType}" \
     '{ InstanceTypes: [$instanceType] }' \
     :: --raw '
@@ -119,7 +119,7 @@ filterSpec="$(lib filter-spec \
 )"
 
 ec2-json describe-images \
-    --in="${inZone}" \
+    --loc="${inZone}" \
     filterSpec:json="${filterSpec}" \
     '$filterSpec +
     {

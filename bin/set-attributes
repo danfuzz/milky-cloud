@@ -28,7 +28,7 @@ function usage {
       <assignment>
         <name>=<value> Assign attribute `name` to be the indicated value.
 
-      --in=<region-or-zone>
+      --loc=<region-or-zone>
         What region to operate in. Must be specified. If specified as an
         availability zone, only the region portion matters.
       --id=<id>
@@ -47,7 +47,7 @@ function usage {
 opt-action --call=usage help/h=0
 
 # Region, passed as either region per se or availability zone.
-opt-value --required --var=inRegion --filter=region-from-location in
+opt-value --required --var=inRegion --filter=region-from-location loc
 
 # ID of the thing to operate on.
 opt-value --required --var=id --filter='/^[-a-z0-9]+$/' id
@@ -202,7 +202,7 @@ for (( n = 0; n < ${#assignNames[@]} && !error; n++ )); do
 
     progress-msg "Setting ${name}..."
     ec2-json "${command}" \
-        --in="${inRegion}" \
+        --loc="${inRegion}" \
         idArg:json="${idArg}" \
         name="${name}" \
         value:json="${value}" \

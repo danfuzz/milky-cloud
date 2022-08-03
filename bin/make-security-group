@@ -30,7 +30,7 @@ function usage {
         Brief description of the security group. If not specified, fairly
         generic and content-free text is used (because it does need to be
         defined on the result).
-      --in=<region-or-zone>
+      --loc=<region-or-zone>
         What region to make the security group in. Must be specified. If
         specified as an availability zone, only the region portion matters.
       --name=<name>
@@ -52,7 +52,7 @@ function usage {
 opt-action --call=usage help/h=0
 
 # Region, passed as either region per se or availability zone.
-opt-value --required --var=inRegion --filter=region-from-location in
+opt-value --required --var=inRegion --filter=region-from-location loc
 
 # Description of the resulting security group.
 opt-value --var=description --filter='/./' description
@@ -81,7 +81,7 @@ function figure-out-name {
 
     local name
     name=$(ec2-json describe-vpcs \
-        --in="${inRegion}" \
+        --loc="${inRegion}" \
         "$(lib filter-spec vpc-id="${vpcId}")" \
         :: --raw \
         '.Vpcs[0].Tags[] | select(.Key == "Name") | .Value'
@@ -101,7 +101,7 @@ function figure-out-name {
 #
 
 # Validate or find the ID of the VPC.
-vpcId="$(lib find-vpc --in="${inRegion}" "${vpcNameOrId}")" \
+vpcId="$(lib find-vpc --loc="${inRegion}" "${vpcNameOrId}")" \
 || exit "$?"
 
 # Figure out the name if not passed as an option.
@@ -116,7 +116,7 @@ if [[ ${description} == '' ]]; then
 fi
 
 groupId="$(ec2-json create-security-group \
-    --in="${inRegion}" \
+    --loc="${inRegion}" \
     description="${description}" \
     name="${name}" \
     tagSpec:json="$(lib name-tag-spec 'security-group' "${name}")" \
@@ -144,13 +144,13 @@ error=0
 
 lib configure-security-group \
     "$(progress-msg-switch --print-option)" \
-    --in="${inRegion}" --security-group="${groupId}" \
+    --loc="${inRegion}" --security-group="${groupId}" \
 || error="$?"
 
 if (( error )); then
     progress-msg 'Error(s) after group creation. Attempting cleanup!'
     ec2-json delete-security-group \
-        --in="${inRegion}" \
+        --loc="${inRegion}" \
         groupId="${groupId}" \
         '{ GroupId: $groupId }' \
     || progress-msg 'Error while deleting group, alas!'

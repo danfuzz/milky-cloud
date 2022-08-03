@@ -26,7 +26,7 @@ function usage {
       with an associated routing table. Upon success, prints a JSON array
       of all the created subnets.
 
-      --in=<region-or-zone>
+      --loc=<region-or-zone>
         What region to make the subnets in. Must be specified. If specified
         as an availability zone, only the region portion matters.
       --name=<name>
@@ -50,7 +50,7 @@ function usage {
 opt-action --call=usage help/h=0
 
 # Region, passed as either region per se or availability zone.
-opt-value --required --var=inRegion --filter=region-from-location in
+opt-value --required --var=inRegion --filter=region-from-location loc
 
 # Name for the subnets.
 opt-value --var=name --filter='/./' name
@@ -71,11 +71,11 @@ process-args "$@" || usage "$?"
 # Main script
 #
 
-azList=($(lib list-availability-zones --in="${inRegion}")) \
+azList=($(lib list-availability-zones --loc="${inRegion}")) \
 || exit "$?"
 
 # Get all the VPC info.
-vpcInfo="$(lib find-vpc --in="${inRegion}" --print-all "${vpcNameOrId}")" \
+vpcInfo="$(lib find-vpc --loc="${inRegion}" --print-all "${vpcNameOrId}")" \
 || exit "$?"
 
 vpcId="$(jget --raw "${vpcInfo}" '.VpcId')"
@@ -137,7 +137,7 @@ for (( n = 0; n < azCount && !error; n++ )); do
     v4Subnet="${v4Subnets[${n}]}"
     v6Subnet="${v6Subnets[${n}]}"
     result="$(ec2-json create-subnet \
-        --in="${inRegion}" \
+        --loc="${inRegion}" \
         az="${azList[${n}]}" \
         tagSpec:json="${tagSpec}" \
         v4Subnet="${v4Subnets[${n}]}" \
@@ -180,7 +180,7 @@ for (( n = 0; n < azCount && !error; n++ )); do
     # * PrivateDnsHostnameTypeOnLaunch: Private DNS name is based on the
     #   instance ID (not private DNS address).
     lib set-attributes \
-        --in="${inRegion}" --id="${result}" "${progressArg}" \
+        --loc="${inRegion}" --id="${result}" "${progressArg}" \
         AssignIpv6AddressOnCreation=true \
         EnableResourceNameDnsARecordOnLaunch=true \
         EnableResourceNameDnsAAAARecordOnLaunch=true \
@@ -198,7 +198,7 @@ if (( error )); then
         progress-msg "Removing subnet: ${id}"
 
         ec2-json delete-subnet \
-            --in="${inRegion}" \
+            --loc="${inRegion}" \
             id="${id}" \
             '{
                 SubnetId: $id

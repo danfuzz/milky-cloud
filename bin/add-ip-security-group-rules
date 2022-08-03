@@ -32,7 +32,7 @@ function usage {
 
       --egress
         The rule is to be an egress rule.
-      --in=<region-or-zone>
+      --loc=<region-or-zone>
         What region to make the security group in. Must be specified. If
         specified as an availability zone, only the region portion matters.
       --ingress
@@ -68,7 +68,7 @@ opt-choice --required --var=direction egress ingress
 opt-value --required --var=groupNameOrId --filter='/./' security-group
 
 # Region, passed as either region per se or availability zone.
-opt-value --required --var=inRegion --filter=region-from-location in
+opt-value --required --var=inRegion --filter=region-from-location loc
 
 # Name of the rule.
 opt-value --var=name --filter='/./' name
@@ -90,7 +90,7 @@ process-args "$@" || usage "$?"
 #
 
 # Validate or find the ID of the security group.
-groupId="$(lib find-security-group --in="${inRegion}" "${groupNameOrId}")" \
+groupId="$(lib find-security-group --loc="${inRegion}" "${groupNameOrId}")" \
 || exit "$?"
 
 tagSpec='{}'
@@ -109,7 +109,7 @@ if (( quiet )); then
 fi
 
 ec2-json "${command}" \
-    --in="${inRegion}" \
+    --loc="${inRegion}" \
     groupId="${groupId}" \
     ipPermissions:json="[${ipSpec}]" \
     tagSpec:json="${tagSpec}" \
