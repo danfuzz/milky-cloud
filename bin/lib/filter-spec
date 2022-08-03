@@ -79,8 +79,8 @@ process-args "$@" || usage "$?"
 #
 
 jval --"${outputStyle}" \
-    names:json="$(jarray --strings "${filterNames[@]}")" \
-    values:json="$(jarray --strings "${filterValues[@]}")" \
+    names:json="$(jarray --input=strings "${filterNames[@]}")" \
+    values:json="$(jarray --input=strings "${filterValues[@]}")" \
 '
     [$names, $values]
     |

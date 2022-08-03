@@ -213,5 +213,5 @@ fi
 progress-msg "Done making and configuring ${#results[@]} subnets."
 
 if (( !quiet )); then
-    jarray --strings "${results[@]}"
+    jarray --input=strings "${results[@]}"
 fi

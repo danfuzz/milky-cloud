@@ -116,5 +116,5 @@ for id in "${subnetIds[@]}"; do
 done
 
 if (( !quiet )); then
-    jarray --strings "${subnetIds[@]}"
+    jarray --input=strings "${subnetIds[@]}"
 fi

@@ -22,15 +22,15 @@ function usage {
 
     ${name} [<opt> ...] [--] [<value> ...]
       Constructs and prints a JSON array of values, of all of the value
-      arguments passed to this script, each of which is interpreted as a
-      JSON value (default) or a string (with the appropriate option).
+      arguments passed to this command.
 
       --compact
         Output in compact (not multiline) JSON form.
       --json
         Output in JSON form. This is the default.
-      --strings (--no-strings to disable)
-        Treat arguments as literal strings instead of JSON values.
+      --input=<type>
+        `json` -- Treat arguments as JSON values. This is the default.
+        `strings` -- Treat arguments as literal strings.
 
     ${name} [--help | -h]
       Displays this message.
@@ -45,8 +45,8 @@ opt-action --call=usage help/h=0
 # Output style.
 opt-choice --var=outputStyle --default=json compact json
 
-# String arguments?
-opt-toggle --var=strings strings
+# Input style.
+opt-enum --var=inputStyle --default=json input json strings
 
 # The array elements.
 rest-arg --var=args
@@ -73,7 +73,7 @@ if [[ ${outputStyle} == 'compact' ]]; then
     jqArgs+=('--compact-output')
 fi
 
-if (( strings )); then
+if [[ ${inputStyle} == 'strings' ]]; then
     argOpt='--arg'
 else
     argOpt='--argjson'
@@ -88,4 +88,5 @@ for (( n = 0; n < ${#args[@]}; n++ )); do
     expr+='$a'"${n}"
 done
 
+echo 1>&2 '#######' "${inputStyle}"
 exec jq "${jqArgs[@]}" "[${expr}]"
