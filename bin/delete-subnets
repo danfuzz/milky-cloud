@@ -96,7 +96,7 @@ allSubnets="$(ec2-json describe-subnets \
 || exit "$?"
 
 selectedSubnets="$(
-    jval <<<"${allSubnets}" --read-stdin -- "${filterArgs[@]}"
+    jval <<<"${allSubnets}" --input=read -- "${filterArgs[@]}"
 )" \
 || exit "$?"
 

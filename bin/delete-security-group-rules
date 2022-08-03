@@ -104,7 +104,7 @@ allRules="$(ec2-json describe-security-group-rules \
 || exit "$?"
 
 selectedRules="$(
-    jval <<<"${allRules}" --read-stdin -- "${filterArgs[@]}"
+    jval <<<"${allRules}" --input=read -- "${filterArgs[@]}"
 )" \
 || exit "$?"
 
