@@ -34,10 +34,10 @@ function usage {
       Finds an AMI to use when launching an instance. On success, prints
       a JSON object of the salient info.
 
-      --loc=<availability-zone>
-        Where the AMI is to be launched. Must be specified.
       --instance-type=<type>
         What type of instance is to be launched. Must be specified.
+      --loc=<availability-zone>
+        Where the AMI is to be launched. Must be specified.
 
     ${name} [--help | -h]
       Displays this message.

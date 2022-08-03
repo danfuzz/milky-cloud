@@ -28,11 +28,11 @@ function usage {
       <assignment>
         <name>=<value> Assign attribute `name` to be the indicated value.
 
+      --id=<id>
+        ID of the thing to operate on. Must be specified.
       --loc=<region-or-zone>
         What region to operate in. Must be specified. If specified as an
         availability zone, only the region portion matters.
-      --id=<id>
-        ID of the thing to operate on. Must be specified.
       --progress (--no-progress to disable)
         Print progress messages to stderr.
 

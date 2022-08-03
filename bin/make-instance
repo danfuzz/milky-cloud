@@ -29,21 +29,21 @@ function usage {
       group of the default VPC for the specified availability zone (which,
       TBQH, is probably not what you want).
 
-      --loc=<availability-zone>
-        Where to launch.
       --instance-type=<type>
         What type of instance to install. Defaults to `t3.nano`, for convenience.
       --key-name=<name>
         Name of the keypair to use for SSH access. If not specified, then
         something else will have to have set up SSH access (e.g. the user
         data script, or something baked into the AMI).
+      --loc=<availability-zone>
+        Availability zone to launch the instance in. Must be specified.
       --name=<name>
         Name tag for the resulting instance.
       --security-group=<name-or-id>
         Name or ID of the security group to use for network access control.
         If specified, this is used to derive the VPC to use, and in conjunction
         with the specified availability zone, the specific subnet within the
-        VPC. It is not valid to specify both this option and --vpc.
+        VPC. It is not valid to specify both this option and `--vpc`.
       --user-data=<data>
         User data for the instance, which is taken to be a script to run on
         first-boot of the instance. It is invalid to specify both this and
@@ -56,7 +56,7 @@ function usage {
       --vpc=<name-or-id>
         Name or ID of the VPC to launch into. If specified, then the instance
         will be in the default security group of the indicated VPC. It is not
-        valid to specify both this option and --security-group.
+        valid to specify both this option and `--security-group`.
 
     ${name} [--help | -h]
       Display this message.

@@ -26,11 +26,11 @@ function usage {
       is one zone name per line (by default), or a JSON array (given the
       appropriate option).
 
+      --json
+        Produce JSON output.
       --loc=<region-or-zone>
         What region to look in. Must be specified. If specified as an
         availability zone, only the region portion matters.
-      --json
-        Produce JSON output.
       --strings
         Produce a list of strings (one per line). This is the default.
 

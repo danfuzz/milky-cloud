@@ -32,11 +32,11 @@ function usage {
 
       --egress
         The rule is to be an egress rule.
+      --ingress
+        The rule is to be an ingress rule.
       --loc=<region-or-zone>
         What region to make the security group in. Must be specified. If
         specified as an availability zone, only the region portion matters.
-      --ingress
-        The rule is to be an ingress rule.
       --name=<name>
         Name to attach to the rule, if any.
       --port=<number> or --port=all

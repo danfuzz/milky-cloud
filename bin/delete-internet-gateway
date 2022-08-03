@@ -25,11 +25,11 @@ function usage {
       Detaches and removes an internet gateway, including removing routing
       rules from the default routing table of the formerly-associated VPC.
 
+      --gateway=<id>
+        ID of the gateway to remove. Must be specified.
       --loc=<region-or-zone>
         What region to operate in. Must be specified. If specified as an
         availability zone, only the region portion matters.
-      --gateway=<id>
-        ID of the gateway to remove. Must be specified.
       --progress (--no-progress to disable)
         Print progress messages to stderr.
 
