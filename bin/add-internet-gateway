@@ -109,7 +109,7 @@ fi
 # Make the actual gateway.
 gatewayId="$(ec2-json create-internet-gateway \
     --loc="${region}" \
-    "$(lib name-tag-spec internet-gateway "${name}")" \
+    "$(lib name-tag-spec 'internet-gateway' "${name}")" \
     :: --output=raw '.InternetGateway.InternetGatewayId'
 )" \
 || exit "$?"

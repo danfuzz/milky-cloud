@@ -24,14 +24,12 @@ function usage {
     ${name} [<opt> ...] <command> <arg> ...
 
     Performs a calculation of some sort on a CIDR address/mask. Input CIDR
-    values can be either standard-form strings or parsed JSON values (such
-    as are produced by the `--json` option of this tool).
-    --json
-      Produces JSON output representing the parsed components of a CIDR
-      value, instead of a standard-form CIDR string. This only affects
-      commands that output CIDR values.
-    --string
-      Produces strings. This is the default.
+    values can be either standard-form strings or parsed JSON values (such as
+    are produced by the `--output=json` option of this tool).
+
+    --output=<style> :: `compact` `json` `lines`
+      Output style, as with `json-val`. Defaults to `lines`, which produces
+      a series of one or more standard-form CIDRs, one per line.
 
     Commands:
 
@@ -70,7 +68,7 @@ function usage {
 }
 
 # Output style.
-opt-choice --var=outputStyle --default=string json string
+opt-enum --var=outputStyle --default=lines output :: compact json lines
 
 # Want help?
 opt-action --call=usage help/h=0
@@ -762,20 +760,20 @@ if [[ ${resultType} != 'text' ]]; then
     # A JSON result is interpreted as a CIDR or list thereof, in which case the
     # output style matters.
     case "${outputStyle}" in
-        json)
-            jget "${result}" '.'
-            ;;
-        string)
+        lines)
             if [[ ${resultType} == 'object' ]]; then
                 cidr-from-json "${result}"
             else
-                # It's an array. Compactly print each element on a line by
-                # itself, then split by lines to convert each object.
+                # It's an array. Compactly print each JSON result element on a
+                # line by itself, then split by lines to convert each object.
                 jget --output=compact "${result}" '.[]' \
                 | while read -r line; do
                     cidr-from-json "${line}"
                 done
             fi
+            ;;
+        *)
+            jget --output="${outputStyle}" "${result}" '.'
             ;;
     esac
 else

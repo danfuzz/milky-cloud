@@ -28,10 +28,8 @@ function usage {
     specification contains both IPv4 and IPv6 entries. <port> must be a valid
     port number or `all`.
 
-    --compact
-      Output in compact (not multiline) JSON form.
-    --json
-      Output in JSON form. This is the default.
+    --output=<style> :: `compact` `json`
+      Output style, as with `json-val`. Defaults to `json`.
 
     ${name} [--help | -h]
       Displays this message.
@@ -44,7 +42,7 @@ function usage {
 opt-action --call=usage help/h=0
 
 # Output style.
-opt-choice --var=outputStyle --default=json compact json
+opt-enum --var=outputStyle --default=json output :: compact json
 
 # Protocol.
 positional-arg --required --var=protocol --filter='/^(all|tcp|udp)$/' protocol
