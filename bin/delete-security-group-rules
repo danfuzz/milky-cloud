@@ -109,13 +109,13 @@ selectedRules="$(
 || exit "$?"
 
 egressRuleIds="$(
-    jval <<<"${selectedRules}" --slurp-stdin \
+    jval <<<"${selectedRules}" --input=slurp \
         'map(select(.IsEgress == true) | .SecurityGroupRuleId)'
 )" \
 || exit "$?"
 
 ingressRuleIds="$(
-    jval <<<"${selectedRules}" --slurp-stdin \
+    jval <<<"${selectedRules}" --input=slurp \
         'map(select(.IsEgress == false) | .SecurityGroupRuleId)'
 )" \
 || exit "$?"
