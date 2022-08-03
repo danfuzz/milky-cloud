@@ -203,9 +203,9 @@ if [[ -x ${specialCaseHandler} ]]; then
     commandParts="$("${specialCaseHandler}" "$(make-command-parts-json)")" \
     || exit 1
 
-    command="$(jget --raw "${commandParts}" '.command')"
-    subcommand="$(jget --raw "${commandParts}" '.subcommand')"
-    jsonArg="$(jget --compact "${commandParts}" '.jsonArg')"
+    command="$(jget --output=raw "${commandParts}" '.command')"
+    subcommand="$(jget --output=raw "${commandParts}" '.subcommand')"
+    jsonArg="$(jget --output=compact "${commandParts}" '.jsonArg')"
 
     dashArgsLength="$(jget "${commandParts}" '.dashArgs | length')"
     dashArgs=()
@@ -276,10 +276,10 @@ if [[ ${outputStyle} != 'none' ]]; then
     jgetOpts=()
     case "${outputStyle}" in
         compact)
-            jgetOpts+=('--compact')
+            jgetOpts+=('--output=compact')
             ;;
         raw)
-            jgetOpts+=('--raw')
+            jgetOpts+=('--output=raw')
             ;;
     esac
 

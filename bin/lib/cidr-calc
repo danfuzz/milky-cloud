@@ -217,7 +217,7 @@ function cidr-address-words-v6 {
 function cidr-from-json {
     local cidr="$1"
 
-    local type="$(jget --raw "${cidr}" '.type')"
+    local type="$(jget --output=raw "${cidr}" '.type')"
     local netmaskBits="$(jget "${cidr}" '.netmaskBits')"
     local address
 
@@ -242,7 +242,7 @@ function cidr-v4-address {
     local cidr="$1"
     local netmaskBits="$2"
 
-    local address="$(jget --raw "${cidr}" '
+    local address="$(jget --output=raw "${cidr}" '
         [
             ((.address[0] / 256) | floor | tostring),
             ((.address[0] % 256) | tostring),
@@ -260,7 +260,7 @@ function cidr-v6-address {
     local cidr="$1"
 
     local address="$(
-        jget --raw "${cidr}" '.address | map(tostring) | join(" ")'
+        jget --output=raw "${cidr}" '.address | map(tostring) | join(" ")'
     )"
 
     # Go from space-separated string to array of elements.
@@ -580,7 +580,7 @@ function command_address-words {
     cidr="$(json-from-any "${cidr}")" \
     || return "$?"
 
-    jget --raw "${cidr}" '.address | map(tostring) | join(" ")'
+    jget --output=raw "${cidr}" '.address | map(tostring) | join(" ")'
 }
 
 # Command: Print a list of subnets.
@@ -771,7 +771,7 @@ if [[ ${resultType} != 'text' ]]; then
             else
                 # It's an array. Compactly print each element on a line by
                 # itself, then split by lines to convert each object.
-                jget --compact "${result}" '.[]' \
+                jget --output=compact "${result}" '.[]' \
                 | while read -r line; do
                     cidr-from-json "${line}"
                 done

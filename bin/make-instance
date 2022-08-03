@@ -121,7 +121,7 @@ amiInfo="$(
     ${progDir}/find-ami --loc="${zone}" --instance-type="${instanceType}")" \
 || exit "$?"
 
-jget 1>&2 --raw "${amiInfo}" '
+jget 1>&2 --output=raw "${amiInfo}" '
     "Using AMI:",
     "  desc: " + .Description,
     "  name: " + .Name,

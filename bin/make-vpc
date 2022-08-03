@@ -81,7 +81,7 @@ function make-vpc-per-se {
             )" \
             || return "$?"
 
-            vpcId="$(jget --raw "${vpcInfo}" '.VpcId')"
+            vpcId="$(jget --output=raw "${vpcInfo}" '.VpcId')"
             echo 1>&2 "Made VPC: ${vpcId}"
         else
             # Re-fetch the VPC info.
@@ -102,7 +102,7 @@ function make-vpc-per-se {
         # then it's safe to assume that all network addresses are `associated`.
         # However, that doesn't seem to be explicitly stated in the AWS docs, so
         # we test explicitly for the network associations.
-        local ready="$(jget --raw "${vpcInfo}" '
+        local ready="$(jget --output=raw "${vpcInfo}" '
               .CidrBlockAssociationSet[0].CidrBlockState as $cidr4
             | .Ipv6CidrBlockAssociationSet[0].Ipv6CidrBlockState as $cidr6
             |
@@ -157,9 +157,9 @@ resourceName="standard-for-${name}"
 vpcInfo="$(make-vpc-per-se)" \
 || exit "$?"
 
-vpcId="$(jget --raw "${vpcInfo}" '.VpcId')"
-cidr4="$(jget --raw "${vpcInfo}" '.CidrBlockAssociationSet[0].CidrBlock')"
-cidr6="$(jget --raw "${vpcInfo}" '.Ipv6CidrBlockAssociationSet[0].Ipv6CidrBlock')"
+vpcId="$(jget --output=raw "${vpcInfo}" '.VpcId')"
+cidr4="$(jget --output=raw "${vpcInfo}" '.CidrBlockAssociationSet[0].CidrBlock')"
+cidr6="$(jget --output=raw "${vpcInfo}" '.Ipv6CidrBlockAssociationSet[0].Ipv6CidrBlock')"
 
 echo 1>&2 'Networks:'
 echo 1>&2 "  IPv4: ${cidr4}"

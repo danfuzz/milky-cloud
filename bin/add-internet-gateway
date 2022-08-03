@@ -94,7 +94,7 @@ function figure-out-name {
 vpcInfo="$(lib find-vpc --print-all --loc="${region}" "${vpcNameOrId}")" \
 || exit "$?"
 
-vpcId="$(jget --raw "${vpcInfo}" '.VpcId')"
+vpcId="$(jget --output=raw "${vpcInfo}" '.VpcId')"
 usesIpv4="$(jget "${vpcInfo}" \
     'if .CidrBlockAssociationSet == null then 0 else 1 end')"
 usesIpv6="$(jget "${vpcInfo}" \

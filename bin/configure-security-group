@@ -80,8 +80,8 @@ groupInfo="$(
 )" \
 || exit "$?"
 
-groupId="$(jget --raw "${groupInfo}" '.GroupId')"
-groupName="$(jget --raw "${groupInfo}" '.GroupName')"
+groupId="$(jget --output=raw "${groupInfo}" '.GroupId')"
+groupName="$(jget --output=raw "${groupInfo}" '.GroupName')"
 
 if [[ ${name} == '' ]]; then
     name="${groupName}"
