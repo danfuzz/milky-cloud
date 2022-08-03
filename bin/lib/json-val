@@ -25,7 +25,7 @@ function usage {
       assignments passed into an expression evaluated by `jq` either with
       `--null-input` (by default) or as a usual pipeline over input values.
       If no expression is given, it is taken to be `.`, which will end up
-      formatting the input as implied/specified by the output options.
+      formatting the input as implied/specified by the output option.
 
       The <jq-expression> arguments are concatenated together (separated by
       spaces) to form the final expression to be evaluated.
@@ -35,7 +35,7 @@ function usage {
         <name>:json=<value> Assign `$name` to be the indicated parsed JSON value.
 
       --input=<style>
-        `null` -- Do not read from stdin. This is the default.
+        `none` -- Do not read from stdin. This is the default.
         `read` -- Read values from stdin individually to form pipeline input.
         `slurp` -- Read all values from stdin into a single array, producing a
           single-value pipeline input.
@@ -60,7 +60,7 @@ function usage {
 opt-action --call=usage help/h=0
 
 # Input style.
-opt-enum --var=inputStyle --default=null input null read slurp
+opt-enum --var=inputStyle --default=none input none read slurp
 
 # Output style.
 opt-enum --var=outputStyle --default=json output compact json lines raw words
@@ -121,7 +121,7 @@ process-args "$@" || usage "$?"
 jqArgs=()
 
 case "${inputStyle}" in
-    null)
+    none)
         jqArgs+=('--null-input')
         ;;
     read)
