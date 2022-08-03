@@ -63,7 +63,7 @@ opt-choice --var=printItem --default=print-none \
     print-none print-region print-zone print-zone-suffix
 
 # Location (availability zone or region).
-positional-arg --required --var=inLocation zone-or-region
+positional-arg --required --var=location zone-or-region
 
 process-args "$@" || usage "$?"
 
@@ -78,8 +78,8 @@ fi
 #
 
 # Split into region and zone suffix, or die trying.
-if [[ ! ${inLocation} =~ ^([a-z]{2}-[a-z]+-[0-9]+)([a-z]|-[a-z]+-[0-9]+[a-z])?$ ]]; then
-    echo 1>&2 'Unparseable location:' "${inLocation}"
+if [[ ! ${location} =~ ^([a-z]{2}-[a-z]+-[0-9]+)([a-z]|-[a-z]+-[0-9]+[a-z])?$ ]]; then
+    echo 1>&2 'Unparseable location:' "${location}"
     exit 1
 fi
 
