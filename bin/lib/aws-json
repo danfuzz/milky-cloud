@@ -47,7 +47,7 @@ function usage {
 
     Output options:
 
-    --output=<style> :: `compact` `json` `none` `raw`
+    --output=<style> :: `compact` `json` `lines` `none` `raw` `words`
       How to process the final output. All options are as with `json-val`, with
       the addition of `none` which means that nothing should be output. The
       default is `json`.
@@ -119,7 +119,7 @@ function parse-rest {
         case "$1" in
             --output=*)
                 outputStyle="${1#*=}"
-                if ! [[ "${outputStyle}" =~ ^(compact|json|none|raw)$ ]]; then
+                if ! [[ "${outputStyle}" =~ ^(compact|json|lines|none|raw|words)$ ]]; then
                     echo 1>&2 "Invalid result output style: ${outputStyle}"
                     return 1
                 fi
