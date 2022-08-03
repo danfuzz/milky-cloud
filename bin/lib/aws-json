@@ -159,7 +159,7 @@ process-args "$@" || usage "$?"
 # Constructs a JSON value to represent all the pieces of a command, based on the
 # globals set up by the main script.
 function make-command-parts-json {
-    local dashArgsJson="$(jarray --strings -- "${dashArgs[@]}")"
+    local dashArgsJson="$(jarray --input=strings -- "${dashArgs[@]}")"
 
     jval \
         command="${command}" \
@@ -189,7 +189,7 @@ fi
 
 jsonArg='{}'
 if (( ${#argConstructor[@]} > 0 )); then
-    jsonArg="$(jval --compact -- "${argConstructor[@]}")" \
+    jsonArg="$(jval --output=compact -- "${argConstructor[@]}")" \
     || {
         echo 1>&2 'Trouble parsing argument constructor.'
         exit 1
@@ -203,14 +203,14 @@ if [[ -x ${specialCaseHandler} ]]; then
     commandParts="$("${specialCaseHandler}" "$(make-command-parts-json)")" \
     || exit 1
 
-    command="$(jget --raw "${commandParts}" '.command')"
-    subcommand="$(jget --raw "${commandParts}" '.subcommand')"
-    jsonArg="$(jget --compact "${commandParts}" '.jsonArg')"
+    command="$(jget --output=raw "${commandParts}" '.command')"
+    subcommand="$(jget --output=raw "${commandParts}" '.subcommand')"
+    jsonArg="$(jget --output=compact "${commandParts}" '.jsonArg')"
 
     dashArgsLength="$(jget "${commandParts}" '.dashArgs | length')"
     dashArgs=()
     for (( i = 0; i < dashArgsLength; i++ )); do
-        dashArgs+=("$(jval --raw p:json="${commandParts}" i:json="${i}" '$p.dashArgs[$i]')")
+        dashArgs+=("$(jval --output=raw p:json="${commandParts}" i:json="${i}" '$p.dashArgs[$i]')")
     done
 fi
 
@@ -243,7 +243,7 @@ if [[ ${printCommandTo} != '' ]]; then
     # much every bit someone might care about.
     jval >"${printCommandTo}" \
         parts:json="$(make-command-parts-json)" \
-        full:json="$(jarray --strings "${fullCommand[@]}")" \
+        full:json="$(jarray --input=strings "${fullCommand[@]}")" \
         '
         def quoteMaybe:
             if test("^[-_/=a-zA-Z0-9]+$")
@@ -276,10 +276,10 @@ if [[ ${outputStyle} != 'none' ]]; then
     jgetOpts=()
     case "${outputStyle}" in
         compact)
-            jgetOpts+=('--compact')
+            jgetOpts+=('--output=compact')
             ;;
         raw)
-            jgetOpts+=('--raw')
+            jgetOpts+=('--output=raw')
             ;;
     esac
 

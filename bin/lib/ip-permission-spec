@@ -69,7 +69,7 @@ if [[ ${protocol} == 'all' ]]; then
     protocol='-1'
 fi
 
-jval --"${outputStyle}" \
+jval --output="${outputStyle}" \
     port:json="${port}" \
     protocol="${protocol}" \
 '{

@@ -22,15 +22,14 @@ function usage {
 
     ${name} [<opt> ...] [--] [<value> ...]
       Constructs and prints a JSON array of values, of all of the value
-      arguments passed to this script, each of which is interpreted as a
-      JSON value (default) or a string (with the appropriate option).
+      arguments passed to this command.
 
-      --compact
-        Output in compact (not multiline) JSON form.
-      --json
-        Output in JSON form. This is the default.
-      --strings (--no-strings to disable)
-        Treat arguments as literal strings instead of JSON values.
+      --input=<style>
+        `json` -- Treat arguments as JSON values. This is the default.
+        `strings` -- Treat arguments as literal strings.
+      --output=<style>
+        `compact` -- Output in compact (single line) JSON form.
+        `json` -- Output in multiline JSON form. This is the default.
 
     ${name} [--help | -h]
       Displays this message.
@@ -43,10 +42,10 @@ function usage {
 opt-action --call=usage help/h=0
 
 # Output style.
-opt-choice --var=outputStyle --default=json compact json
+opt-enum --var=outputStyle --default=json output compact json
 
-# String arguments?
-opt-toggle --var=strings strings
+# Input style.
+opt-enum --var=inputStyle --default=json input json strings
 
 # The array elements.
 rest-arg --var=args
@@ -63,7 +62,7 @@ process-args "$@" || usage "$?"
 # much simpler. Unfortunately, because `jq` doesn't actually do the usual shell
 # command behavior of not attempting to interpret things that look like options
 # but are positioned after non-option arguments, it's not actually possible to
-# use `--args` or `--json-args`, especially if we want to be resilient to errant
+# use `--args` or `--jsonargs`, especially if we want to be resilient to errant
 # input to this script (and not blithely pass it into a `jq` which will do
 # who-knows-what with it).
 
@@ -73,7 +72,7 @@ if [[ ${outputStyle} == 'compact' ]]; then
     jqArgs+=('--compact-output')
 fi
 
-if (( strings )); then
+if [[ ${inputStyle} == 'strings' ]]; then
     argOpt='--arg'
 else
     argOpt='--argjson'

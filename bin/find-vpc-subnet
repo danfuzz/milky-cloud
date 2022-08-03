@@ -68,7 +68,7 @@ result="$(ec2-json describe-subnets \
 )" \
 || exit "$?"
 
-subnetId="$(jget --raw "${result}" '
+subnetId="$(jget --output=raw "${result}" '
     if length == 0 then "none"
     elif length == 1 then .[0]
     else "ambiguous"
@@ -78,7 +78,7 @@ subnetId="$(jget --raw "${result}" '
 case "${subnetId}" in
     ambiguous)
         echo 1>&2 'Ambiguous specification matches all of:'
-        jget 1>&2 --raw "${result}" '.[] | "  " + .'
+        jget 1>&2 --output=raw "${result}" '.[] | "  " + .'
         exit 1
         ;;
     none)

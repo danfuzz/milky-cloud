@@ -72,7 +72,7 @@ gatewayInfo="$(ec2-json describe-internet-gateways \
 
 # Find the attached VPC ID if any. And if there is a VPC, figure out what needs
 # to be done to detach it.
-vpcId="$(jget --raw "${gatewayInfo}" '.Attachments[0].VpcId')"
+vpcId="$(jget --output=raw "${gatewayInfo}" '.Attachments[0].VpcId')"
 rtId=
 attached=0
 hasIpv4Route=0
@@ -89,7 +89,7 @@ if [[ ${vpcId} != 'null' ]]; then
     )" \
     || exit "$?"
 
-    rtId="$(jget --raw "${rtInfo}" '.RouteTableId')"
+    rtId="$(jget --output=raw "${rtInfo}" '.RouteTableId')"
 
     hasIpv4Route="$(jget "${rtInfo}" '
           .Routes

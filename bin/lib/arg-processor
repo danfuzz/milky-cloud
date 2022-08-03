@@ -143,6 +143,55 @@ function opt-choice {
     fi
 }
 
+# Declares an enumerated-value option, which requires a value when passed on a
+# commandline to be one of a specific listed set. No `<abbrev>` or `<value>` is
+# allowed in the argument spec. If left unspecified, the default variable value
+# for an enumerated-value option is `''` (the empty string). This definer also
+# accepts the `--required` option, but notably _not_ `--filter` (which is
+# effectively used "under the covers" to implement the value validity check).
+function opt-enum {
+    local optCall=''
+    local optDefault=''
+    local optRequired=0
+    local optVar=''
+    local args=("$@")
+    _argproc_janky-args --multi-spec call default required var \
+    || return 1
+
+    if (( ${#args[@]} < 2 )); then
+        echo 1>&2 'Missing enumerated values.'
+        return 1
+    fi
+
+    local specName=''
+    _argproc_parse-spec "${args[0]}" \
+    || return 1
+    unset args[0]
+
+    local filterExpr=''
+    local value
+    for value in "${args[@]}"; do
+        if ! [[ ${value} =~ ^[-_a-zA-Z0-9]*$ ]]; then
+            echo 1>&2 "Invalid enumerated value: ${value}"
+            return 1
+        fi
+        filterExpr+="|${value}"
+    done
+    filterExpr="/^(${filterExpr:1})$/" # ':1` to drop the extra `|`.
+
+    if [[ ${optVar} != '' ]]; then
+        # Set up the default initializer.
+        _argproc_initStatements+=("${optVar}=$(_argproc_quote "${optDefault}")")
+    fi
+
+    _argproc_define-value-required-arg --option \
+        "${specName}" "${optCall}" "${optVar}" "${filterExpr}"
+
+    if (( optRequired )); then
+        _argproc_add-required-arg-postcheck "${specName}"
+    fi
+}
+
 # Declares a "toggle" option, which does not accept a value on the commandline.
 # No `<value>` is allowed in the argument spec. The toggle state of off or on is
 # always indicated by a value of `0` or `1` (respectively). In addition to the

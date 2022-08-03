@@ -78,9 +78,9 @@ azList=($(lib list-availability-zones --loc="${region}")) \
 vpcInfo="$(lib find-vpc --loc="${region}" --print-all "${vpcNameOrId}")" \
 || exit "$?"
 
-vpcId="$(jget --raw "${vpcInfo}" '.VpcId')"
+vpcId="$(jget --output=raw "${vpcInfo}" '.VpcId')"
 
-cidr4="$(jget --raw "${vpcInfo}" '
+cidr4="$(jget --output=raw "${vpcInfo}" '
     .CidrBlockAssociationSet
     |
     if length == 0 then "none"
@@ -94,7 +94,7 @@ if [[ ${cidr4} == 'many' ]]; then
     exit 1
 fi
 
-cidr6="$(jget --raw "${vpcInfo}" '
+cidr6="$(jget --output=raw "${vpcInfo}" '
     .Ipv6CidrBlockAssociationSet
     |
     if length == 0 then "none"
@@ -213,5 +213,5 @@ fi
 progress-msg "Done making and configuring ${#results[@]} subnets."
 
 if (( !quiet )); then
-    jarray --strings "${results[@]}"
+    jarray --input=strings "${results[@]}"
 fi

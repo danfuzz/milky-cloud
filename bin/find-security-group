@@ -98,12 +98,12 @@ if (( count == 0 )); then
     exit 1
 elif (( count != 1 )); then
     echo 1>&2 'Ambiguous name or ID matches all of:'
-    jget --raw 1>&2 "${result}" '.all[] | "  " + .'
+    jget 1>&2 --output=raw "${result}" '.all[] | "  " + .'
     exit 1
 fi
 
 if [[ ${outputStyle} == 'print-all' ]]; then
     jget "${result}" '.group'
 else
-    jget --raw "${result}" '.group.GroupId'
+    jget --output=raw "${result}" '.group.GroupId'
 fi
