@@ -115,9 +115,6 @@ if [[ ${userDataFile} != '' ]]; then
     || exit 1
 fi
 
-echo 1>&2 "type: ${instanceType}"
-echo 1>&2 "in:   ${zone}"
-
 # Figure out the correct AMI.
 
 amiInfo="$(
