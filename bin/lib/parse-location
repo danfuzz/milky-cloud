@@ -62,8 +62,19 @@ opt-choice --var=inputType --default=input-any \
 opt-choice --var=printItem --default=print-none \
     print-none print-region print-zone print-zone-suffix
 
-# Location (availability zone or region).
-positional-arg --required --var=inLocation zone-or-region
+# Location to parse, and parsed bits.
+region=''
+zoneSuffix=''
+positional-arg --required --var=zoneOrRegion --call=parse-zone-or-region zone-or-region
+function parse-zone-or-region {
+    if [[ ! $1 =~ ^([a-z]{2}-[a-z]+-[0-9]+)([a-z]|-[a-z]+-[0-9]+[a-z])?$ ]]; then
+        echo 1>&2 'Invalid value for argument <zone-or-region>:' "$1"
+        exit 1
+    fi
+
+    region="${BASH_REMATCH[1]}"
+    zoneSuffix="${BASH_REMATCH[2]}"
+}
 
 process-args "$@" || usage "$?"
 
@@ -76,15 +87,6 @@ fi
 #
 # Main script
 #
-
-# Split into region and zone suffix, or die trying.
-if [[ ! ${inLocation} =~ ^([a-z]{2}-[a-z]+-[0-9]+)([a-z]|-[a-z]+-[0-9]+[a-z])?$ ]]; then
-    echo 1>&2 'Unparseable location:' "${inLocation}"
-    exit 1
-fi
-
-region="${BASH_REMATCH[1]}"
-zoneSuffix="${BASH_REMATCH[2]}"
 
 # Validate the required input type, if needed.
 case "${inputType}" in
@@ -108,7 +110,7 @@ case "${printItem}" in
         echo "${region}"
         ;;
     print-zone)
-        echo "${inLocation}"
+        echo "${zoneOrRegion}"
         ;;
     print-zone-suffix)
         echo "${zoneSuffix}"

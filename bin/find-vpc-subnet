@@ -25,7 +25,7 @@ function usage {
       Finds a VPC subnet that meets the indicated criteria. On success,
       prints the subnet ID.
 
-      --in=<availability-zone>
+      --loc=<availability-zone>
         What availibility zone to look in. Must be specified.
       --vpc=<name-or-id>
         Name or ID of the VPC to look in. Must be specified.
@@ -41,7 +41,7 @@ function usage {
 opt-action --call=usage help/h=0
 
 # Availability zone.
-opt-value --required --var=inZone --call=parse-zone in
+opt-value --required --var=zone --call=parse-zone loc
 
 # Name or ID of VPC to look up.
 opt-value --required --var=nameOrId --filter='/./' vpc
@@ -53,16 +53,16 @@ process-args "$@" || usage "$?"
 # Main script
 #
 
-vpcId="$(lib find-vpc --in="${inZone}" "${nameOrId}")" \
+vpcId="$(lib find-vpc --loc="${zone}" "${nameOrId}")" \
 || exit "$?"
 
 filterSpec="$(lib filter-spec \
-    availability-zone="${inZone}" \
+    availability-zone="${zone}" \
     vpc-id="${vpcId}"
 )"
 
 result="$(ec2-json describe-subnets \
-    --in="${inZone}" \
+    --loc="${zone}" \
     "${filterSpec}" \
     :: '.Subnets | map(.SubnetId)' \
 )" \

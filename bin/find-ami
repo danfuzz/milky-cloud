@@ -34,10 +34,10 @@ function usage {
       Finds an AMI to use when launching an instance. On success, prints
       a JSON object of the salient info.
 
-      --in=<availability-zone>
-        Where the AMI is to be launched. Must be specified.
       --instance-type=<type>
         What type of instance is to be launched. Must be specified.
+      --loc=<availability-zone>
+        Where the AMI is to be launched. Must be specified.
 
     ${name} [--help | -h]
       Displays this message.
@@ -50,7 +50,7 @@ function usage {
 opt-action --call=usage help/h=0
 
 # Availability zone.
-opt-value --required --var=inZone --call=parse-zone in
+opt-value --required --var=zone --call=parse-zone loc
 
 # Instance type.
 opt-value --required --var=instanceType \
@@ -67,13 +67,13 @@ process-args "$@" || usage "$?"
 # zone.
 
 filterSpec="$(lib filter-spec \
-    location="${inZone}" \
+    location="${zone}" \
     instance-type="${instanceType}"
 )"
 
 foundInstanceType="$(
 ec2-json describe-instance-type-offerings \
-    --in="${inZone}" \
+    --loc="${zone}" \
     filterSpec:json="${filterSpec}" \
     '$filterSpec + { LocationType: "availability-zone" }' \
     :: '.InstanceTypeOfferings | length'
@@ -81,7 +81,7 @@ ec2-json describe-instance-type-offerings \
 || exit "$?"
 
 if (( !foundInstanceType )); then
-    echo 1>&2 "No such instance type: ${instanceType} in ${inZone}"
+    echo 1>&2 "No such instance type: ${instanceType} in ${zone}"
     exit 1
 fi
 
@@ -90,7 +90,7 @@ fi
 
 architecture="$(
 ec2-json describe-instance-types \
-    --in="${inZone}" \
+    --loc="${zone}" \
     instanceType="${instanceType}" \
     '{ InstanceTypes: [$instanceType] }' \
     :: --raw '
@@ -102,7 +102,7 @@ ec2-json describe-instance-types \
 || exit "$?"
 
 if [[ ${architecture} == 'error' ]]; then
-    echo 1>&2 "Unsupported instance type: ${instanceType} in ${inZone}"
+    echo 1>&2 "Unsupported instance type: ${instanceType} in ${zone}"
     exit 1
 fi
 
@@ -119,7 +119,7 @@ filterSpec="$(lib filter-spec \
 )"
 
 ec2-json describe-images \
-    --in="${inZone}" \
+    --loc="${zone}" \
     filterSpec:json="${filterSpec}" \
     '$filterSpec +
     {

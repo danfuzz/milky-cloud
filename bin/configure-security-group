@@ -31,7 +31,7 @@ function usage {
       incoming traffic on all ports, from sources that are within the same
       security group.
 
-      --in=<region-or-zone>
+      --loc=<region-or-zone>
         What region to make the security group in. Must be specified. If
         specified as an availability zone, only the region portion matters.
       --name=<name>
@@ -56,7 +56,7 @@ function usage {
 opt-action --call=usage help/h=0
 
 # Region, passed as either region per se or availability zone.
-opt-value --required --var=inRegion --filter=region-from-location in
+opt-value --required --var=region --filter=region-from-location loc
 
 # Name for the security group.
 opt-value --var=name --filter='/./' name
@@ -76,7 +76,7 @@ process-args "$@" || usage "$?"
 
 # Validate or find the ID of the security group.
 groupInfo="$(
-    lib find-security-group --print-all --in="${inRegion}" "${groupNameOrId}"
+    lib find-security-group --print-all --loc="${region}" "${groupNameOrId}"
 )" \
 || exit "$?"
 
@@ -101,14 +101,14 @@ error=0
 # of a VPC) come with one or more rules, but relying on those details is
 # arguably not a wise idea.
 if (( !error )); then
-    lib delete-security-group-rules --quiet --in="${inRegion}" \
+    lib delete-security-group-rules --quiet --loc="${region}" \
         --security-group="${groupId}" --all \
     && progress-msg 'Removed old rules (if any).' \
     || error="$?"
 fi
 
 # Common args for all calls to `add-ip-security-group-rules`.
-commonArgs=(--quiet --in="${inRegion}" --security-group="${groupId}"
+commonArgs=(--quiet --loc="${region}" --security-group="${groupId}"
     --name="${name}")
 
 # Add egress rules.
@@ -129,7 +129,7 @@ if (( !error )); then
     fi
 
     ec2-json authorize-security-group-ingress \
-        --in="${inRegion}" \
+        --loc="${region}" \
         groupId="${groupId}" \
         tagSpec:json="${tagSpec}" \
         '
@@ -163,7 +163,7 @@ if (( !error )); then
 fi
 
 if (( !error )) && [[ ${name} != '' ]]; then
-    ec2-json create-tags --in="${inRegion}" \
+    ec2-json create-tags --loc="${region}" \
         groupId="${groupId}" \
         value="${name}" \
         '{

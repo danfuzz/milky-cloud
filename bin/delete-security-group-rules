@@ -37,7 +37,7 @@ function usage {
         Remove all egress rules.
       --all-ingress
         Remove all ingress rules.
-      --in=<region-or-zone>
+      --loc=<region-or-zone>
         What region to make the security group in. Must be specified. If
         specified as an availability zone, only the region portion matters.
       --quiet
@@ -57,7 +57,7 @@ function usage {
 opt-action --call=usage help/h=0
 
 # Region, passed as either region per se or availability zone.
-opt-value --required --var=inRegion --filter=region-from-location in
+opt-value --required --var=region --filter=region-from-location loc
 
 # Name or ID of the security group.
 opt-value --required --var=groupNameOrId --filter='/./' security-group
@@ -93,11 +93,11 @@ fi
 #
 
 # Validate or find the ID of the security group.
-groupId="$(lib find-security-group --in="${inRegion}" "${groupNameOrId}")" \
+groupId="$(lib find-security-group --loc="${region}" "${groupNameOrId}")" \
 || exit "$?"
 
 allRules="$(ec2-json describe-security-group-rules \
-    --in="${inRegion}" \
+    --loc="${region}" \
     "$(lib filter-spec group-id="${groupId}")" \
     :: '.SecurityGroupRules[]'
 )" \
@@ -123,7 +123,7 @@ ingressRuleIds="$(
 if [[ ${egressRuleIds} != '[]' ]]; then
     # Non-empty list of egress rules to delete.
     ec2-json revoke-security-group-egress \
-        --in="${inRegion}" \
+        --loc="${region}" \
         groupId="${groupId}" \
         ruleIds:json="${egressRuleIds}" \
         '{
@@ -137,7 +137,7 @@ fi
 if [[ ${ingressRuleIds} != '[]' ]]; then
     # Non-empty list of egress rules to delete.
     ec2-json revoke-security-group-ingress \
-        --in="${inRegion}" \
+        --loc="${region}" \
         groupId="${groupId}" \
         ruleIds:json="${ingressRuleIds}" \
         '{

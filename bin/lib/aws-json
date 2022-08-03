@@ -33,7 +33,7 @@ function usage {
     <cmd> <subcommand>
       The AWS command and subcommand to call, e.g. `ec2 run-instances`.
 
-    --in=<region-or-zone>
+    --loc=<region-or-zone>
       What region to make the call in. If specified as an availability zone,
       only the region portion matters. Either this option or `--skeleton` must
       be specified.
@@ -78,7 +78,7 @@ fi
 opt-action --call=usage help/h=0
 
 # Region, passed as either region per se or availability zone.
-opt-value --var=inRegion --filter=region-from-location in
+opt-value --var=region --filter=region-from-location loc
 
 # File to print the constructed command to.
 opt-value --filter='/./' --var=printCommandTo print-command-to
@@ -86,7 +86,7 @@ opt-value --filter='/./' --var=printCommandTo print-command-to
 # Just print argument "skeleton" ?
 opt-action --var=skeleton skeleton
 
-require-exactly-one-arg-of in skeleton
+require-exactly-one-arg-of loc skeleton
 
 # Output style (result post-processor option).
 outputStyle=normal
@@ -184,7 +184,7 @@ dashArgs=(--no-cli-pager --output=json)
 if (( skeleton )); then
     dashArgs+=(--generate-cli-skeleton)
 else
-    dashArgs+=(--region="${inRegion}")
+    dashArgs+=(--region="${region}")
 fi
 
 jsonArg='{}'

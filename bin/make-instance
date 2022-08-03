@@ -29,21 +29,21 @@ function usage {
       group of the default VPC for the specified availability zone (which,
       TBQH, is probably not what you want).
 
-      --in=<availability-zone>
-        Where to launch.
       --instance-type=<type>
         What type of instance to install. Defaults to `t3.nano`, for convenience.
       --key-name=<name>
         Name of the keypair to use for SSH access. If not specified, then
         something else will have to have set up SSH access (e.g. the user
         data script, or something baked into the AMI).
+      --loc=<availability-zone>
+        Availability zone to launch the instance in. Must be specified.
       --name=<name>
         Name tag for the resulting instance.
       --security-group=<name-or-id>
         Name or ID of the security group to use for network access control.
         If specified, this is used to derive the VPC to use, and in conjunction
         with the specified availability zone, the specific subnet within the
-        VPC. It is not valid to specify both this option and --vpc.
+        VPC. It is not valid to specify both this option and `--vpc`.
       --user-data=<data>
         User data for the instance, which is taken to be a script to run on
         first-boot of the instance. It is invalid to specify both this and
@@ -56,7 +56,7 @@ function usage {
       --vpc=<name-or-id>
         Name or ID of the VPC to launch into. If specified, then the instance
         will be in the default security group of the indicated VPC. It is not
-        valid to specify both this option and --security-group.
+        valid to specify both this option and `--security-group`.
 
     ${name} [--help | -h]
       Display this message.
@@ -69,7 +69,7 @@ function usage {
 opt-action --call=usage help/h=0
 
 # Availability zone.
-opt-value --required --var=inZone --call=parse-zone in
+opt-value --required --var=zone --call=parse-zone loc
 
 # Instance type.
 opt-value --var=instanceType --default='t3.nano' instance-type
@@ -115,13 +115,10 @@ if [[ ${userDataFile} != '' ]]; then
     || exit 1
 fi
 
-echo 1>&2 "type: ${instanceType}"
-echo 1>&2 "in:   ${inZone}"
-
 # Figure out the correct AMI.
 
 amiInfo="$(
-    ${progDir}/find-ami --in="${inZone}" --instance-type="${instanceType}")" \
+    ${progDir}/find-ami --loc="${zone}" --instance-type="${instanceType}")" \
 || exit "$?"
 
 jget 1>&2 --raw "${amiInfo}" '
@@ -138,20 +135,20 @@ groupId=''
 subnetId=''
 if [[ ${groupNameOrId} != '' ]]; then
     # Resolve the security group ID, and then use it to find the VPC ID.
-    groupId="$(lib find-security-group --in="${inZone}" "${groupNameOrId}")" \
+    groupId="$(lib find-security-group --loc="${zone}" "${groupNameOrId}")" \
     || exit 1
-    vpcId="$(lib find-vpc --in="${inZone}" "${groupId}")" \
+    vpcId="$(lib find-vpc --loc="${zone}" "${groupId}")" \
     || exit 1
 elif [[ ${vpcNameOrId} != '' ]]; then
     # Resolve the VPC ID, and then use it to find the security group ID.
-    vpcId="$(lib find-vpc --in="${inZone}" "${vpcNameOrId}")" \
+    vpcId="$(lib find-vpc --loc="${zone}" "${vpcNameOrId}")" \
     || exit 1
-    groupId="$(lib find-security-group --in="${inZone}" "${vpcId}")" \
+    groupId="$(lib find-security-group --loc="${zone}" "${vpcId}")" \
     || exit 1
 fi
 
 if [[ ${vpcId} != '' ]]; then
-    subnetId="$(lib find-vpc-subnet --in="${inZone}" --vpc="${vpcId}")" \
+    subnetId="$(lib find-vpc-subnet --loc="${zone}" --vpc="${vpcId}")" \
     || exit 1
 fi
 
@@ -174,9 +171,9 @@ echo 1>&2 'Launching...'
 # output from `ec2 run-instances`, that is, they aren't known at the moment of
 # launch.
 result="$(ec2-json run-instances \
-    --in="${inZone}" \
+    --loc="${zone}" \
     amiInfo:json="${amiInfo}" \
-    inZone="${inZone}" \
+    zone="${zone}" \
     instanceType="${instanceType}" \
     keyName="${keyName}" \
     groupId="${groupId}" \
@@ -188,7 +185,7 @@ result="$(ec2-json run-instances \
             ImageId:      $amiInfo.ImageId,
             InstanceType: $instanceType,
             MaxCount:     1,
-            Placement:    { AvailabilityZone: $inZone }
+            Placement:    { AvailabilityZone: $zone }
         }
         + $tagSpec
         + if $keyName == "" then {} else { KeyName: $keyName } end

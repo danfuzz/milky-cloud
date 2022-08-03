@@ -25,11 +25,11 @@ function usage {
       Detaches and removes an internet gateway, including removing routing
       rules from the default routing table of the formerly-associated VPC.
 
-      --in=<region-or-zone>
-        What region to operate in. Must be specified. If specified as an
-        availability zone, only the region portion matters.
       --gateway=<id>
         ID of the gateway to remove. Must be specified.
+      --loc=<region-or-zone>
+        What region to operate in. Must be specified. If specified as an
+        availability zone, only the region portion matters.
       --progress (--no-progress to disable)
         Print progress messages to stderr.
 
@@ -44,7 +44,7 @@ function usage {
 opt-action --call=usage help/h=0
 
 # Region, passed as either region per se or availability zone.
-opt-value --required --var=inRegion --filter=region-from-location in
+opt-value --required --var=region --filter=region-from-location loc
 
 # ID of the gateway.
 opt-value --required --var=gatewayId --filter='/./' gateway
@@ -61,7 +61,7 @@ process-args "$@" || usage "$?"
 
 # Get info on the gateway (which also validates the ID).
 gatewayInfo="$(ec2-json describe-internet-gateways \
-    --in="${inRegion}" \
+    --loc="${region}" \
     gatewayId="${gatewayId}" \
     '{
         InternetGatewayIds: [$gatewayId]
@@ -82,7 +82,7 @@ if [[ ${vpcId} != 'null' ]]; then
 
     # Find the default route table for the VPC.
     rtInfo="$(ec2-json describe-route-tables \
-        --in="${inRegion}" \
+        --loc="${region}" \
         filters:json="$(lib filter-spec vpc-id="${vpcId}" association.main=true)" \
         '$filters' \
         :: --raw '.RouteTables[0]'
@@ -112,7 +112,7 @@ error=0
 if (( hasIpv4Route )); then
     progress-msg 'Deleting IPv4 route...'
     ec2-json delete-route \
-        --in="${inRegion}" \
+        --loc="${region}" \
         rtId="${rtId}" \
         '{
             RouteTableId: $rtId,
@@ -124,7 +124,7 @@ fi
 if (( hasIpv6Route )); then
     progress-msg 'Deleting IPv6 route...'
     ec2-json delete-route \
-        --in="${inRegion}" \
+        --loc="${region}" \
         rtId="${rtId}" \
         '{
             RouteTableId: $rtId,
@@ -136,7 +136,7 @@ fi
 if (( attached )); then
     progress-msg 'Detaching gateway...'
     ec2-json detach-internet-gateway \
-        --in="${inRegion}" \
+        --loc="${region}" \
         gatewayId="${gatewayId}" \
         vpcId="${vpcId}" \
         '{
@@ -148,7 +148,7 @@ fi
 
 progress-msg 'Deleting gateway...'
 ec2-json delete-internet-gateway \
-    --in="${inRegion}" \
+    --loc="${region}" \
     gatewayId="${gatewayId}" \
     '{ InternetGatewayId: $gatewayId }' \
 || error=1

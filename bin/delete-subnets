@@ -32,7 +32,7 @@ function usage {
 
       --all
         Remove all subnets.
-      --in=<region-or-zone>
+      --loc=<region-or-zone>
         What region to make the security group in. Must be specified. If
         specified as an availability zone, only the region portion matters.
       --quiet
@@ -51,7 +51,7 @@ function usage {
 opt-action --call=usage help/h=0
 
 # Region, passed as either region per se or availability zone.
-opt-value --required --var=inRegion --filter=region-from-location in
+opt-value --required --var=region --filter=region-from-location loc
 
 # Name or ID of the VPC.
 opt-value --required --var=vpcNameOrId --filter='/./' vpc
@@ -85,11 +85,11 @@ fi
 #
 
 # Validate or find the ID of the VPC.
-vpcId="$(lib find-vpc --in="${inRegion}" "${vpcNameOrId}")" \
+vpcId="$(lib find-vpc --loc="${region}" "${vpcNameOrId}")" \
 || exit "$?"
 
 allSubnets="$(ec2-json describe-subnets \
-    --in="${inRegion}" \
+    --loc="${region}" \
     "$(lib filter-spec vpc-id="${vpcId}")" \
     :: '.Subnets[]'
 )" \
@@ -107,7 +107,7 @@ subnetIds=($(
 
 for id in "${subnetIds[@]}"; do
     ec2-json delete-subnet \
-        --in="${inRegion}" \
+        --loc="${region}" \
         id="${id}" \
         '{
             SubnetId: $id
