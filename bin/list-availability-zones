@@ -22,17 +22,13 @@ function usage {
     Usage:
 
     ${name} [<opt> ...]
-      Lists all accessible availability zones in a given region. The result
-      is one zone name per line (by default), or a JSON array (given the
-      appropriate option).
+      Lists all accessible availability zones in a given region.
 
-      --json
-        Produce JSON output.
       --loc=<region-or-zone>
         What region to look in. Must be specified. If specified as an
         availability zone, only the region portion matters.
-      --strings
-        Produce a list of strings (one per line). This is the default.
+      --output=<style> :: `compact` `json` `lines`
+        Output style, as with `json-val`. Defaults to `lines`.
 
     ${name} [--help | -h]
       Displays this message.
@@ -47,8 +43,8 @@ opt-action --call=usage help/h=0
 # Region, passed as either region per se or availability zone.
 opt-value --required --var=region --filter=region-from-location loc
 
-# What to print.
-opt-choice --var=outputStyle --default=strings json strings
+# Output style.
+opt-enum --var=outputStyle --default=lines output compact json lines
 
 process-args "$@" || usage "$?"
 
@@ -60,9 +56,14 @@ process-args "$@" || usage "$?"
 cmd=(ec2-json describe-availability-zones --loc="${region}" ::)
 suffix=()
 
-if [[ ${outputStyle} == 'strings' ]]; then
-    cmd+=(--raw)
-    suffix=('| .[]')
-fi
+case "${outputStyle}" in
+    compact)
+        cmd+=(--compact)
+        ;;
+    lines)
+        cmd+=(--raw)
+        suffix=('| .[]')
+        ;;
+esac
 
 "${cmd[@]}" '.AvailabilityZones | map(.ZoneName) | sort' "${suffix[@]}"
