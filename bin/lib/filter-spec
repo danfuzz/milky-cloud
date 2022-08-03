@@ -20,21 +20,19 @@ function usage {
     print-usage $'
     Usage:
 
-    ${name} [<opt> ...] [--] [<filter-spec> ...]
+    ${name} [<opt> ...] [--] [<spec> ...]
       Constructs and prints a JSON object suitable for use as a
       `Filters` specification argument to an AWS command. The result is
       an object that binds `Filters`, so it can be used as-is (if that is
       the only argument) or merged with other arguments.
 
-      <filter-spec>
-        <name>=<value> Use `value` as a filter for `name`. If the same
-        name is used multiple times, then (per the usual AWS rules) the
-        result is a logical OR of the values.
+      <spec>
+        <name>=<value> -- Use `value` as a filter for `name`. If the same name
+          is used multiple times, then (per the usual AWS rules) the result is a
+          logical OR of the values.
 
-      --compact
-        Output in compact (not multiline) JSON form.
-      --json
-        Output in JSON form. This is the default.
+      --output=<style> :: `compact` `json`
+        Output style, as with `json-val`. Defaults to `json`.
 
     ${name} [--help | -h]
       Displays this message.
@@ -44,7 +42,7 @@ function usage {
 }
 
 # Output style.
-opt-choice --var=outputStyle --default=json compact json
+opt-enum --var=outputStyle --default=json output :: compact json
 
 # Want help?
 opt-action --call=usage help/h=0
