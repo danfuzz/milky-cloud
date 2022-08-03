@@ -743,20 +743,18 @@ function _argproc_janky-args {
         fi
    done
 
-   # Special case for `--call` and `--var` (which always go together).
-   if [[ ${argSpecs} =~ ' call '|' var ' ]]; then
-       if [[ (${optCall} == '') && (${optVar} == '') ]]; then
-           echo 1>&2 'Must use at least one of --call or --var.'
-           return 1
-       fi
-   fi
-
-   if (( ${#args[@]} == 0 )); then
+   if (( !optsDone || (${#args[@]} == 0) )); then
        echo 1>&2 'Missing argument specification.'
        return 1
    elif (( ${#args[@]} > 1 && !multiArg )); then
        echo 1>&2 'Too many arguments.'
        return 1
+   elif [[ ${argSpecs} =~ ' call '|' var ' ]]; then
+       # Special case for `--call` and `--var` (which always go together).
+       if [[ (${optCall} == '') && (${optVar} == '') ]]; then
+           echo 1>&2 'Must use at least one of --call or --var.'
+           return 1
+       fi
    fi
 }
 
