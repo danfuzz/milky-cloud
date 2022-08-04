@@ -552,30 +552,22 @@ function _argproc_define-no-value-arg {
     local abbrevChar="$4"
     local value="$5"
 
+    _argproc_set-arg-description "${longName}" option || return 1
+
+    local handlerName="_argproc:long-${longName}"
+    local handlerBody="$(
+        _argproc_handler-body "${longName}" '' "${callFunc}" "${varName}"
+    )"
+
     value="$(_argproc_quote "${value}")"
 
-    _argproc_set-arg-description "${longName}" option \
-    || return 1
-
-    if [[ ${callFunc} != '' ]]; then
-        # Re-form as the caller code.
-        callFunc="${callFunc} ${value}"' || return "$?"'
-    fi
-
-    if [[ ${varName} != '' ]]; then
-        # Re-form as the setter code.
-        varName="${varName}=${value}"
-    fi
-
-    eval 'function _argproc:long-'"${longName}"' {
+    eval 'function '"${handlerName}"' {
         if (( $# > 0 )); then
             echo 1>&2 "Value not allowed for option --'"${longName}"'."
             return 1
         fi
-
-        '"${callFunc}"'
-        '"${varName}"'
-        _argproc_receivedArgNames+="<'"${longName}"'>"
+        set '"${value}"'
+        '"${handlerBody}"'
     }'
 
     if [[ ${abbrevChar} != '' ]]; then
