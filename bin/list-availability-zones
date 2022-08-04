@@ -25,8 +25,8 @@ function usage {
       Lists all accessible availability zones in a given region.
 
       --loc=<region-or-zone>
-        What region to look in. Must be specified. If specified as an
-        availability zone, only the region portion matters.
+        What region to look in. Must be specified. If specified as an availability
+        zone, only the region portion matters.
       --output=<style> :: `compact` `json` `lines`
         Output style, as with `json-val`. Defaults to `lines`, which indicates
         _raw_ lines (no JSON decoration).
