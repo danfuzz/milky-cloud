@@ -51,7 +51,7 @@ function jval {
 
 # Calls `lib parse-location --input-zone`.
 function parse-zone {
-    lib parse-location --input-zone "$@"
+    lib parse-location --input=zone "$@"
 }
 
 # Calls `lib parse-location --print-region`.

@@ -22,17 +22,12 @@ function usage {
 
     ${name} [<opt> ...] <zone-or-region>
       Parses a location -- a region or availability zone -- and if
-      valid then optionally prints out one of the components. Note that
-      only one each `--input-` and `--print-` option has any effect (the
-      last specified).
+      valid then optionally prints out one of the components.
 
-      --input-any
-        Accept either an availability zone or a region as input. This is the
-        default.
-      --input-region
-        Require a region as input.
-      --input-zone
-        Require an availibility zone as input.
+      --input=<style>
+        `any` -- Accept either an availability zone or region as <zone-or-region>.
+        `region` -- Require a region.
+        `zone` -- Require an availability zone.
       --print-none
         Do not print anything. This is the default.
       --print-region
@@ -41,8 +36,8 @@ function usage {
         Print the full zone (which will be the same as the input). Implies
         `--input-zone`.
       --print-zone-suffix
-        Print the zone suffix (everything after the region). Implies
-        `--input-zone`.
+        Print the zone suffix (everything after the region). This implies
+        `--input=zone`.
 
     ${name} [--help | -h]
       Displays this message.
@@ -54,9 +49,8 @@ function usage {
 # Want help?
 opt-action --call=usage help/h=0
 
-# Required input type.
-opt-choice --var=inputType --default=input-any \
-    input-any input-region input-zone
+# Input type.
+opt-enum --var=inputType --default=any input :: any region zone
 
 # Item to print.
 opt-choice --var=printItem --default=print-none \
@@ -80,7 +74,7 @@ process-args "$@" || usage "$?"
 
 if [[ ${printItem} =~ ^print-zone ]]; then
     # Don't allow region input if we are to print a zone-ish thing.
-    inputType='input-zone'
+    inputType='zone'
 fi
 
 
@@ -90,15 +84,15 @@ fi
 
 # Validate the required input type, if needed.
 case "${inputType}" in
-    input-region)
+    region)
         if [[ ${zoneSuffix} != '' ]]; then
-            echo 1>&2 'Region input required; got zone.'
+            echo 1>&2 "Region required; got zone: ${zoneOrRegion}"
             exit 1
         fi
         ;;
-    input-zone)
+    zone)
         if [[ ${zoneSuffix} == '' ]]; then
-            echo 1>&2 'Zone input required; got region.'
+            echo 1>&2 "Zone required; got region: ${zoneOrRegion}"
             exit 1
         fi
         ;;
