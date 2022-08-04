@@ -58,7 +58,7 @@ opt-toggle --call=progress-msg-switch progress
 # Names and values of assignments, as parallel arrays.
 assignNames=()
 assignValues=()
-rest-arg --call=parse-rest
+rest-arg --call=parse-rest assignments
 function parse-rest {
     local arg
 

@@ -21,7 +21,7 @@ function usage {
     print-usage $'
     Usage:
 
-    ${name} [<opt> ...] [<assignment> ...] <jq-expression> ...
+    ${name} [<opt> ...] [<assignment> ...] <filter-expr> ...
       Removes rules from an existing security group, based on given filter
       criteria. Simple filters can be specified via options, or if no such
       option is used, a general filter can be specified via assignment and
@@ -72,7 +72,7 @@ opt-choice --var=simpleFilter \
 opt-toggle --var=quiet quiet
 
 # Filter arguments.
-rest-arg --var=filterArgs
+rest-arg --var=filterArgs filter-exprs
 
 process-args "$@" || usage "$?"
 

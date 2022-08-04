@@ -73,7 +73,7 @@ varValues=()
 # Value construction expression.
 valueExpression=''
 
-rest-arg --call=parse-rest
+rest-arg --call=parse-rest jval-exprs
 function parse-rest {
     # Parse assignments.
     while (( $# > 0 )); do

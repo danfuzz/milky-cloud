@@ -23,18 +23,16 @@ function usage {
 
     ${name} [<opt> ...] <name-or-id>
       Finds a security group by name or validates the existence of one by
-      ID. If passed an ID, it can either be the ID of a security group per
-      se, or it can be an ID of a VPC which is taken to refer to the default
-      security group for the indicated VPC. On success, prints the security
-      group ID (by default) or the entire group info object.
+      ID, and prints its information. If passed an ID, it can either be the ID
+      of a security group per se, or it can be an ID of a VPC which is taken to
+      refer to the default security group for the indicated VPC.
 
       --loc=<region-or-zone>
         Where to look. Must be specified. If specified as an availability
         zone, only the region portion matters.
-      --print-all
-        Print the full info object, not just the ID.
-      --print-id
-        Print the ID of the security group. This is the default.
+      --output=<style> :: `compact` `id` `json`
+        What to output, as with `json-val`, except that `id` prints just the
+        ID of the security group as a plain string. `id` is the default.
 
     ${name} [--help | -h]
       Displays this message.
@@ -49,8 +47,8 @@ opt-action --call=usage help/h=0
 # Region, passed as either region per se or availability zone.
 opt-value --required --var=region --filter=region-from-location loc
 
-# What to print.
-opt-choice --var=outputStyle --default=print-id print-all print-id
+# Output style.
+opt-enum --var=outputStyle --default=id output :: compact id json
 
 # Name or ID to look up.
 positional-arg --required --var=nameOrId name-or-id
@@ -102,8 +100,8 @@ elif (( count != 1 )); then
     exit 1
 fi
 
-if [[ ${outputStyle} == 'print-all' ]]; then
-    jget "${result}" '.group'
-else
+if [[ ${outputStyle} == 'id' ]]; then
     jget --output=raw "${result}" '.group.GroupId'
+else
+    jget --output="${outputStyle}" "${result}" '.group'
 fi

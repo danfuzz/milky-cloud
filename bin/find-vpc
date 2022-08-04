@@ -23,16 +23,14 @@ function usage {
 
     ${name} [<opt> ...] <name-or-id>
       Finds a VPC by name or security group ID, or validates the existence
-      of one by ID. On success, prints the VPC ID (by default) or the
-      full VPC info object.
+      of one by ID, and prints its information.
 
       --loc=<region-or-zone>
         Where to look. Must be specified. If specified as an availability
         zone, only the region portion matters.
-      --print-all
-        Print the full info object, not just the ID.
-      --print-id
-        Print the ID of the VPC. This is the default.
+      --output=<style> :: `compact` `id` `json`
+        What to output, as with `json-val`, except that `id` prints just the
+        ID of the VPC as a plain string. `id` is the default.
 
     ${name} [--help | -h]
       Displays this message.
@@ -48,7 +46,7 @@ opt-action --call=usage help/h=0
 opt-value --required --var=region --filter=region-from-location loc
 
 # What to print.
-opt-choice --var=outputStyle --default=print-id print-all print-id
+opt-enum --var=outputStyle --default=id output :: compact id json
 
 # Name or ID to look up.
 positional-arg --required --var=nameOrId name-or-id
@@ -69,7 +67,7 @@ function do-find {
     local topKey="$2"
     local filterName="$3"
     local nameOrId="$4"
-    local printAll="$5"
+    local outputStyle="$5"
 
     local result
     result="$(ec2-json "${commandName}" \
@@ -106,7 +104,9 @@ function do-find {
             ;;
     esac
 
-    if (( printAll )); then
+    if [[ ${outputStyle} == 'id' ]]; then
+        echo "${vpcId}"
+    else
         if [[ ${topKey} != 'Vpcs' ]]; then
             # We got the ID out of some other object (e.g. a security group),
             # and we've been asked for full info. So we need to actually get
@@ -118,9 +118,7 @@ function do-find {
             )" \
             || return "$?"
         fi
-        jget "${result}" '.Vpcs[0]'
-    else
-        echo "${vpcId}"
+        jget --output="${outputStyle}" "${result}" '.Vpcs[0]'
     fi
 }
 
@@ -128,18 +126,18 @@ function do-find {
 function find-via-describe-vpcs {
     local filterName="$1"
     local nameOrId="$2"
-    local printAll="$3"
+    local outputStyle="$3"
 
-    do-find describe-vpcs Vpcs "${filterName}" "${nameOrId}" "${printAll}"
+    do-find describe-vpcs Vpcs "${filterName}" "${nameOrId}" "${outputStyle}"
 }
 
 # Find a VPC from an associated security group.
 function find-via-describe-security-groups {
     local nameOrId="$1"
-    local printAll="$2"
+    local outputStyle="$2"
 
     do-find describe-security-groups SecurityGroups group-id "${nameOrId}" \
-        "${printAll}"
+        "${outputStyle}"
 }
 
 
@@ -147,18 +145,13 @@ function find-via-describe-security-groups {
 # Main script
 #
 
-printAll=0
-if [[ ${outputStyle} == 'print-all' ]]; then
-    printAll=1
-fi
-
 if [[ ${nameOrId} =~ ^vpc- ]]; then
     # It looks like an ID.
-    find-via-describe-vpcs 'vpc-id' "${nameOrId}" "${printAll}"
+    find-via-describe-vpcs 'vpc-id' "${nameOrId}" "${outputStyle}"
 elif [[ ${nameOrId} =~ ^sg- ]]; then
     # It looks like a security group ID.
-    find-via-describe-security-groups "${nameOrId}" "${printAll}"
+    find-via-describe-security-groups "${nameOrId}" "${outputStyle}"
 else
     # It's expected to be a name.
-    find-via-describe-vpcs 'tag:Name' "${nameOrId}" "${printAll}"
+    find-via-describe-vpcs 'tag:Name' "${nameOrId}" "${outputStyle}"
 fi

@@ -78,7 +78,7 @@ positional-arg --required --var=command command
 
 # Command arguments.
 args=()
-rest-arg --var=args
+rest-arg --var=args args
 
 process-args "$@" || usage "$?"
 

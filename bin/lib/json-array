@@ -48,7 +48,7 @@ opt-enum --var=outputStyle --default=json output :: compact json
 opt-enum --var=inputStyle --default=json input :: json strings
 
 # The array elements.
-rest-arg --var=args
+rest-arg --var=values values
 
 process-args "$@" || usage "$?"
 
@@ -79,8 +79,8 @@ else
 fi
 
 expr=''
-for (( n = 0; n < ${#args[@]}; n++ )); do
-    jqArgs+=("${argOpt}" "a${n}" "${args[${n}]}")
+for (( n = 0; n < ${#values[@]}; n++ )); do
+    jqArgs+=("${argOpt}" "a${n}" "${values[${n}]}")
     if (( n != 0 )); then
         expr+=','
     fi
