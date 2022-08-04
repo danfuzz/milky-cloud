@@ -20,17 +20,21 @@
 # `<value>` are always optional and (independently) sometimes prohibited,
 # depending on the definition function.
 #
-# The public argument-defining functions also all take two options,
-# `--call=<name>` and `--var=<name>`, at least one of which must be passed.
-# `--call` specifies a function to be called when parsing an argument, and
-# `--var` specifies a variable to set. If both are used, then the call is made
-# first, and the variable is only set if the call returns successfully. The
-# variable, if specified, is always initialized to a default value, which is
-# itself optionally specified via `--default=<value>`. If `--default` isn't
-# used, then the default-for-the-default depends on the specific function.
+# The public argument-defining functions also all take two options, of which at
+# least one must be used to define any argument:
+# * `--call=<name>` or `--call={<code>}` -- Calls the named function passing it
+#   the argument value(s), or runs the indicated code snippet. If the call
+#   fails, the argument is rejected. In the snippet form, normal positional
+#   parameter references (`$1` `$@` `set <value>` etc.) are available.
+# * `--var=<name>` -- Sets the named variable to the argument value(s). If both
+#   this and `--call` are used, the call is made first and the variable is only
+#   set if the call succeeds. The variable is always initialized to a default
+#   value, which is itself optionally specified via `--default=<value>`. If
+#   `--default` isn't used (or isn't available), then the default-for-the-
+#   default depends on the specific function.
 #
 # Definers for value-accepting arguments take an option `--filter=<spec>`, which
-# can take three possible forms:
+# can take two possible forms:
 # * `/<regex>/` -- A regular expression to match against the value. If there is
 #   no match, then the argument isn't accepted.
 # * `<name>` -- The name of a function to call, passed the value as a single
@@ -38,10 +42,6 @@
 #   function succeeds, then its output becomes the argument value. Note: The
 #   filter function runs in a subshell, and as such it cannot be used to affect
 #   the global environment of the main script.
-# * `{<code>}` -- A snippet of code to run, in which `$1` is the argument value.
-#   Relatedly, the argument value can be replaced with `set <value>`. If the
-#   code fails (that is, the final command returns a non-zero exit status), then
-#   the argument isn't accepted.
 #
 # Some argument-definers also accept `--required`, to indicate that the argument
 # or option is required (mandatory).
@@ -639,11 +639,6 @@ function _argproc_handler-body {
                 done' \
                 "${filter}" "${desc}")"
         )
-    elif [[ ${filter} =~ ^\{(.*)\}$ ]]; then
-        # Add a compound statement for the code block.
-        result+=(
-            "$(printf '{\n%s\n} || return "$?"\n' "${BASH_REMATCH[1]}")"
-        )
     elif [[ ${filter} != '' ]]; then
         # Add a loop to call the filter function on each argument.
         result+=(
@@ -657,7 +652,12 @@ function _argproc_handler-body {
         )
     fi
 
-    if [[ ${callFunc} != '' ]]; then
+    if [[ ${callFunc} =~ ^\{(.*)\}$ ]]; then
+        # Add a compound statement for the code block.
+        result+=(
+            "$(printf '{\n%s\n} || return "$?"\n' "${BASH_REMATCH[1]}")"
+        )
+    elif [[ ${callFunc} != '' ]]; then
         result+=(
             "$(printf '%s "$@" || return "$?"' "${callFunc}")"
         )
@@ -719,7 +719,7 @@ function _argproc_janky-args {
 
             case "${name}" in
                 call)
-                    [[ ${value} =~ ^=([_a-zA-Z][-_:a-zA-Z0-9]*)$ ]] \
+                    [[ ${value} =~ ^=(\{.*\}|[_a-zA-Z][-_:a-zA-Z0-9]*)$ ]] \
                     && optCall="${BASH_REMATCH[1]}" \
                     || argError=1
                     ;;
@@ -729,7 +729,7 @@ function _argproc_janky-args {
                     || argError=1
                     ;;
                 filter)
-                    [[ ${value} =~ ^=(/.*/|\{.*\}|[_a-zA-Z][-_:a-zA-Z0-9]*)$ ]] \
+                    [[ ${value} =~ ^=(/.*/|[_a-zA-Z][-_:a-zA-Z0-9]*)$ ]] \
                     && optFilter="${BASH_REMATCH[1]}" \
                     || argError=1
                     ;;
