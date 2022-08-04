@@ -21,11 +21,11 @@ function usage {
     Usage:
 
     ${name} [<opt> ...] [--] <json-value> [<jval-expr> ...]
-      Performs an operation on a single JSON value (at least with typical
-      usage). More specifically, <json-value> is used as the sole input to
-      a `json-val` invocation consisting of the rest of the arguments. If
-      no expression is given, it is taken to be `.`, which will end up just
-      formatting the input value as implied/specified by the output options.
+      Performs an operation on a single JSON value (at least with typical usage).
+      More specifically, <json-value> is used as the sole input to a `json-val`
+      invocation consisting of the rest of the arguments. If no expression is
+      given, it is taken to be `.`, which will end up just formatting the input
+      value as implied/specified by the output options.
 
       --output=<style>
         `compact` -- Output in compact (single line) JSON form.

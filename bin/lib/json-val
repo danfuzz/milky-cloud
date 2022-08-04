@@ -21,11 +21,11 @@ function usage {
     Usage:
 
     ${name} [<opt> ...] [--] [<assignment> ...] [--] [<jq-expression> ...]
-      Constructs and prints one or more JSON values from variable
-      assignments passed into an expression evaluated by `jq` either with
-      `--null-input` (by default) or as a usual pipeline over input values.
-      If no expression is given, it is taken to be `.`, which will end up
-      formatting the input as implied/specified by the output option.
+      Constructs and prints one or more JSON values from variable assignments
+      passed into an expression evaluated by `jq` either with `--null-input` (by
+      default) or as a usual pipeline over input values. If no expression is
+      given, it is taken to be `.`, which will end up formatting the input as
+      implied/specified by the output option.
 
       The <jq-expression> arguments are concatenated together (separated by
       spaces) to form the final expression to be evaluated.

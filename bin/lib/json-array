@@ -21,8 +21,8 @@ function usage {
     Usage:
 
     ${name} [<opt> ...] [--] [<value> ...]
-      Constructs and prints a JSON array of values, of all of the value
-      arguments passed to this command.
+      Constructs and prints a JSON array of values, of all of the value arguments
+      passed to this command.
 
       --input=<style>
         `json` -- Treat arguments as JSON values. This is the default.

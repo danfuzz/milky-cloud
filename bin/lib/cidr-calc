@@ -23,42 +23,41 @@ function usage {
 
     ${name} [<opt> ...] <command> <arg> ...
 
-    Performs a calculation of some sort on a CIDR address/mask. Input CIDR
-    values can be either standard-form strings or parsed JSON values (such as
-    are produced by the `--output=json` option of this tool).
+    Performs a calculation of some sort on a CIDR address/mask. Input CIDR values
+    can be either standard-form strings or parsed JSON values (such as are
+    produced by the `--output=json` option of this tool).
 
     --output=<style> :: `compact` `json` `lines`
-      Output style, as with `json-val`. Defaults to `lines`, which produces
-      a series of one or more standard-form CIDRs, one per line.
+      Output style, as with `json-val`. Defaults to `lines`, which produces a
+      series of one or more standard-form CIDRs, one per line.
 
     Commands:
 
     add-to-network <cidr> <amount>
       Adds the given amount (a positive integer) to the network address, and
-      prints the resulting CIDR. This can be used in conjunction with
-      `widen-to` to enumerate subnet addresses (though `make-subnets` is
-      more convenient for that use case). `<amount>` can be specified either
-      in decimal or hex. Use the suggestive prefix `::` to indicate hex.
+      prints the resulting CIDR. This can be used in conjunction with `widen-to`
+      to enumerate subnet addresses (though `make-subnets` is more convenient for
+      that use case). `<amount>` can be specified either in decimal or hex. Use
+      the suggestive prefix `::` to indicate hex.
     address-length <cidr>
-      Prints the length (number of bits) of the address (not just the
-      netmask).
+      Prints the length (number of bits) of the address (not just the netmask).
     address-words
-      Prints the words (16-bit components) of the full address, in a
-      shell-friendly space-separated decimal form. Note: Even an IPv4
-      address gets chunked as 16-bit words by this command.
+      Prints the words (16-bit components) of the full address, in a shell-
+      friendly space-separated decimal form. Note: Even an IPv4 address gets
+      chunked as 16-bit words by this command.
     make-subnets <cidr> <count> [<bits>]
       Prints the indicated number of subnets of the given CIDR, created by
-      widening the netmask and filling in the new bits with the sequence of
-      `0` through `<count> - 1`. By default, the netmask is widened by the
-      minimum number of bits needed, but an optional third argument indicates
-      a specific result netmask length in bits.
+      widening the netmask and filling in the new bits with the sequence of `0`
+      through `<count> - 1`. By default, the netmask is widened by the minimum
+      number of bits needed, but an optional third argument indicates a specific
+      result netmask length in bits.
     netmask-length <cidr>
       Prints the length (number of bits) in the netmask.
     print <cidr>
       Prints a CIDR value.
     widen-to <cidr> <bits>
-      Widens the address in a CIDR by adding enough low-order zero bits to
-      result in the indicated length. Prints the resulting CIDR.
+      Widens the address in a CIDR by adding enough low-order zero bits to result
+      in the indicated length. Prints the resulting CIDR.
 
     ${name} [--help | -h]
       Displays this message.

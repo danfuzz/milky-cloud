@@ -22,11 +22,10 @@ function usage {
 
     ${name} [<opt> ...] <resource-type> <name>
 
-    Constructs and prints a JSON object suitable for use as a
-    `TagSpecifications` argument to an AWS command, to _just_ define a
-    `Name` tag. The result is an object that binds `TagSpecifications`, so
-    it can be used as-is (if that is the only argument) or merged with
-    other arguments.
+    Constructs and prints a JSON object suitable for use as a `TagSpecifications`
+    argument to an AWS command, to _just_ define a `Name` tag. The result is an
+    object that binds `TagSpecifications`, so it can be used as-is (if that is
+    the only argument) or merged with other arguments.
 
     --output=<style> :: `compact` `json`
       Output style, as with `json-val`. Defaults to `json`.

@@ -23,11 +23,11 @@ function usage {
     ${name} <cmd> <subcommand> [<opt> ...] [--] [<jval-expr> ...]
       [:: [<out-opt> ...] [<jval-expr> ...]
 
-    Makes an AWS call with a JSON value constructed with `json-val`, and
-    with successful result optionally post-processed through `json-val`.
-    If no argument expression is supplied, the value `{}` (an empty object)
-    is passed to the command. When post-processing, the original result
-    becomes the sole input from stdin.
+    Makes an AWS call with a JSON value constructed with `json-val`, and with
+    successful result optionally post-processed through `json-val`. If no
+    argument expression is supplied, the value `{}` (an empty object) is passed
+    to the command. When post-processing, the original result becomes the sole
+    input from stdin.
 
     <cmd> <subcommand>
       The AWS command and subcommand to call, e.g. `ec2 run-instances`.
@@ -37,9 +37,8 @@ function usage {
       only the region portion matters. Either this option or `--skeleton` must
       be specified.
     --print-command-to=<file>
-      Name of a file to print the fully-constructed command to. It is
-      emitted as a JSON value including both split-out components and
-      the actual commandline.
+      Name of a file to print the fully-constructed command to. It is emitted as
+      a JSON value including both split-out components and the actual commandline.
     --skeleton
       Instead of making a regular call, just print out a JSON "skeleton" of the
       parameters to the command. This can be filtered just like any other result.
