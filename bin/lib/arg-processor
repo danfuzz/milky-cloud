@@ -548,7 +548,7 @@ function _argproc_define-no-value-arg {
 
     _argproc_set-arg-description "${longName}" option || return 1
 
-    local desc="option --${longName}"
+    local desc="$(_argproc_arg-description "${longName}")"
     local handlerName="_argproc:long-${longName}"
     local handlerBody="$(
         _argproc_handler-body "${longName}" "${desc}" '' "${callFunc}" "${varName}"
@@ -558,7 +558,7 @@ function _argproc_define-no-value-arg {
 
     eval 'function '"${handlerName}"' {
         if (( $# > 0 )); then
-            echo 1>&2 "Value not allowed for option --'"${longName}"'."
+            echo 1>&2 "Value not allowed for '"${desc}"'."
             return 1
         fi
         set '"${value}"'
@@ -583,17 +583,16 @@ function _argproc_define-value-required-arg {
     local varName="$3"
     local filter="$4"
 
-    local desc handlerName
+    local handlerName
     if (( isOption )); then
         _argproc_set-arg-description "${longName}" option || return 1
-        desc="option --${longName}"
         handlerName="_argproc:long-${longName}"
     else
         _argproc_set-arg-description "${longName}" argument || return 1
-        desc="argument <${longName}>"
         handlerName="_argproc:positional-${longName}"
     fi
 
+    local desc="$(_argproc_arg-description "${longName}")"
     local handlerBody="$(
         _argproc_handler-body "${longName}" "${desc}" "${filter}" "${callFunc}" "${varName}"
     )"
