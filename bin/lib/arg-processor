@@ -406,7 +406,7 @@ function require-exactly-one-arg-of {
     || return 1
 }
 
-# Declares a "rest" argument, which gets all the non-option and non-positional
+# Declares a "rest" argument, which gets all the otherwise-untaken positional
 # arguments, during parsing. If this is not declared, argument processing will
 # report an error in the presence of any "rest" arguments.
 function rest-arg {
@@ -414,6 +414,10 @@ function rest-arg {
     local optVar=''
     local args=("$@")
     _argproc_janky-args call var \
+    || return 1
+
+    local specName=''
+    _argproc_parse-spec "${args[0]}" \
     || return 1
 
     if [[ ${optCall} != '' ]]; then
@@ -430,6 +434,9 @@ function rest-arg {
     eval 'function _argproc:rest {
         '"${optCall}"'
         '"${optVar}"'
+        if (( $# > 0 )); then
+            _argproc_receivedArgNames+="<'"${specName}"'>"
+        fi
     }'
 }
 
