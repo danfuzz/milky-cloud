@@ -23,11 +23,10 @@ function usage {
 
     ${name} [<opt> ...] [<assignment> ...] <filter-expr> ...
       Removes rules from an existing security group, based on given filter
-      criteria. Simple filters can be specified via options, or if no such
-      option is used, a general filter can be specified via assignment and
-      expression arguments, similar to `aws-json`. This filter is expected
-      to accept `SecurityGroupRule` objects and then re-output the ones to
-      be removed.
+      criteria. Simple filters can be specified via options, or if no such option
+      is used, a general filter can be specified via assignment and expression
+      arguments, similar to `aws-json`. This filter is expected to accept
+      `SecurityGroupRule` objects and then re-output the ones to be removed.
 
       On success, prints a JSON array of the IDs of all removed rules.
 
@@ -43,8 +42,8 @@ function usage {
       --quiet
         Suppress non-error output to stdout.
       --security-group=<name-or-id>
-        Name or ID of the security group to operate on. Can also be a VPC ID,
-        to indicate the default security group for that VPC.
+        Name or ID of the security group to operate on. Can also be a VPC ID, to
+        indicate the default security group for that VPC.
 
     ${name} [--help | -h]
       Displays this message.

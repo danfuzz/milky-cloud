@@ -22,8 +22,8 @@ function usage {
     Usage:
 
     ${name} [<opt> ...]
-      Detaches and removes an internet gateway, including removing routing
-      rules from the default routing table of the formerly-associated VPC.
+      Detaches and removes an internet gateway, including removing routing rules
+      from the default routing table of the formerly-associated VPC.
 
       --gateway=<id>
         ID of the gateway to remove. Must be specified.

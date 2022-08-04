@@ -31,8 +31,8 @@ function usage {
     Usage:
 
     ${name} [<opt> ...]
-      Finds an AMI to use when launching an instance. On success, prints
-      a JSON object of the salient info.
+      Finds an AMI to use when launching an instance. On success, prints a JSON
+      object of the salient info.
 
       --instance-type=<type>
         What type of instance is to be launched. Must be specified.

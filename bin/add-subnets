@@ -22,13 +22,13 @@ function usage {
     Usage:
 
     ${name} [<opt> ...]
-      Adds a set of subnets to a VPC -- one per availability zone -- along
-      with an associated routing table. Upon success, prints a JSON array
-      of all the created subnets.
+      Adds a set of subnets to a VPC -- one per availability zone -- along with
+      an associated routing table. Upon success, prints a JSON array of all the
+      created subnets.
 
       --loc=<region-or-zone>
-        What region to make the subnets in. Must be specified. If specified
-        as an availability zone, only the region portion matters.
+        What region to make the subnets in. Must be specified. If specified as an
+        availability zone, only the region portion matters.
       --name=<name>
         Name to use for the created subnets. If not specified, a name is
         generated programatically.

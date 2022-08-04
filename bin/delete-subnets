@@ -23,10 +23,10 @@ function usage {
 
     ${name} [<opt> ...] [<assignment> ...] <filter-expr> ...
       Removes rules from an existing subnet, based on given filter criteria.
-      Simple filters can be specified via options, or if no such option is
-      used, a general filter can be specified via assignment and expression
-      arguments, similar to `aws-json`. This filter is expected to accept
-      to accept `Subnet` objects and then re-output the ones to be removed.
+      Simple filters can be specified via options, or if no such option is used,
+      a general filter can be specified via assignment and expression arguments,
+      similar to `aws-json`. This filter is expected to accept `Subnet` objects
+      and then re-output the ones to be removed.
 
       On success, prints a JSON array of the IDs of all removed subnets.
 

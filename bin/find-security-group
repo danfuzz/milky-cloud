@@ -22,17 +22,17 @@ function usage {
     Usage:
 
     ${name} [<opt> ...] <name-or-id>
-      Finds a security group by name or validates the existence of one by
-      ID, and prints its information. If passed an ID, it can either be the ID
-      of a security group per se, or it can be an ID of a VPC which is taken to
-      refer to the default security group for the indicated VPC.
+      Finds a security group by name or validates the existence of one by ID, and
+      prints its information. If passed an ID, it can either be the ID of a
+      security group per se, or it can be an ID of a VPC which is taken to refer
+      to the default security group for the indicated VPC.
 
       --loc=<region-or-zone>
-        Where to look. Must be specified. If specified as an availability
-        zone, only the region portion matters.
+        Where to look. Must be specified. If specified as an availability zone,
+        only the region portion matters.
       --output=<style> :: `compact` `id` `json`
-        What to output, as with `json-val`, except that `id` prints just the
-        ID of the security group as a plain string. `id` is the default.
+        What to output, as with `json-val`, except that `id` prints just the ID
+        of the security group as a plain string. `id` is the default.
 
     ${name} [--help | -h]
       Displays this message.
