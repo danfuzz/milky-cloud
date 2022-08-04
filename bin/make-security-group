@@ -22,20 +22,20 @@ function usage {
     Usage:
 
     ${name} [<opt> ...]
-      Makes a new security group, configured in a standard way. On success,
-      prints the ID of the created security group. See `configure-security-group`
-      for details about the resulting configuration.
+      Makes a new security group, configured in a standard way. On success, prints
+      the ID of the created security group. See `configure-security-group` for
+      details about the resulting configuration.
 
       --description=<description>
-        Brief description of the security group. If not specified, fairly
-        generic and content-free text is used (because it does need to be
-        defined on the result).
+        Brief description of the security group. If not specified, fairly generic
+        and content-free text is used (because it does need to be defined on the
+        result).
       --loc=<region-or-zone>
         What region to make the security group in. Must be specified. If
         specified as an availability zone, only the region portion matters.
       --name=<name>
-        Name to assign to the constructed security group. If not specified,
-        a name is derived from the associated VPC.
+        Name to assign to the constructed security group. If not specified, a
+        name is derived from the associated VPC.
       --progress (--no-progress to disable)
         Print progress messages to stderr.
       --vpc=<name-or-id>

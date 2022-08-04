@@ -22,15 +22,15 @@ function usage {
     Usage:
 
     ${name} [<opt> ...] <name-or-id>
-      Finds a VPC by name or security group ID, or validates the existence
-      of one by ID, and prints its information.
+      Finds a VPC by name or security group ID, or validates the existence of one
+      by ID, and prints its information.
 
       --loc=<region-or-zone>
-        Where to look. Must be specified. If specified as an availability
-        zone, only the region portion matters.
+        Where to look. Must be specified. If specified as an availability zone,
+        only the region portion matters.
       --output=<style> :: `compact` `id` `json`
-        What to output, as with `json-val`, except that `id` prints just the
-        ID of the VPC as a plain string. `id` is the default.
+        What to output, as with `json-val`, except that `id` prints just the ID
+        of the VPC as a plain string. `id` is the default.
 
     ${name} [--help | -h]
       Displays this message.

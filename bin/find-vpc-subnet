@@ -22,8 +22,8 @@ function usage {
     Usage:
 
     ${name} [<opt> ...]
-      Finds a VPC subnet that meets the indicated criteria. On success,
-      prints the subnet ID.
+      Finds a VPC subnet that meets the indicated criteria. On success, prints
+      the subnet ID.
 
       --loc=<availability-zone>
         What availibility zone to look in. Must be specified.
