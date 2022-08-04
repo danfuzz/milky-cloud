@@ -76,7 +76,7 @@ process-args "$@" || usage "$?"
 
 # Validate or find the ID of the security group.
 groupInfo="$(
-    lib find-security-group --print-all --loc="${region}" "${groupNameOrId}"
+    lib find-security-group --output=json --loc="${region}" "${groupNameOrId}"
 )" \
 || exit "$?"
 
