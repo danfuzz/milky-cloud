@@ -42,9 +42,8 @@ function usage {
       --port=<number> or --port=all
         Port for the rule, or an indicator to apply to all ports. Must be
         specified.
-      --protocol=<spec>
-        Protocol(s) the rule applies to, one of `all`, `tcp`, or `udp`. Must be
-        specified.
+      --protocol=<spec> :: `all` `tcp` `udp`
+        Protocol(s) the rule applies to. Must be specified.
       --quiet (--no-quiet to disable)
         Suppress non-error output to stdout.
       --security-group=<name-or-id>
@@ -77,7 +76,7 @@ opt-value --var=name --filter='/./' name
 opt-value --required --var=port --filter='/^([0-9]+|all)$/' port
 
 # Protocol of the rule.
-opt-value --required --var=protocol --filter='/^(all|tcp|udp)$/' protocol
+opt-enum --required --var=protocol protocol :: all tcp udp
 
 # Quiet?
 opt-toggle --var=quiet quiet
