@@ -21,13 +21,13 @@ function usage {
     Usage:
 
     ${name} [<opt> ...] [--] [<spec> ...]
-      Constructs and prints a JSON object suitable for use as a
-      `Filters` specification argument to an AWS command. The result is
-      an object that binds `Filters`, so it can be used as-is (if that is
-      the only argument) or merged with other arguments.
+      Constructs and prints a JSON object suitable for use as a `Filters`
+      specification argument to an AWS command. The result is an object that
+      binds `Filters`, so it can be used as-is (if that is the only argument) or
+      merged with other arguments.
 
       <spec>
-        <name>=<value> -- Use `value` as a filter for `name`. If the same name
+        <name>=<value> -- Use <value> as a filter for <name>. If the same name
           is used multiple times, then (per the usual AWS rules) the result is a
           logical OR of the values.
 
@@ -42,7 +42,7 @@ function usage {
 }
 
 # Output style.
-opt-enum --var=outputStyle --default=json output :: compact json
+opt-value --var=outputStyle --default=json --enum='compact json' output
 
 # Want help?
 opt-action --call=usage help/h=0

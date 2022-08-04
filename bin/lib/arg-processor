@@ -20,28 +20,29 @@
 # `<value>` are always optional and (independently) sometimes prohibited,
 # depending on the definition function.
 #
-# The public argument-defining functions also all take two options, of which at
-# least one must be used to define any argument:
+# The public argument-defining functions also allow these options, of which
+# at least one of `--call` or `--var` must be used. When multiple of these are
+# present, evaluation order is filter then call then variable setting.
 # * `--call=<name>` or `--call={<code>}` -- Calls the named function passing it
 #   the argument value(s), or runs the indicated code snippet. If the call
 #   fails, the argument is rejected. In the snippet form, normal positional
 #   parameter references (`$1` `$@` `set <value>` etc.) are available.
-# * `--var=<name>` -- Sets the named variable to the argument value(s). If both
-#   this and `--call` are used, the call is made first and the variable is only
-#   set if the call succeeds. The variable is always initialized to a default
-#   value, which is itself optionally specified via `--default=<value>`. If
-#   `--default` isn't used (or isn't available), then the default-for-the-
-#   default depends on the specific function.
+# * `--filter=<name>` -- Calls the named function passing it a single argument
+#   value; the function must output a replacement value. If the call fails, the
+#   argument is rejected. Note: The filter function runs in a subshell, and as
+#   such it cannot be used to affect the global environment of the main script.
+# * `--filter=/<regex>/` -- Matches each argument value against the regex. If
+#   the regex doesn't match, the argument is rejected.
+# * `--var=<name>` -- Sets the named variable to the argument value(s). The
+#   variable is always initialized to a default value, which is itself
+#   optionally specified via `--default=<value>`. If `--default` isn't used (or
+#   isn't available), then the default-for-the-default depends on the specific
+#   function.
 #
-# Definers for value-accepting arguments take an option `--filter=<spec>`, which
-# can take two possible forms:
-# * `/<regex>/` -- A regular expression to match against the value. If there is
-#   no match, then the argument isn't accepted.
-# * `<name>` -- The name of a function to call, passed the value as a single
-#   argument. If the function fails, then the argument isn't accepted. If the
-#   function succeeds, then its output becomes the argument value. Note: The
-#   filter function runs in a subshell, and as such it cannot be used to affect
-#   the global environment of the main script.
+# Value-accepting argument definers allow `--enum=<spec>` as an alternate form
+# of filter. In this case `<spec>` must be a space-separated list of names --
+# e.g. `--enum='yes no maybe'` -- and the argument is restricted to only take on
+# those possible values.
 #
 # Some argument-definers also accept `--required`, to indicate that the argument
 # or option is required (mandatory).
@@ -83,9 +84,10 @@ _argproc_preReturnStatements=()
 function opt-action {
     local optCall=''
     local optDefault='0'
+    local optFilter=''
     local optVar=''
     local args=("$@")
-    _argproc_janky-args call default var \
+    _argproc_janky-args call default filter var \
     || return 1
 
     local specName=''
@@ -96,7 +98,7 @@ function opt-action {
     || return 1
 
     _argproc_define-no-value-arg --option \
-        "${specName}" "${optCall}" "${optVar}" "${specAbbrev}" "${specValue}"
+        "${specName}" "${optFilter}" "${optCall}" "${optVar}" "${specAbbrev}" "${specValue}"
 
     if [[ ${optVar} != '' ]]; then
         # Set up the default initializer.
@@ -112,10 +114,11 @@ function opt-action {
 function opt-choice {
     local optCall=''
     local optDefault=''
+    local optFilter=''
     local optRequired=0
     local optVar=''
     local args=("$@")
-    _argproc_janky-args --multi-arg call default required var \
+    _argproc_janky-args --multi-arg call default filter required var \
     || return 1
 
     if [[ ${optVar} != '' ]]; then
@@ -138,63 +141,13 @@ function opt-choice {
         fi
 
         _argproc_define-no-value-arg --option \
-            "${specName}" "${optCall}" "${optVar}" "${specAbbrev}" "${specValue}"
+            "${specName}" "${optFilter}" "${optCall}" "${optVar}" "${specAbbrev}" "${specValue}"
 
         allNames+=("${specName}")
     done
 
     if (( optRequired )); then
         _argproc_add-required-arg-postcheck "${allNames[@]}"
-    fi
-}
-
-# Declares an enumerated-value option, which requires a value when passed on a
-# commandline to be one of a specific listed set. No `<abbrev>` or `<value>` is
-# allowed in the argument spec. If left unspecified, the default variable value
-# for an enumerated-value option is `''` (the empty string). This definer also
-# accepts the `--required` option, but notably _not_ `--filter` (which is
-# effectively used "under the covers" to implement the value validity check).
-function opt-enum {
-    local optCall=''
-    local optDefault=''
-    local optRequired=0
-    local optVar=''
-    local args=("$@")
-    _argproc_janky-args --multi-arg call default required var \
-    || return 1
-
-    local specName=''
-    _argproc_parse-spec "${args[0]}" \
-    || return 1
-    unset args[0]
-
-    if (( ${#args[@]} < 2 )) || [[ ${args[1]} != '::' ]]; then
-        echo 1>&2 'Missing enumerated values after `::` marker.'
-        return 1
-    fi
-    unset args[1]
-
-    local filterExpr=''
-    local value
-    for value in "${args[@]}"; do
-        if ! [[ ${value} =~ ^[-_a-zA-Z0-9]*$ ]]; then
-            echo 1>&2 "Invalid enumerated value: ${value}"
-            return 1
-        fi
-        filterExpr+="|${value}"
-    done
-    filterExpr="/^(${filterExpr:1})$/" # ':1` to drop the extra `|`.
-
-    if [[ ${optVar} != '' ]]; then
-        # Set up the default initializer.
-        _argproc_initStatements+=("${optVar}=$(_argproc_quote "${optDefault}")")
-    fi
-
-    _argproc_define-value-required-arg --option \
-        "${specName}" "${optCall}" "${optVar}" "${filterExpr}"
-
-    if (( optRequired )); then
-        _argproc_add-required-arg-postcheck "${specName}"
     fi
 }
 
@@ -206,9 +159,10 @@ function opt-enum {
 # toggle option is `0`.
 function opt-toggle {
     local optCall=''
+    local optFilter=''
     local optVar=''
     local args=("$@")
-    _argproc_janky-args call var \
+    _argproc_janky-args call filter var \
     || return 1
 
     local specName=''
@@ -222,9 +176,9 @@ function opt-toggle {
     fi
 
     _argproc_define-no-value-arg --option \
-        "${specName}" "${optCall}" "${optVar}" "${specAbbrev}" '1'
+        "${specName}" "${optFilter}" "${optCall}" "${optVar}" "${specAbbrev}" '1'
     _argproc_define-no-value-arg --option \
-        "no-${specName}" "${optCall}" "${optVar}" '' '0'
+        "no-${specName}" "${optFilter}" "${optCall}" "${optVar}" '' '0'
 
     if [[ ${specAbbrev} != '' ]]; then
         _argproc_define-abbrev "${specAbbrev}" "${specName}"
@@ -234,8 +188,7 @@ function opt-toggle {
 # Declares a "value" option, which requires a value when passed on a
 # commandline. No `<abbrev>` or `<value>` is allowed in the argument spec. If
 # left unspecified, the default variable value for a value option is `''` (the
-# empty string). This definer also accepts the `--required` and `--filter`
-# options.
+# empty string). This definer also accepts the `--required` option.
 function opt-value {
     local optCall=''
     local optDefault=''
@@ -243,7 +196,7 @@ function opt-value {
     local optRequired=0
     local optVar=''
     local args=("$@")
-    _argproc_janky-args call default filter required var \
+    _argproc_janky-args call default enum filter required var \
     || return 1
 
     local specName=''
@@ -256,7 +209,7 @@ function opt-value {
     fi
 
     _argproc_define-value-required-arg --option \
-        "${specName}" "${optCall}" "${optVar}" "${optFilter}"
+        "${specName}" "${optFilter}" "${optCall}" "${optVar}"
 
     if (( optRequired )); then
         _argproc_add-required-arg-postcheck "${specName}"
@@ -266,7 +219,7 @@ function opt-value {
 # Declares a positional argument. No `<abbrev>` or `<value>` is allowed in the
 # argument spec. Unlike options, a positional argument name is _only_ used for
 # error messages and internal bookkeeping. This definer also accepts the
-# `--required` and `--filter` options.
+# `--required` option.
 function positional-arg {
     local optCall=''
     local optDefault=''
@@ -274,7 +227,7 @@ function positional-arg {
     local optRequired=0
     local optVar=''
     local args=("$@")
-    _argproc_janky-args call default filter required var \
+    _argproc_janky-args call default enum filter required var \
     || return 1
 
     local specName=''
@@ -287,7 +240,7 @@ function positional-arg {
     fi
 
     _argproc_define-value-required-arg \
-        "${specName}" "${optCall}" "${optVar}" "${optFilter}"
+        "${specName}" "${optFilter}" "${optCall}" "${optVar}"
 
     if (( optRequired )); then
         _argproc_add-required-arg-postcheck "${specName}"
@@ -403,14 +356,13 @@ function require-exactly-one-arg-of {
 
 # Declares a "rest" argument, which gets all the otherwise-untaken positional
 # arguments, during parsing. If this is not declared, argument processing will
-# report an error in the presence of any "rest" arguments. This definer also
-# accepts the `--filter` option; the filter runs on each argument individually.
+# report an error in the presence of any "rest" arguments.
 function rest-arg {
     local optCall=''
     local optFilter=''
     local optVar=''
     local args=("$@")
-    _argproc_janky-args call filter var \
+    _argproc_janky-args call enum filter var \
     || return 1
 
     local specName=''
@@ -541,17 +493,18 @@ function _argproc_define-no-value-arg {
     fi
 
     local longName="$1"
-    local callFunc="$2"
-    local varName="$3"
-    local abbrevChar="$4"
-    local value="$5"
+    local filter="$2"
+    local callFunc="$3"
+    local varName="$4"
+    local abbrevChar="$5"
+    local value="$6"
 
     _argproc_set-arg-description "${longName}" option || return 1
 
     local desc="$(_argproc_arg-description "${longName}")"
     local handlerName="_argproc:long-${longName}"
     local handlerBody="$(
-        _argproc_handler-body "${longName}" "${desc}" '' "${callFunc}" "${varName}"
+        _argproc_handler-body "${longName}" "${desc}" "${filter}" "${callFunc}" "${varName}"
     )"
 
     value="$(_argproc_quote "${value}")"
@@ -579,9 +532,9 @@ function _argproc_define-value-required-arg {
     fi
 
     local longName="$1"
-    local callFunc="$2"
-    local varName="$3"
-    local filter="$4"
+    local filter="$2"
+    local callFunc="$3"
+    local varName="$4"
 
     local handlerName
     if (( isOption )); then
@@ -721,6 +674,20 @@ function _argproc_janky-args {
                     [[ ${value} =~ ^=(.*)$ ]] \
                     && optDefault="${BASH_REMATCH[1]}" \
                     || argError=1
+                    ;;
+                enum)
+                    if [[ ${value} =~ ^=(' '*([-_a-zA-Z0-9]+' '*)+)$ ]]; then
+                        # Re-form as a filter expression.
+                        optFilter=''
+                        while [[ ${value} =~ ([-_a-zA-Z0-9]+)' '*(.*)$ ]]; do
+                            optFilter+="|${BASH_REMATCH[1]}"
+                            value="${BASH_REMATCH[2]}"
+                        done
+                        # `:1` to drop the initial `|`.
+                        optFilter="/^(${optFilter:1})\$/"
+                    else
+                        argError=1
+                    fi
                     ;;
                 filter)
                     [[ ${value} =~ ^=(/.*/|[_a-zA-Z][-_:a-zA-Z0-9]*)$ ]] \

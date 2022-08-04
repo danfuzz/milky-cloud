@@ -76,7 +76,7 @@ opt-value --var=name --filter='/./' name
 opt-value --required --var=port --filter='/^([0-9]+|all)$/' port
 
 # Protocol of the rule.
-opt-enum --required --var=protocol protocol :: all tcp udp
+opt-value --required --var=protocol --enum='all tcp udp' protocol
 
 # Quiet?
 opt-toggle --var=quiet quiet

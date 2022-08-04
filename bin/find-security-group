@@ -48,7 +48,7 @@ opt-action --call=usage help/h=0
 opt-value --required --var=region --filter=region-from-location loc
 
 # Output style.
-opt-enum --var=outputStyle --default=id output :: compact id json
+opt-value --var=outputStyle --default=id --enum='compact id json' output
 
 # Name or ID to look up.
 positional-arg --required --var=nameOrId name-or-id
