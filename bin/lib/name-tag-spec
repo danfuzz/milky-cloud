@@ -42,7 +42,7 @@ function usage {
 opt-action --call=usage help/h=0
 
 # Output style.
-opt-enum --var=outputStyle --default=json output :: compact json
+opt-value --var=outputStyle --default=json --enum='compact json' output
 
 # Resource type.
 positional-arg --required --var=resourceType --filter='/^[-a-z0-9]+$/' resource-type

@@ -48,7 +48,7 @@ function usage {
 opt-action --call=usage help/h=0
 
 # Output style.
-opt-enum --var=outputStyle --default=json output :: compact json lines raw words
+opt-value --var=outputStyle --default=json --enum='compact json lines raw words' output
 
 # Value to operate on.
 positional-arg --required --var=value value
