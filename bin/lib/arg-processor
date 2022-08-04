@@ -625,13 +625,18 @@ function _argproc_handler-body {
     local result=()
 
     if [[ ${filter} =~ ^/(.*)/$ ]]; then
-        # Add a statement which performs the regex check.
+        # Add a loop to perform the regex check on each argument.
         filter="${BASH_REMATCH[1]}"
         result+=(
-            'if ! [[ $1 =~ '"${filter}"' ]]; then
-                echo 1>&2 "Invalid value for '"${desc}"': $1"
-                return 1
-            fi'
+            "$(printf '
+                local _argproc_value
+                for _argproc_value in "$@"; do
+                    if ! [[ $1 =~ %s ]]; then
+                        echo 1>&2 "Invalid value for %s: ${_argproc_value}"
+                        return 1
+                    fi
+                done' \
+                "${filter}" "${desc}")"
         )
     elif [[ ${filter} =~ ^\{(.*)\}$ ]]; then
         # Add a compound statement for the code block.
@@ -639,26 +644,27 @@ function _argproc_handler-body {
             "$(printf '{\n%s\n} || return "$?"\n' "${BASH_REMATCH[1]}")"
         )
     elif [[ ${filter} != '' ]]; then
-        # Add a call to the filter function. Note: We can't do `set "$(...)"` or
-        # assign in the `local` statement, because either of those will swallow
-        # a failure from the call.
+        # Add a loop to call the filter function on each argument.
         result+=(
             "$(printf '
-                local _argproc_value; _argproc_value="$(%s "$1")" || return 1
-                set "${_argproc_value}"' \
+                local _argproc_value _argproc_args=()
+                for _argproc_value in "$@"; do
+                    _argproc_args+=("$(%s "${_argproc_value}")") || return 1
+                done
+                set "${_argproc_args[@]}"' \
                 "${filter}")"
         )
     fi
 
     if [[ ${callFunc} != '' ]]; then
         result+=(
-            "$(printf '%s "$1" || return "$?"' "${callFunc}")"
+            "$(printf '%s "$@" || return "$?"' "${callFunc}")"
         )
     fi
 
     if [[ ${varName} != '' ]]; then
         result+=(
-            "$(printf '%s="$1"' "${varName}")"
+            "$(printf '%s=("$@")' "${varName}")"
         )
     fi
 
@@ -679,7 +685,7 @@ function _argproc_handler-body {
 # if `--multi-arg` is passed to this function, in which case there must be at
 # least one.
 function _argproc_janky-args {
-    multiArg=0
+    local multiArg=0
     if [[ $1 == '--multi-arg' ]]; then
         multiArg=1
         shift
