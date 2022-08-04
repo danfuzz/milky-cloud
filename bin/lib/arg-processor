@@ -625,7 +625,7 @@ function _argproc_handler-body {
             "$(printf '
                 local _argproc_value
                 for _argproc_value in "$@"; do
-                    if ! [[ $1 =~ %s ]]; then
+                    if ! [[ ${_argproc_value} =~ %s ]]; then
                         echo 1>&2 "Invalid value for %s: ${_argproc_value}"
                         return 1
                     fi
