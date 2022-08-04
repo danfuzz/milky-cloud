@@ -647,7 +647,7 @@ function _argproc_handler-body {
                 for _argproc_value in "$@"; do
                     _argproc_args+=("$(%s "${_argproc_value}")") || return 1
                 done
-                set "${_argproc_args[@]}"' \
+                set -- "${_argproc_args[@]}"' \
                 "${filter}")"
         )
     fi
