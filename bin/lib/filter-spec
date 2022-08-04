@@ -51,7 +51,7 @@ opt-action --call=usage help/h=0
 filterNames=()
 filterValues=()
 
-rest-arg --call=parse-specs
+rest-arg --call=parse-specs specs
 function parse-specs {
     local arg
 

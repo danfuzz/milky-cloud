@@ -20,9 +20,8 @@ function usage {
     print-usage $'
     Usage:
 
-    ${name} <cmd> <subcommand> [<opt> ...] [--] [<assignment> ...]
-      [<jq-expression> ...]
-      [:: [<out-opt> ...] [<assignment> ...] <jq-expression> ...]
+    ${name} <cmd> <subcommand> [<opt> ...] [--] [<jval-expr> ...]
+      [:: [<out-opt> ...] [<jval-expr> ...]
 
     Makes an AWS call with a JSON value constructed with `json-val`, and
     with successful result optionally post-processed through `json-val`.
@@ -97,7 +96,7 @@ argConstructor=()
 # post-processing.
 resultConstructor=()
 
-rest-arg --call=parse-rest
+rest-arg --call=parse-rest jval-exprs
 function parse-rest {
     local error=0
     local arg

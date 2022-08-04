@@ -20,8 +20,7 @@ function usage {
     print-usage $'
     Usage:
 
-    ${name} [<opt> ...] [--] <json-value> [<assignment> ...] [--]
-    [<jq-expression> ...]
+    ${name} [<opt> ...] [--] <json-value> [<jval-expr> ...]
       Performs an operation on a single JSON value (at least with typical
       usage). More specifically, <json-value> is used as the sole input to
       a `json-val` invocation consisting of the rest of the arguments. If
@@ -55,7 +54,7 @@ opt-enum --var=outputStyle --default=json output :: compact json lines raw words
 positional-arg --required --var=value value
 
 # Expressions to operate on the value.
-rest-arg --var=exprArgs
+rest-arg --var=exprArgs jval-exprs
 
 process-args "$@" || usage "$?"
 
