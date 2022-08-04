@@ -348,11 +348,6 @@ function print-usage {
 # Processes all of the given arguments, according to the configured handlers.
 # Returns non-zero if there is trouble parsing options or if any handler returns
 # non-zero.
-#
-# Note: In addition to handlers defined by `opt-switch`, and `opt-value`, the
-# handler `arg-rest`, if defined, is called with all arguments that remain after
-# option processing. If not defined, it is considered an error to pass any
-# non-option arguments.
 function process-args {
     local _argproc_error=0
     local _argproc_s
