@@ -75,7 +75,7 @@ azList=($(lib list-availability-zones --loc="${region}")) \
 || exit "$?"
 
 # Get all the VPC info.
-vpcInfo="$(lib find-vpc --loc="${region}" --print-all "${vpcNameOrId}")" \
+vpcInfo="$(lib find-vpc --loc="${region}" --output=json "${vpcNameOrId}")" \
 || exit "$?"
 
 vpcId="$(jget --output=raw "${vpcInfo}" '.VpcId')"

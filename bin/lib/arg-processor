@@ -20,17 +20,21 @@
 # `<value>` are always optional and (independently) sometimes prohibited,
 # depending on the definition function.
 #
-# The public argument-defining functions also all take two options,
-# `--call=<name>` and `--var=<name>`, at least one of which must be passed.
-# `--call` specifies a function to be called when parsing an argument, and
-# `--var` specifies a variable to set. If both are used, then the call is made
-# first, and the variable is only set if the call returns successfully. The
-# variable, if specified, is always initialized to a default value, which is
-# itself optionally specified via `--default=<value>`. If `--default` isn't
-# used, then the default-for-the-default depends on the specific function.
+# The public argument-defining functions also all take two options, of which at
+# least one must be used to define any argument:
+# * `--call=<name>` or `--call={<code>}` -- Calls the named function passing it
+#   the argument value(s), or runs the indicated code snippet. If the call
+#   fails, the argument is rejected. In the snippet form, normal positional
+#   parameter references (`$1` `$@` `set <value>` etc.) are available.
+# * `--var=<name>` -- Sets the named variable to the argument value(s). If both
+#   this and `--call` are used, the call is made first and the variable is only
+#   set if the call succeeds. The variable is always initialized to a default
+#   value, which is itself optionally specified via `--default=<value>`. If
+#   `--default` isn't used (or isn't available), then the default-for-the-
+#   default depends on the specific function.
 #
 # Definers for value-accepting arguments take an option `--filter=<spec>`, which
-# can take three possible forms:
+# can take two possible forms:
 # * `/<regex>/` -- A regular expression to match against the value. If there is
 #   no match, then the argument isn't accepted.
 # * `<name>` -- The name of a function to call, passed the value as a single
@@ -38,10 +42,6 @@
 #   function succeeds, then its output becomes the argument value. Note: The
 #   filter function runs in a subshell, and as such it cannot be used to affect
 #   the global environment of the main script.
-# * `{<code>}` -- A snippet of code to run, in which `$1` is the argument value.
-#   Relatedly, the argument value can be replaced with `set <value>`. If the
-#   code fails (that is, the final command returns a non-zero exit status), then
-#   the argument isn't accepted.
 #
 # Some argument-definers also accept `--required`, to indicate that the argument
 # or option is required (mandatory).
@@ -348,11 +348,6 @@ function print-usage {
 # Processes all of the given arguments, according to the configured handlers.
 # Returns non-zero if there is trouble parsing options or if any handler returns
 # non-zero.
-#
-# Note: In addition to handlers defined by `opt-switch`, and `opt-value`, the
-# handler `arg-rest`, if defined, is called with all arguments that remain after
-# option processing. If not defined, it is considered an error to pass any
-# non-option arguments.
 function process-args {
     local _argproc_error=0
     local _argproc_s
@@ -408,35 +403,34 @@ function require-exactly-one-arg-of {
 
 # Declares a "rest" argument, which gets all the otherwise-untaken positional
 # arguments, during parsing. If this is not declared, argument processing will
-# report an error in the presence of any "rest" arguments.
+# report an error in the presence of any "rest" arguments. This definer also
+# accepts the `--filter` option; the filter runs on each argument individually.
 function rest-arg {
     local optCall=''
+    local optFilter=''
     local optVar=''
     local args=("$@")
-    _argproc_janky-args call var \
+    _argproc_janky-args call filter var \
     || return 1
 
     local specName=''
     _argproc_parse-spec "${args[0]}" \
     || return 1
 
-    if [[ ${optCall} != '' ]]; then
-        # Re-form as the caller code.
-        optCall="${optCall}"' "$@" || return "$?"'
+    if [[ ${optVar} != '' ]]; then
+        # Set up the default initializer.
+        _argproc_initStatements+=("${optVar}=()")
     fi
 
-    if [[ ${optVar} != '' ]]; then
-        # Set up the default initializer, and then re-form as the setter code.
-        _argproc_initStatements+=("${optVar}=()")
-        optVar="${optVar}"'=("$@")'
-    fi
+    _argproc_set-arg-description "${longName}" argument || return 1
+
+    local desc="argument <${specName}>"
+    local handlerBody="$(
+        _argproc_handler-body "${specName}" "${desc}" "${optFilter}" "${optCall}" "${optVar}"
+    )"
 
     eval 'function _argproc:rest {
-        '"${optCall}"'
-        '"${optVar}"'
-        if (( $# > 0 )); then
-            _argproc_receivedArgNames+="<'"${specName}"'>"
-        fi
+        '"${handlerBody}"'
     }'
 }
 
@@ -552,30 +546,23 @@ function _argproc_define-no-value-arg {
     local abbrevChar="$4"
     local value="$5"
 
+    _argproc_set-arg-description "${longName}" option || return 1
+
+    local desc="option --${longName}"
+    local handlerName="_argproc:long-${longName}"
+    local handlerBody="$(
+        _argproc_handler-body "${longName}" "${desc}" '' "${callFunc}" "${varName}"
+    )"
+
     value="$(_argproc_quote "${value}")"
 
-    _argproc_set-arg-description "${longName}" option \
-    || return 1
-
-    if [[ ${callFunc} != '' ]]; then
-        # Re-form as the caller code.
-        callFunc="${callFunc} ${value}"' || return "$?"'
-    fi
-
-    if [[ ${varName} != '' ]]; then
-        # Re-form as the setter code.
-        varName="${varName}=${value}"
-    fi
-
-    eval 'function _argproc:long-'"${longName}"' {
+    eval 'function '"${handlerName}"' {
         if (( $# > 0 )); then
             echo 1>&2 "Value not allowed for option --'"${longName}"'."
             return 1
         fi
-
-        '"${callFunc}"'
-        '"${varName}"'
-        _argproc_receivedArgNames+="<'"${longName}"'>"
+        set '"${value}"'
+        '"${handlerBody}"'
     }'
 
     if [[ ${abbrevChar} != '' ]]; then
@@ -607,52 +594,81 @@ function _argproc_define-value-required-arg {
         handlerName="_argproc:positional-${longName}"
     fi
 
-    if [[ ${callFunc} != '' ]]; then
-        # Re-form as the caller code.
-        callFunc="${callFunc}"' "$1" || return "$?"'
-    fi
-
-    if [[ ${varName} != '' ]]; then
-        # Re-form as the setter code.
-        varName="${varName}"'="$1"'
-    fi
-
-    if [[ ${filter} =~ ^/(.*)/$ ]]; then
-        # Re-form `filter` as the statement which performs the regex check.
-        filter="${BASH_REMATCH[1]}"
-        filter='
-            if ! [[ $1 =~ '"${filter}"' ]]; then
-                echo 1>&2 "Invalid value for '"${desc}"': ${_argproc_value}"
-                return 1
-            fi'
-    elif [[ ${filter} =~ ^\{(.*)\}$ ]]; then
-        # Re-form `filter` as the code block to run.
-        filter="$(printf '{\n%s\n} || return "$?"\n' "${BASH_REMATCH[1]}")"
-    elif [[ ${filter} != '' ]]; then
-        # Re-form `filter` as the call to the filter function. Note: We can't
-        # do `set "$(...)"` or assign on the `local` line, because either of
-        # those will swallow a failure from the call.
-        filter="$(printf '
-            local _argproc_value
-            _argproc_value="$(%s "$1")" || return 1
-            set "${_argproc_value}"
-            ' "${filter}")"
-    fi
+    local handlerBody="$(
+        _argproc_handler-body "${longName}" "${desc}" "${filter}" "${callFunc}" "${varName}"
+    )"
 
     eval 'function '"${handlerName}"' {
         if (( $# < 1 )); then
             echo 1>&2 "Value required for '"${desc}"'."
             return 1
         fi
-        '"${filter}"'
-        '"${callFunc}"'
-        '"${varName}"'
-        _argproc_receivedArgNames+="<'"${longName}"'>"
+        '"${handlerBody}"'
     }'
 
     if [[ ${abbrevChar} != '' ]]; then
         _argproc_define-abbrev "${abbrevChar}" "${longName}"
     fi
+}
+
+# Produce an argument handler body, from the given components.
+function _argproc_handler-body {
+    local longName="$1"
+    local desc="$2"
+    local filter="$3"
+    local callFunc="$4"
+    local varName="$5"
+    local result=()
+
+    if [[ ${filter} =~ ^/(.*)/$ ]]; then
+        # Add a loop to perform the regex check on each argument.
+        filter="${BASH_REMATCH[1]}"
+        result+=(
+            "$(printf '
+                local _argproc_value
+                for _argproc_value in "$@"; do
+                    if ! [[ ${_argproc_value} =~ %s ]]; then
+                        echo 1>&2 "Invalid value for %s: ${_argproc_value}"
+                        return 1
+                    fi
+                done' \
+                "${filter}" "${desc}")"
+        )
+    elif [[ ${filter} != '' ]]; then
+        # Add a loop to call the filter function on each argument.
+        result+=(
+            "$(printf '
+                local _argproc_value _argproc_args=()
+                for _argproc_value in "$@"; do
+                    _argproc_args+=("$(%s "${_argproc_value}")") || return 1
+                done
+                set -- "${_argproc_args[@]}"' \
+                "${filter}")"
+        )
+    fi
+
+    if [[ ${callFunc} =~ ^\{(.*)\}$ ]]; then
+        # Add a compound statement for the code block.
+        result+=(
+            "$(printf '{\n%s\n} || return "$?"\n' "${BASH_REMATCH[1]}")"
+        )
+    elif [[ ${callFunc} != '' ]]; then
+        result+=(
+            "$(printf '%s "$@" || return "$?"' "${callFunc}")"
+        )
+    fi
+
+    if [[ ${varName} != '' ]]; then
+        result+=(
+            "$(printf '%s=("$@")' "${varName}")"
+        )
+    fi
+
+    result+=(
+        "$(printf '_argproc_receivedArgNames+="<%s>"' "${longName}")"
+    )
+
+    printf '%s\n' "${result[@]}"
 }
 
 # Janky yet reasonable argument parser for the commands in this library. (How
@@ -665,7 +681,7 @@ function _argproc_define-value-required-arg {
 # if `--multi-arg` is passed to this function, in which case there must be at
 # least one.
 function _argproc_janky-args {
-    multiArg=0
+    local multiArg=0
     if [[ $1 == '--multi-arg' ]]; then
         multiArg=1
         shift
@@ -698,7 +714,7 @@ function _argproc_janky-args {
 
             case "${name}" in
                 call)
-                    [[ ${value} =~ ^=([_a-zA-Z][-_:a-zA-Z0-9]*)$ ]] \
+                    [[ ${value} =~ ^=(\{.*\}|[_a-zA-Z][-_:a-zA-Z0-9]*)$ ]] \
                     && optCall="${BASH_REMATCH[1]}" \
                     || argError=1
                     ;;
@@ -708,7 +724,7 @@ function _argproc_janky-args {
                     || argError=1
                     ;;
                 filter)
-                    [[ ${value} =~ ^=(/.*/|\{.*\}|[_a-zA-Z][-_:a-zA-Z0-9]*)$ ]] \
+                    [[ ${value} =~ ^=(/.*/|[_a-zA-Z][-_:a-zA-Z0-9]*)$ ]] \
                     && optFilter="${BASH_REMATCH[1]}" \
                     || argError=1
                     ;;
