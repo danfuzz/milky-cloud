@@ -420,23 +420,17 @@ function rest-arg {
     _argproc_parse-spec "${args[0]}" \
     || return 1
 
-    if [[ ${optCall} != '' ]]; then
-        # Re-form as the caller code.
-        optCall="${optCall}"' "$@" || return "$?"'
+    if [[ ${optVar} != '' ]]; then
+        # Set up the default initializer.
+        _argproc_initStatements+=("${optVar}=()")
     fi
 
-    if [[ ${optVar} != '' ]]; then
-        # Set up the default initializer, and then re-form as the setter code.
-        _argproc_initStatements+=("${optVar}=()")
-        optVar="${optVar}"'=("$@")'
-    fi
+    local handlerBody="$(
+        _argproc_handler-body "${specName}" '' "${optCall}" "${optVar}"
+    )"
 
     eval 'function _argproc:rest {
-        '"${optCall}"'
-        '"${optVar}"'
-        if (( $# > 0 )); then
-            _argproc_receivedArgNames+="<'"${specName}"'>"
-        fi
+        '"${handlerBody}"'
     }'
 }
 
