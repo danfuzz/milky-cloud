@@ -30,8 +30,8 @@ function usage {
         What region to make the gateway in. Must be specified. If specified as an
         availability zone, only the region portion matters.
       --name=<name>
-        Name to assign to the constructed gateway. If not specified, a
-        name is derived from the associated VPC.
+        Name to assign to the constructed gateway. If not specified, a name is
+        derived from the associated VPC.
       --progress (--no-progress to disable)
         Print progress messages to stderr.
       --vpc=<name-or-id>
