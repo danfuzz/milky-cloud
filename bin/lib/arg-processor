@@ -408,12 +408,14 @@ function require-exactly-one-arg-of {
 
 # Declares a "rest" argument, which gets all the otherwise-untaken positional
 # arguments, during parsing. If this is not declared, argument processing will
-# report an error in the presence of any "rest" arguments.
+# report an error in the presence of any "rest" arguments. This definer also
+# accepts the `--filter` option; the filter runs on each argument individually.
 function rest-arg {
     local optCall=''
+    local optFilter=''
     local optVar=''
     local args=("$@")
-    _argproc_janky-args call var \
+    _argproc_janky-args call filter var \
     || return 1
 
     local specName=''
@@ -425,8 +427,11 @@ function rest-arg {
         _argproc_initStatements+=("${optVar}=()")
     fi
 
+    _argproc_set-arg-description "${longName}" argument || return 1
+
+    local desc="argument <${specName}>"
     local handlerBody="$(
-        _argproc_handler-body "${specName}" '' "${optCall}" "${optVar}"
+        _argproc_handler-body "${specName}" "${desc}" "${optFilter}" "${optCall}" "${optVar}"
     )"
 
     eval 'function _argproc:rest {
@@ -548,9 +553,10 @@ function _argproc_define-no-value-arg {
 
     _argproc_set-arg-description "${longName}" option || return 1
 
+    local desc="option --${longName}"
     local handlerName="_argproc:long-${longName}"
     local handlerBody="$(
-        _argproc_handler-body "${longName}" '' "${callFunc}" "${varName}"
+        _argproc_handler-body "${longName}" "${desc}" '' "${callFunc}" "${varName}"
     )"
 
     value="$(_argproc_quote "${value}")"
@@ -594,7 +600,7 @@ function _argproc_define-value-required-arg {
     fi
 
     local handlerBody="$(
-        _argproc_handler-body "${longName}" "${filter}" "${callFunc}" "${varName}"
+        _argproc_handler-body "${longName}" "${desc}" "${filter}" "${callFunc}" "${varName}"
     )"
 
     eval 'function '"${handlerName}"' {
@@ -613,9 +619,10 @@ function _argproc_define-value-required-arg {
 # Produce an argument handler body, from the given components.
 function _argproc_handler-body {
     local longName="$1"
-    local filter="$2"
-    local callFunc="$3"
-    local varName="$4"
+    local desc="$2"
+    local filter="$3"
+    local callFunc="$4"
+    local varName="$5"
     local result=()
 
     if [[ ${filter} =~ ^/(.*)/$ ]]; then
