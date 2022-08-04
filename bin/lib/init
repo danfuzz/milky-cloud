@@ -56,7 +56,7 @@ function parse-zone {
 
 # Calls `lib parse-location --print-region`.
 function region-from-location {
-    lib parse-location --print-region "$@"
+    lib parse-location --output=region "$@"
 }
 
 

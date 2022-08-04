@@ -21,23 +21,21 @@ function usage {
     Usage:
 
     ${name} [<opt> ...] <zone-or-region>
-      Parses a location -- a region or availability zone -- and if
-      valid then optionally prints out one of the components.
+      Parses a location -- a region or availability zone -- and if valid then
+      optionally prints out one of the components.
 
       --input=<style>
         `any` -- Accept either an availability zone or region as <zone-or-region>.
+          This is the default.
         `region` -- Require a region.
         `zone` -- Require an availability zone.
-      --print-none
-        Do not print anything. This is the default.
-      --print-region
-        Print the parsed region.
-      --print-zone
-        Print the full zone (which will be the same as the input). Implies
-        `--input-zone`.
-      --print-zone-suffix
-        Print the zone suffix (everything after the region). This implies
-        `--input=zone`.
+      --output=<style>
+        `none` -- Do not produce any output. This is the default.
+        `region` -- Output the region.
+        `zone` -- Output the availability zone (which will be the same as the
+          input). This implies `--input=zone`.
+        `zone-suffix` -- Output the zone suffix (everything after the region).
+          This implies `--input=zone`.
 
     ${name} [--help | -h]
       Displays this message.
@@ -52,9 +50,8 @@ opt-action --call=usage help/h=0
 # Input type.
 opt-enum --var=inputType --default=any input :: any region zone
 
-# Item to print.
-opt-choice --var=printItem --default=print-none \
-    print-none print-region print-zone print-zone-suffix
+# Item to output
+opt-enum --var=outputItem --default=none output :: none region zone zone-suffix
 
 # Location to parse, and parsed bits.
 region=''
@@ -72,7 +69,7 @@ function parse-zone-or-region {
 
 process-args "$@" || usage "$?"
 
-if [[ ${printItem} =~ ^print-zone ]]; then
+if [[ ${outputItem} =~ ^zone ]]; then
     # Don't allow region input if we are to print a zone-ish thing.
     inputType='zone'
 fi
@@ -99,14 +96,14 @@ case "${inputType}" in
 esac
 
 # Output whatever is requested, if anything.
-case "${printItem}" in
-    print-region)
+case "${outputItem}" in
+    region)
         echo "${region}"
         ;;
-    print-zone)
+    zone)
         echo "${zoneOrRegion}"
         ;;
-    print-zone-suffix)
+    zone-suffix)
         echo "${zoneSuffix}"
         ;;
 esac
