@@ -91,7 +91,7 @@ function figure-out-name {
 #
 
 # Validate the VPC name/id and get its info, extracting a couple useful bits.
-vpcInfo="$(lib find-vpc --print-all --loc="${region}" "${vpcNameOrId}")" \
+vpcInfo="$(lib find-vpc --output=json --loc="${region}" "${vpcNameOrId}")" \
 || exit "$?"
 
 vpcId="$(jget --output=raw "${vpcInfo}" '.VpcId')"
