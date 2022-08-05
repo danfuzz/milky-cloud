@@ -24,6 +24,8 @@ function usage {
         availability zone, only the region portion matters.
       --name=<name>
         Name to assign to the constructed VPC. Must be specified.
+      --progress
+        Print progress messages to stderr.
 
     ${name} [--help | -h]
       Displays this message.
@@ -40,6 +42,9 @@ opt-value --required --var=region --filter=region-from-location loc
 
 # Name for the resulting VPC.
 opt-value --required --var=name --filter='/^[-_a-zA-Z0-9]+$/' name
+
+# Progress messages?
+opt-toggle --call=progress-msg-switch progress
 
 process-args "$@" || usage "$?"
 
@@ -76,7 +81,7 @@ function make-vpc-per-se {
             || return "$?"
 
             vpcId="$(jget --output=raw "${vpcInfo}" '.VpcId')"
-            error-msg "Made VPC: ${vpcId}"
+            progress-msg "Made VPC: ${vpcId}"
         else
             # Re-fetch the VPC info.
             vpcInfo="$(ec2-json describe-vpcs \
@@ -126,7 +131,7 @@ function make-vpc-per-se {
             sleep 0.1
             waitSec=1
         else
-            error-msg 'Not yet ready...'
+            progress-msg 'Not yet ready...'
             sleep "${waitSec}"
             (( waitSec = waitSec * 3 / 2 + 1 ))
         fi
@@ -155,9 +160,9 @@ vpcId="$(jget --output=raw "${vpcInfo}" '.VpcId')"
 cidr4="$(jget --output=raw "${vpcInfo}" '.CidrBlockAssociationSet[0].CidrBlock')"
 cidr6="$(jget --output=raw "${vpcInfo}" '.Ipv6CidrBlockAssociationSet[0].Ipv6CidrBlock')"
 
-error-msg 'Networks:'
-error-msg "  IPv4: ${cidr4}"
-error-msg "  IPv6: ${cidr6}"
+progress-msg 'Networks:'
+progress-msg "  IPv4: ${cidr4}"
+progress-msg "  IPv6: ${cidr6}"
 
 # After this point, in case of error, we try to clean things up by removing the
 # VPC and all its interconnected dependencies.
@@ -206,7 +211,7 @@ fi
 # Do cleanup if necessary.
 
 if (( error )); then
-    error-msg 'Error(s) after VPC creation. Attempting cleanup!'
+    progress-msg 'Error(s) after VPC creation. Attempting cleanup!'
 
     if (( gatewayAdded )); then
         error-msg 'Deleting internet gateway...'
