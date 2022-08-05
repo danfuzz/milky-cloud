@@ -179,7 +179,7 @@ function opt-toggle {
 
     # Extra filter on the positive option, so it can take a value.
     _argproc_define-value-taking-arg --option "${specName}" \
-        '=1' "/^[01]$/\n${optFilter}" "${optCall}" "${optVar}" \
+        '=1' $'/^[01]$/\n'"${optFilter}" "${optCall}" "${optVar}" \
     _argproc_define-no-value-arg --option "no-${specName}" \
         '0' "${optFilter}" "${optCall}" "${optVar}" ''
 
@@ -591,7 +591,7 @@ function _argproc_handler-body {
     local varName="$5"
     local result=()
 
-    while [[ ${filters} =~ ^$'\n'*([^$'\n']*)'\n'*(.*)$ ]]; do
+    while [[ ${filters} =~ ^$'\n'*([^$'\n']+)(.*)$ ]]; do
         local f="${BASH_REMATCH[1]}"
         filters="${BASH_REMATCH[2]}"
         if [[ ${f} =~ ^/(.*)/$ ]]; then
