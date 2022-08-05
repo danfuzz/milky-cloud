@@ -89,12 +89,12 @@ opt-value --var=vpcNameOrId --filter='/./' vpc
 process-args "$@" || usage "$?"
 
 if [[ (${userData} != '') && (${userDataFile} != '') ]]; then
-    echo 1>&2 'Cannot specify both --user-data and --user-data-file.'
+    error-msg 'Cannot specify both --user-data and --user-data-file.'
     exit 1
 fi
 
 if [[ (${groupNameOrId} != '') && (${vpc} != '') ]]; then
-    echo 1>&2 'Cannot specify both --security-group and --vpc.'
+    error-msg 'Cannot specify both --security-group and --vpc.'
     exit 1
 fi
 
@@ -152,7 +152,7 @@ fi
 
 # Form the main command, and do it!
 
-echo 1>&2 'Launching...'
+error-msg 'Launching...'
 
 # Note: If a subnet ID is known, then it implies the availability zone, in which
 # case one doesn't also need to specify the availability zone explicitly.
@@ -199,6 +199,6 @@ result="$(ec2-json run-instances \
 )" \
 || exit "$?"
 
-echo 1>&2 'Launched!'
+error-msg 'Launched!'
 
 jget "${result}" '.'

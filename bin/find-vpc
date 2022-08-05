@@ -88,12 +88,12 @@ function do-find {
 
     case "${vpcId}" in
         ambiguous)
-            echo 1>&2 'Ambiguous name or ID matches all of:'
+            error-msg 'Ambiguous name or ID matches all of:'
             jget 1>&2 --output=raw "${idResult}" '.[] | "  " + .'
             return 1
             ;;
         none)
-            echo 1>&2 'No such VPC.'
+            error-msg 'No such VPC.'
             return 1
             ;;
     esac

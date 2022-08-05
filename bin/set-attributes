@@ -60,7 +60,7 @@ function parse-rest {
         arg="$1"
 
         if ! [[ ${arg} =~ ^([-_:.a-zA-Z0-9]+)=(.*)$ ]]; then
-            echo 1>&2 "Invalid assignment: ${arg}"
+            error-msg "Invalid assignment: ${arg}"
             return 1
         fi
 
@@ -71,7 +71,7 @@ function parse-rest {
     done
 
     if (( ${#assignNames[@]} == 0 )); then
-        echo 1>&2 'Missing assignment(s).'
+        error-msg 'Missing assignment(s).'
         return 1
     fi
 }
@@ -84,7 +84,7 @@ process-args "$@" || usage "$?"
 #
 
 if ! [[ ${id} =~ ^([a-z]+)-([a-f0-9]+)$ ]]; then
-    echo 1>&2 "Unparseable ID: ${id}"
+    error-msg "Unparseable ID: ${id}"
     exit 1
 fi
 
@@ -104,7 +104,7 @@ case "${idType}" in
         idArg='VpcId'
         ;;
     *)
-        echo 1>&2 "Cannot work with type: ${idType}"
+        error-msg "Cannot work with type: ${idType}"
         exit 1
         ;;
 esac
@@ -168,17 +168,17 @@ for (( n = 0; n < ${#assignNames[@]}; n++ )); do
             || jsonError=1
             ;;
         missing)
-            echo 1>&2 "No such attribute: ${name}"
+            error-msg "No such attribute: ${name}"
             error=1
             ;;
         *)
-            echo 1>&2 "Unhandled attribute: ${name}"
+            error-msg "Unhandled attribute: ${name}"
             error=1
             ;;
     esac
 
     if (( jsonError )); then
-        echo 1>&2 "Unparseable value for attribute: ${name}"
+        error-msg "Unparseable value for attribute: ${name}"
         error=1
     else
         assignValues[${n}]="${value}"
@@ -205,7 +205,7 @@ for (( n = 0; n < ${#assignNames[@]} && !error; n++ )); do
 done
 
 if (( error )); then
-    echo 1>&2 'Could not set all attributes.'
+    error-msg 'Could not set all attributes.'
     exit 1
 fi
 

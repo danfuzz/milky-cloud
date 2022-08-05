@@ -148,7 +148,7 @@ ec2-json delete-internet-gateway \
 || error=1
 
 if (( error )); then
-    echo 1>&2 'Trouble with gateway deletion. May not be fully deleted. Alas!'
+    error-msg 'Trouble with gateway deletion. May not be fully deleted. Alas!'
 else
     progress-msg 'Done with gateway deletion.'
 fi

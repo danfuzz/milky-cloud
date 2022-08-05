@@ -86,10 +86,10 @@ ec2-json describe-security-groups \
 count="$(jget "${result}" '.count')"
 
 if (( count == 0 )); then
-    echo 1>&2 "No such security group: ${nameOrId}"
+    error-msg "No such security group: ${nameOrId}"
     exit 1
 elif (( count != 1 )); then
-    echo 1>&2 'Ambiguous name or ID matches all of:'
+    error-msg 'Ambiguous name or ID matches all of:'
     jget 1>&2 --output=raw "${result}" '.all[] | "  " + .'
     exit 1
 fi
