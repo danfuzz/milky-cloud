@@ -23,7 +23,7 @@ _milky_cloud_libDir="${_milky_cloud_libDir%/*}"
 if [[ ${_milky_cloud_cmdDir} == ${_milky_cloud_libDir} ]]; then
     _milky_cloud_mainDir="$(cd "${_milky_cloud_libDir}/.."; /bin/pwd)"
 else
-    _milky_cloud_mainDir="${_milky_cloud_cmdDir}"
+    _milky_cloud_mainDir="${_milky_cloud_cmdPath%/*}"
 fi
 
 
