@@ -258,20 +258,15 @@ result="$("${fullCommand[@]}")" \
 # color output when appropriate and to do "raw" output when requested.
 
 if (( ${#resultConstructor[@]} == 0 )); then
+    if [[ ${outputStyle} == 'none' ]]; then
+        # No need to run a nop-filter just to not produce output.
+        exit 0
+    fi
     resultConstructor=('.')
 fi
 
-if [[ ${outputStyle} != 'none' ]]; then
-    jgetOpts=()
-    case "${outputStyle}" in
-        compact|json|raw)
-            jgetOpts+=(--output="${outputStyle}")
-            ;;
-    esac
-
-    jget "${jgetOpts[@]}" -- "${result}" "${resultConstructor[@]}" \
-    || {
-        error-msg 'Trouble filtering result.'
-        exit 1
-    }
-fi
+jget --output="${outputStyle}" -- "${result}" "${resultConstructor[@]}" \
+|| {
+    error-msg 'Trouble filtering result.'
+    exit 1
+}
