@@ -71,12 +71,12 @@ subnetId="$(jget --output=raw "${result}" '
 
 case "${subnetId}" in
     ambiguous)
-        echo 1>&2 'Ambiguous specification matches all of:'
-        jget 1>&2 --output=raw "${result}" '.[] | "  " + .'
+        error-msg 'Ambiguous specification matches all of:'
+        jget --output=raw "${result}" '.[] | "  " + .' | error-msg --read
         exit 1
         ;;
     none)
-        echo 1>&2 'No such subnet.'
+        error-msg 'No such subnet.'
         exit 1
         ;;
 esac

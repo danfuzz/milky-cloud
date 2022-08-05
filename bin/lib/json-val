@@ -164,7 +164,7 @@ for (( i = 0; i < ${#varTypes[@]}; i++ )); do
             jqArgs+=('--arg')
             ;;
         *)
-            echo 1>&2 "Unrecognized variable type: ${varType}"
+            error-msg "Unrecognized variable type: ${varType}"
             exit 1
             ;;
     esac

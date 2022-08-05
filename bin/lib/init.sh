@@ -3,7 +3,7 @@
 # Version 2.0. Details: <http://www.apache.org/licenses/LICENSE-2.0>
 
 if [[ ${_milky_cloud_libDir} != '' ]]; then
-    echo 1>&2 'Warning: Not reinitializing library!'
+    error-msg 'Warning: Not reinitializing library!'
     return 1
 fi
 
@@ -30,6 +30,15 @@ fi
 
 
 #
+# Sibling libararies
+#
+
+. "${_milky_cloud_libDir}/stderr-messages.sh"  # Error and progress messages.
+. "${_milky_cloud_libDir}/arg-processor.sh"    # Argument processor.
+. "${_milky_cloud_libDir}/init-wrappers.sh"    # Simple command wrappers.
+
+
+#
 # Prerequisites checker
 #
 # This is arranged to only do prerequisite checks once per high-level script
@@ -39,20 +48,12 @@ fi
 if [[ ${MILKY_CLOUD_PREREQUISITES_DONE} != 1 ]]; then
     . "${_milky_cloud_libDir}/init-check-prereqs.sh" \
     || {
-        echo 1>&2 'Failed one or more prerequisite checks!'
+        error-msg 'Failed one or more prerequisite checks!'
         return 1
     }
 
     export MILKY_CLOUD_PREREQUISITES_DONE=1
 fi
-
-
-#
-# Sibling libararies
-#
-
-. "${_milky_cloud_libDir}/arg-processor.sh"  # Argument processor.
-. "${_milky_cloud_libDir}/init-wrappers.sh"  # Simple command wrappers.
 
 
 #
@@ -80,7 +81,7 @@ function this-cmd-path {
 # Calls through to an arbitrary library script.
 function lib {
     if (( $# == 0 )); then
-        echo 1>&2 'Missing library script name.'
+        error-msg 'Missing library script name.'
         return 1
     fi
 
@@ -88,7 +89,7 @@ function lib {
     shift
 
     if ! [[ ${name} =~ ^[-a-z]+$ ]]; then
-        echo 1>&2 'Weird script name:' "${name}"
+        error-msg 'Weird script name:' "${name}"
         return 1
     elif [[ -x "${_milky_cloud_libDir}/${name}" ]]; then
         # It's in the internal helper library.
@@ -97,49 +98,7 @@ function lib {
         # It's an exposed script.
         "${_milky_cloud_mainDir}/${name}" "$@"
     else
-        echo 1>&2 'No such library script:' "${name}"
+        error-msg 'No such library script:' "${name}"
         return 1
     fi
-}
-
-# Whether progress messages are enabled.
-_milky_cloud_progressEnabled=0
-
-# Prints a "progress" message to stderr, if such are enabled. Use
-# `progress-msg-switch` to change or check the enabled status of progress
-# messages.
-function progress-msg {
-    if (( _milky_cloud_progressEnabled )); then
-        echo 1>&2 "$@"
-    fi
-}
-
-# Enables, disables, or checks the enabled status of "progress" messages.
-#
-# --disable | 0 -- Disables progress messages.
-# --enable | 1` -- Enables progress messages.
-# --print-option -- Prints `--progress` or `--no-progress` to stdout, reflecting
-#   the enabled status. (This is to make it easy to propagate the progress state
-#   down into another command.)
-# --status -- Prints `1` or `0` to stdout, to indicate enabled status.
-function progress-msg-switch {
-    case "$1" in
-        --enable|1)
-            _milky_cloud_progressEnabled=1
-            ;;
-        --disable|0)
-            _milky_cloud_progressEnabled=0
-            ;;
-        --print-option)
-            (( _milky_cloud_progressEnabled )) \
-            && echo '--progress' \
-            || echo '--no-progress'
-            ;;
-        --status)
-            echo "${_milky_cloud_progressEnabled}"
-            ;;
-        *)
-            echo 1>&2 "Unrecognized argument: $1"
-            return 1
-    esac
 }

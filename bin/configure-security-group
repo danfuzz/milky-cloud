@@ -171,7 +171,7 @@ if (( !error )) && [[ ${name} != '' ]]; then
 fi
 
 if (( error )); then
-    progress-msg 'Error(s) during rule configuration. Alas!'
+    error-msg 'Error(s) during rule configuration. Alas!'
     exit "${error}"
 fi
 

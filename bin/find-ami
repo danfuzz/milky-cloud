@@ -75,7 +75,7 @@ ec2-json describe-instance-type-offerings \
 || exit "$?"
 
 if (( !foundInstanceType )); then
-    echo 1>&2 "No such instance type: ${instanceType} in ${zone}"
+    error-msg "No such instance type: ${instanceType} in ${zone}"
     exit 1
 fi
 
@@ -96,7 +96,7 @@ ec2-json describe-instance-types \
 || exit "$?"
 
 if [[ ${architecture} == 'error' ]]; then
-    echo 1>&2 "Unsupported instance type: ${instanceType} in ${zone}"
+    error-msg "Unsupported instance type: ${instanceType} in ${zone}"
     exit 1
 fi
 

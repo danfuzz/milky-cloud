@@ -84,7 +84,7 @@ cidr4="$(jget --output=raw "${vpcInfo}" '
 ')"
 
 if [[ ${cidr4} == 'many' ]]; then
-    echo 1>&2 'Sorry, not set up to deal with multiple CIDRs (IPv4).'
+    error-msg 'Sorry, not set up to deal with multiple CIDRs (IPv4).'
     exit 1
 fi
 
@@ -98,7 +98,7 @@ cidr6="$(jget --output=raw "${vpcInfo}" '
 ')"
 
 if [[ ${cidr6} == 'many' ]]; then
-    echo 1>&2 'Sorry, not set up to deal with multiple CIDRs (IPv6).'
+    error-msg 'Sorry, not set up to deal with multiple CIDRs (IPv6).'
     exit 1
 fi
 
@@ -186,7 +186,7 @@ done
 
 if (( error )); then
     # Attempt to delete any subnets that had been added.
-    progress-msg 'Problem creating subnets; attempting cleanup...'
+    error-msg 'Problem creating subnets; attempting cleanup...'
 
     for id in "${results[@]}"; do
         progress-msg "Removing subnet: ${id}"

@@ -57,7 +57,7 @@ argError=0
 
 # AWS command and subcommand. These are expected before any dashed options.
 if ! ( (( $# >= 2 )) && [[ $1 =~ ^[a-z] ]] && [[ $2 =~ ^[a-z] ]] ); then
-    echo 1>&2 'Missing AWS command and/or subcommand.'
+    error-msg 'Missing AWS command and/or subcommand.'
     usage 1
 else
     command="$1"
@@ -113,7 +113,7 @@ function parse-rest {
             --output=*)
                 outputStyle="${1#*=}"
                 if ! [[ "${outputStyle}" =~ ^(compact|json|lines|none|raw|words)$ ]]; then
-                    echo 1>&2 "Invalid result output style: ${outputStyle}"
+                    error-msg "Invalid result output style: ${outputStyle}"
                     return 1
                 fi
                 ;;
@@ -123,7 +123,7 @@ function parse-rest {
                 break
                 ;;
             -?*)
-                echo 1>&2 "Unknown result option: $1"
+                error-msg "Unknown result option: $1"
                 return 1
                 ;;
             *)
@@ -180,7 +180,7 @@ jsonArg='{}'
 if (( ${#argConstructor[@]} > 0 )); then
     jsonArg="$(jval --output=compact -- "${argConstructor[@]}")" \
     || {
-        echo 1>&2 'Trouble parsing argument constructor.'
+        error-msg 'Trouble parsing argument constructor.'
         exit 1
     }
 fi
@@ -250,7 +250,7 @@ fi
 
 result="$("${fullCommand[@]}")" \
 || {
-    echo 1>&2 'Trouble running AWS command.'
+    error-msg 'Trouble running AWS command.'
     exit 1
 }
 
@@ -271,7 +271,7 @@ if [[ ${outputStyle} != 'none' ]]; then
 
     jget "${jgetOpts[@]}" -- "${result}" "${resultConstructor[@]}" \
     || {
-        echo 1>&2 'Trouble filtering result.'
+        error-msg 'Trouble filtering result.'
         exit 1
     }
 fi

@@ -71,12 +71,12 @@ process-args "$@" || usage "$?"
 
 if (( ${#filterArgs[@]} == 0 )); then
     if [[ ${simpleFilter} == '' ]]; then
-        echo 1>&2 'Missing filter option or arguments.'
+        error-msg 'Missing filter option or arguments.'
         exit 1
     fi
     filterArgs=("${simpleFilter}")
 elif [[ ${simpleFilter} != '' ]]; then
-    echo 1>&2 'Cannot specify both filter option and arguments.'
+    error-msg 'Cannot specify both filter option and arguments.'
     exit 1
 fi
 

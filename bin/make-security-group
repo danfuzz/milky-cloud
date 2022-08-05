@@ -142,7 +142,7 @@ lib configure-security-group \
 || error="$?"
 
 if (( error )); then
-    progress-msg 'Error(s) after group creation. Attempting cleanup!'
+    error-msg 'Error(s) after group creation. Attempting cleanup!'
     ec2-json delete-security-group \
         --loc="${region}" \
         groupId="${groupId}" \

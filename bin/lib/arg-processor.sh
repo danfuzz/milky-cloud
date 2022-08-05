@@ -262,7 +262,7 @@ function positional-arg {
 function print-usage {
     local msg="$1"
 
-    awk 2>&1 <<<"${msg}" -v name="${_argproc_cmdName}" \
+    awk <<<"${msg}" -v name="${_argproc_cmdName}" \
     '
     BEGIN {
         atStart = 1;
@@ -297,7 +297,8 @@ function print-usage {
         gsub(/\${name}/, name);
         print;
     }
-    '
+    ' \
+    | error-msg --no-name --read
 }
 
 # Processes all of the given arguments, according to the configured handlers.
@@ -428,7 +429,7 @@ function _argproc_add-required-arg-postcheck {
     if (( exactlyOne )); then
         errorMsg="Too many ${argNoun}s from set:${allNames}"
         _argproc_preReturnStatements+=("$(
-            printf '(( _argproc_count <= 1 )) || { echo 1>&2 %q; false; }' \
+            printf '(( _argproc_count <= 1 )) || { error-msg %q; false; }' \
                 "${errorMsg}"
         )")
     fi
@@ -440,7 +441,7 @@ function _argproc_add-required-arg-postcheck {
     fi
 
     _argproc_preReturnStatements+=(
-        "$(printf $'(( _argproc_count != 0 )) || { echo 1>&2 %q; false; }\n' \
+        "$(printf $'(( _argproc_count != 0 )) || { error-msg %q; false; }\n' \
             "${errorMsg}"
     )")
 }
@@ -458,7 +459,7 @@ function _argproc_arg-description {
     local desc
 
     if ! declare -F "${funcName}" >/dev/null; then
-        echo 1>&2 "No such argument: <${longName}>"
+        error-msg "No such argument: <${longName}>"
         return 1
     fi
 
@@ -490,7 +491,7 @@ function _argproc_define-no-value-arg {
         shift
     else
         # `--option` is really defined here for parallel structure, not utility.
-        echo 1>&2 'Not supported.'
+        error-msg 'Not supported.'
         return 1
     fi
 
@@ -513,7 +514,7 @@ function _argproc_define-no-value-arg {
 
     eval 'function '"${handlerName}"' {
         if (( $# > 0 )); then
-            echo 1>&2 "Value not allowed for '"${desc}"'."
+            error-msg "Value not allowed for '"${desc}"'."
             return 1
         fi
         set '"${value}"'
@@ -554,7 +555,7 @@ function _argproc_define-value-required-arg {
 
     eval 'function '"${handlerName}"' {
         if (( $# < 1 )); then
-            echo 1>&2 "Value required for '"${desc}"'."
+            error-msg "Value required for '"${desc}"'."
             return 1
         fi
         '"${handlerBody}"'
@@ -582,7 +583,7 @@ function _argproc_handler-body {
                 local _argproc_value
                 for _argproc_value in "$@"; do
                     if ! [[ ${_argproc_value} =~ %s ]]; then
-                        echo 1>&2 "Invalid value for %s: ${_argproc_value}"
+                        error-msg "Invalid value for %s: ${_argproc_value}"
                         return 1
                     fi
                 done' \
@@ -654,7 +655,7 @@ function _argproc_janky-args {
 
         if [[ ${a} =~ ^--. ]]; then
             if ! [[ ${a} =~ ^--([a-z]+)(=.*)?$ ]]; then
-                echo 1>&2 "Invalid option syntax: ${a}"
+                error-msg "Invalid option syntax: ${a}"
                 return 1
             fi
 
@@ -662,7 +663,7 @@ function _argproc_janky-args {
             local value="${BASH_REMATCH[2]}"
 
             if ! [[ ${argSpecs} =~ " ${name} " ]]; then
-                echo 1>&2 "Unknown option: --${name}"
+                error-msg "Unknown option: --${name}"
                 return 1
             fi
 
@@ -707,16 +708,16 @@ function _argproc_janky-args {
                     || argError=1
                     ;;
                 *)
-                    echo 1>&2 "Unknown arg-processing option: --${name}"
+                    error-msg "Unknown arg-processing option: --${name}"
                     return 1
                     ;;
             esac
 
             if (( argError )); then
                 if [[ ${value} != '' ]]; then
-                    echo 1>&2 "Invalid value for option --${name}: ${value:1}"
+                    error-msg "Invalid value for option --${name}: ${value:1}"
                 else
-                    echo 1>&2 "Value required for option --${name}."
+                    error-msg "Value required for option --${name}."
                 fi
                 return 1
             fi
@@ -729,21 +730,21 @@ function _argproc_janky-args {
             args=("${a}")
             optsDone=1
         else
-            echo 1>&2 "Invalid option syntax: ${a}"
+            error-msg "Invalid option syntax: ${a}"
             return 1
         fi
    done
 
    if (( !optsDone || (${#args[@]} == 0) )); then
-       echo 1>&2 'Missing argument specification.'
+       error-msg 'Missing argument specification.'
        return 1
    elif (( ${#args[@]} > 1 && !multiArg )); then
-       echo 1>&2 'Too many arguments.'
+       error-msg 'Too many arguments.'
        return 1
    elif [[ ${argSpecs} =~ ' call '|' var ' ]]; then
        # Special case for `--call` and `--var` (which always go together).
        if [[ (${optCall} == '') && (${optVar} == '') ]]; then
-           echo 1>&2 'Must use at least one of --call or --var.'
+           error-msg 'Must use at least one of --call or --var.'
            return 1
        fi
    fi
@@ -767,7 +768,7 @@ function _argproc_parse-spec {
     local spec="$1"
 
     if ! [[ ${spec} =~ ^([a-zA-Z0-9][-a-zA-Z0-9]*)(/[a-zA-Z])?(=.*)?$ ]]; then
-        echo 1>&2 "Invalid spec: ${spec}"
+        error-msg "Invalid spec: ${spec}"
         return 1
     fi
 
@@ -778,7 +779,7 @@ function _argproc_parse-spec {
     if (( abbrevOk )); then
         specAbbrev="${abbrev:1}" # `:1` to drop the slash.
     elif [[ ${abbrev} != '' ]]; then
-        echo 1>&2 "Abbrev not allowed in spec: ${spec}"
+        error-msg "Abbrev not allowed in spec: ${spec}"
         return 1
     fi
 
@@ -788,7 +789,7 @@ function _argproc_parse-spec {
             specValue="${value:1}" # `:1` to drop the equal sign.
         fi
     elif [[ ${value} != '' ]]; then
-        echo 1>&2 "Value not allowed in spec: ${spec}"
+        error-msg "Value not allowed in spec: ${spec}"
         return 1
     fi
 }
@@ -802,7 +803,7 @@ function _argproc_set-arg-description {
     local funcName="_argproc:arg-description-${longName}"
 
     if declare -F "${funcName}" >/dev/null; then
-        echo 1>&2 "Duplicate argument: ${longName}"
+        error-msg "Duplicate argument: ${longName}"
         return 1
     fi
 
@@ -815,7 +816,7 @@ function _argproc_set-arg-description {
             desc="option --${longName}"
             ;;
         *)
-            echo 1>&2 "Unknown type: ${typeName}"
+            error-msg "Unknown type: ${typeName}"
             return 1
             ;;
     esac
@@ -856,7 +857,7 @@ function _argproc_statements-from-args {
             value="${BASH_REMATCH[2]}"
             handler="_argproc:long-${name}"
             if ! declare -F "${handler}" >/dev/null; then
-                echo 1>&2 "Unknown option: --${name}"
+                error-msg "Unknown option: --${name}"
                 argError=1
             elif [[ ${value} == '' ]]; then
                 _argproc_statements+=("${handler}")
@@ -872,7 +873,7 @@ function _argproc_statements-from-args {
                 arg="${BASH_REMATCH[2]}"
                 handler="_argproc:abbrev-${name}"
                 if ! declare -F "${handler}" >/dev/null; then
-                    echo 1>&2 "Unknown option: -${name}"
+                    error-msg "Unknown option: -${name}"
                     argError=1
                     # Break, to avoid spewing a ton of errors in case of a pilot
                     # error along the lines of `-longOptionName`.
@@ -883,7 +884,7 @@ function _argproc_statements-from-args {
             done
         else
             # Something weird and invalid, e.g. `--=`.
-            echo 1>&2 "Invalid option syntax: ${arg}"
+            error-msg "Invalid option syntax: ${arg}"
             argError=1
         fi
 
@@ -904,9 +905,9 @@ function _argproc_statements-from-args {
         _argproc_statements+=("_argproc:rest $(_argproc_quote "$@")")
     elif (( $# > 0 )); then
         if (( ${#_argproc_positionalFuncs[@]} == 0 )); then
-            echo 1>&2 'Positional arguments are not allowed.'
+            error-msg 'Positional arguments are not allowed.'
         else
-            echo 1>&2 'Too many positional arguments.'
+            error-msg 'Too many positional arguments.'
         fi
         argError=1
     fi
