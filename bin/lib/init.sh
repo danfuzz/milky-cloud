@@ -30,6 +30,15 @@ fi
 
 
 #
+# Sibling libararies
+#
+
+. "${_milky_cloud_libDir}/stderr-messages.sh"  # Error and progress messages.
+. "${_milky_cloud_libDir}/arg-processor.sh"    # Argument processor.
+. "${_milky_cloud_libDir}/init-wrappers.sh"    # Simple command wrappers.
+
+
+#
 # Prerequisites checker
 #
 # This is arranged to only do prerequisite checks once per high-level script
@@ -39,21 +48,12 @@ fi
 if [[ ${MILKY_CLOUD_PREREQUISITES_DONE} != 1 ]]; then
     . "${_milky_cloud_libDir}/init-check-prereqs.sh" \
     || {
-        echo 1>&2 'Failed one or more prerequisite checks!'
+        error-msg 'Failed one or more prerequisite checks!'
         return 1
     }
 
     export MILKY_CLOUD_PREREQUISITES_DONE=1
 fi
-
-
-#
-# Sibling libararies
-#
-
-. "${_milky_cloud_libDir}/arg-processor.sh"    # Argument processor.
-. "${_milky_cloud_libDir}/stderr-messages.sh"  # Error and progress messages.
-. "${_milky_cloud_libDir}/init-wrappers.sh"    # Simple command wrappers.
 
 
 #
