@@ -211,29 +211,29 @@ fi
 # Do cleanup if necessary.
 
 if (( error )); then
-    progress-msg 'Error(s) after VPC creation. Attempting cleanup!'
+    error-msg 'Error(s) after VPC creation. Attempting cleanup!'
 
     if (( gatewayAdded )); then
-        error-msg 'Deleting internet gateway...'
+        progress-msg 'Deleting internet gateway...'
         lib delete-internet-gateway \
             --loc="${region}" --gateway="${gatewayId}"
     fi
 
-    error-msg 'Deleting subnets...'
+    progress-msg 'Deleting subnets...'
     lib delete-subnets --quiet --loc="${region}" --vpc="${vpcId}" --all
 
-    error-msg 'Deleting VPC...'
+    progress-msg 'Deleting VPC...'
     ec2-json delete-vpc \
         --loc="${region}" \
         vpcId="${vpcId}" \
         '{ VpcId: $vpcId }'
 
-    error-msg 'Done with post-error cleanup.'
+    progress-msg 'Done with post-error cleanup.'
     exit "${error}"
 fi
 
 if (( !error )); then
-    error-msg "VPC ${vpcId} is ready for action!"
+    progress-msg "VPC ${vpcId} is ready for action!"
 fi
 
 echo "${vpcId}"
