@@ -1,5 +1,3 @@
-#!/bin/bash
-#
 # Copyright 2022 Dan Bornstein.
 # Licensed AS IS and WITHOUT WARRANTY under the Apache License,
 # Version 2.0. Details: <http://www.apache.org/licenses/LICENSE-2.0>
@@ -8,6 +6,10 @@ if [[ ${_milky_cloud_libDir} != '' ]]; then
     echo 1>&2 'Warning: Not reinitializing library!'
     return 1
 fi
+
+#
+# Global variable setup
+#
 
 # The symlink-resolved path of the command that is running (that is, the
 # top-level script).
@@ -28,51 +30,16 @@ fi
 
 
 #
-# Library functions: Convenience callers for external scripts. These are for
-# items that are used often enough to be shorter to name, or in contexts that
-# require a simple function name.
+# Sibling libararies
 #
 
-# Calls `lib aws-json ec2`.
-function ec2-json {
-    lib aws-json ec2 "$@"
-}
-
-# Calls `lib json-array`.
-function jarray {
-    lib json-array "$@"
-}
-
-# Calls `lib json-get`.
-function jget {
-    lib json-get "$@"
-}
-
-# Calls `lib json-val`.
-function jval {
-    lib json-val "$@"
-}
-
-# Calls `lib parse-location --input-zone`.
-function parse-zone {
-    lib parse-location --input=zone "$@"
-}
-
-# Calls `lib parse-location --print-region`.
-function region-from-location {
-    lib parse-location --output=region "$@"
-}
+. "${_milky_cloud_libDir}/arg-processor.sh"  # Argument processor.
+. "${_milky_cloud_libDir}/init-wrappers.sh"  # Simple command wrappers.
 
 
 #
-# Library functions: Others
+# More library functions
 #
-
-# Load the simple command wrappers.
-. "${_milky_cloud_libDir}/init-wrappers.sh"
-
-# Load the argument processor library.
-. "${_milky_cloud_libDir}/arg-processor.sh"
 
 # Gets the directory of this command, "this command" being the main script that
 # is running.
