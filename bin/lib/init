@@ -9,11 +9,9 @@ if [[ ${_milky_cloud_libDir} != '' ]]; then
     return 1
 fi
 
-# Figure out the symlink-resolved name and directory of the main command (the
-# top-level script that is running).
-_milky_cloud_cmdName="$(readlink -f "$0")" || return "$?"
-_milky_cloud_cmdDir="${cmdName%/*}"
-_milky_cloud_cmdName="${cmdName##*/}"
+# The symlink-resolved path of the command that is running (that is, the
+# top-level script).
+_milky_cloud_cmdPath="$(readlink -f "$0")" || return "$?"
 
 # Figure out the symlink-resolved directory of this script.
 _milky_cloud_libDir="$(readlink -f "${BASH_SOURCE[0]}")" || return "$?"
@@ -73,16 +71,22 @@ function region-from-location {
 # Load the argument processor library.
 . "${_milky_cloud_libDir}/arg-processor.sh"
 
-# Gets the directory of this command, that is, the directory of the main script
-# that is running.
+# Gets the directory of this command, "this command" being the main script that
+# is running.
 function this-cmd-dir {
-    echo "${_milky_cloud_cmdDir}"
+    echo "${_milky_cloud_cmdPath%/*}"
 }
 
-# Gets the name of this command, that is, the name of the main script that is
-# running.
+# Gets the name of this command, that is, "this command" being the main script
+# that is running.
 function this-cmd-name {
-    echo "${_milky_cloud_cmdName}"
+    echo "${_milky_cloud_cmdPath##*/}"
+}
+
+# Gets the full path of this command, "this command" being the main script that
+# is running.
+function this-cmd-path {
+    echo "${_milky_cloud_cmdPath}"
 }
 
 # Calls through to an arbitrary library script.
