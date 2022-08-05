@@ -4,14 +4,8 @@
 # Licensed AS IS and WITHOUT WARRANTY under the Apache License,
 # Version 2.0. Details: <http://www.apache.org/licenses/LICENSE-2.0>
 
-# Figure out the symlink-resolved program name and directory.
-progName="$(readlink -f "$0")" || exit "$?"
-progDir="${progName%/*}"
-progName="${progName##*/}"
-
-# Load the helper library.
-. "${progDir}/lib/init"
-
+# Load the helper libraries.
+. "$(dirname "$(readlink -f "$0")")/lib/init.sh" || exit "$?"
 
 #
 # Parameters for occasional update.
