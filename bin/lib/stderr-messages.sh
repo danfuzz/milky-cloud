@@ -26,7 +26,8 @@ _stderr_progressEnabled=0
 
 # Prints an error message to stderr, if such are enabled. Use option `--no-name`
 # to suppress printing of the top-level command name on the first message. Use
-# `--read` to read messages from stdin.
+# option `--read` to read messages from stdin. Use `error-msg-switch` to change
+# the enabled status of error messages.
 #
 # Note: Error messages are _enabled_ by default.
 function error-msg {
@@ -89,14 +90,42 @@ function error-msg-switch {
     esac
 }
 
-# Prints a "progress" message to stderr, if such are enabled. Use
-# `progress-msg-switch` to change or check the enabled status of progress
-# messages.
+# Prints a "progress" message to stderr, if such are enabled. Use option
+# `--read` to read messages from stdin. Use `progress-msg-switch` to change or
+# check the enabled status of progress messages.
+#
+# Note: Progress messages are _disabled by default.
 function progress-msg {
-    if (( _stderr_progressEnabled )); then
-        # `printf` to avoid option-parsing weirdness with `echo`.
-        printf 1>&2 '%s\n' "$*"
+    if (( !_stderr_progressEnabled )); then
+        return
     fi
+
+    local msg="$*"
+    local read=0
+
+    while [[ $1 =~ ^-- ]]; do
+        case "$1" in
+            --read)
+                read=1
+                ;;
+            --)
+                shift
+                break
+                ;;
+            *)
+                error-msg "Unrecognized option: $1"
+                return 1
+                ;;
+        esac
+        shift
+    done
+
+    if (( read )); then
+        msg="$(cat)"
+    fi
+
+    # `printf` to avoid option-parsing weirdness with `echo`.
+    printf 1>&2 '%s\n' "${msg}"
 }
 
 # Enables, disables, or checks the enabled status of "progress" messages.
