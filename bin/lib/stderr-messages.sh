@@ -10,6 +10,9 @@
 _stderr_cmdName="$(readlink -f "$0")" || return "$?"
 _stderr_cmdName="${_stderr_cmdName##*/}"
 
+# Has an error been emitted?
+_stderr_anyErrors=0
+
 # Whether error messages are enabled.
 _stderr_errorEnabled=1
 
@@ -21,13 +24,32 @@ _stderr_progressEnabled=0
 # Library functions
 #
 
-# Prints an error message to stderr, if such are enabled.
+# Prints an error message to stderr, if such are enabled. Use option `--no-name`
+# to suppress printing of the top-level command name on the first message.
 #
 # Note: Error messages are _enabled_ by default.
 function error-msg {
-    if (( _stderr_errorEnabled )); then
-        echo 1>&2 "$@"
+    if (( !_stderr_errorEnabled )); then
+        return
     fi
+
+    local msg="$*"
+    local name="$(( !_stderr_anyErrors ))"
+
+    if [[ $1 == '--no-name' ]]; then
+        shift
+        name=0
+    elif [[ $1 == '--' ]]; then
+        shift
+    fi
+
+    if (( name )); then
+        msg="${_stderr_cmdName}: ${msg}"
+    fi
+
+    # `printf` to avoid option-parsing weirdness with `echo`
+    printf 1>&2 '%s\n' "${msg}"
+    _stderr_anyErrors=1
 }
 
 # Enables or disables error messages.
