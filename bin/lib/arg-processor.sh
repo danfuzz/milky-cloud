@@ -262,7 +262,7 @@ function positional-arg {
 function print-usage {
     local msg="$1"
 
-    awk 2>&1 <<<"${msg}" -v name="${_argproc_cmdName}" \
+    awk 1>&2 <<<"${msg}" -v name="${_argproc_cmdName}" \
     '
     BEGIN {
         atStart = 1;
