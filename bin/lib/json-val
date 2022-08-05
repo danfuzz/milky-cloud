@@ -88,9 +88,7 @@ function parse-rest {
         if [[ ${varType} == '' ]]; then
             varType='string'
         else
-            # Drop initial `:`.
-            [[ ${varType} =~ ^:(.*)$ ]];
-            varType="${BASH_REMATCH[1]}"
+            varType="${varType:1}" # `:1` to drop the initial `:`.
         fi
 
         varTypes+=("${varType}")
