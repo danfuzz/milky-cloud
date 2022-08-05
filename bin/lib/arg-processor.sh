@@ -53,9 +53,9 @@
 # name. Generated functions use the convention `_argproc:<name>`, to make the
 # origin clear and to avoid collisions.
 
-# Symlink-resolved program name (not of this file, but our includer).
-_argproc_progName="$(readlink -f "$0")" || return "$?"
-_argproc_progName="${_argproc_progName##*/}"
+# Symlink-resolved command name (not of this file, but our top-level includer).
+_argproc_cmdName="$(readlink -f "$0")" || return "$?"
+_argproc_cmdName="${_argproc_cmdName##*/}"
 
 # List of statements to run just before parsing. This includes:
 #
@@ -262,7 +262,7 @@ function positional-arg {
 function print-usage {
     local msg="$1"
 
-    awk 2>&1 <<<"${msg}" -v name="${_argproc_progName}" \
+    awk 2>&1 <<<"${msg}" -v name="${_argproc_cmdName}" \
     '
     BEGIN {
         atStart = 1;
