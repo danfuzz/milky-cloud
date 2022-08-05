@@ -31,21 +31,21 @@ _stderr_progressEnabled=0
 #
 # Note: Error messages are _enabled_ by default.
 function error-msg {
-    if (( !_stderr_errorEnabled )); then
-        return
-    fi
-
-    local msg="$*"
-    local name="$(( !_stderr_anyErrors ))"
-    local read=0
+    local printName="$(( !_stderr_anyErrors ))"
+    local readStdin=0
+    local wasCmd=0
 
     while [[ $1 =~ ^-- ]]; do
         case "$1" in
             --no-name)
-                name=0
+                printName=0
                 ;;
             --read)
-                read=1
+                readStdin=1
+                ;;
+            --set=1|--set=0)
+                _stderr_stderrEnabled="${1#*=}"
+                wasCmd=1
                 ;;
             --)
                 shift
@@ -59,16 +59,21 @@ function error-msg {
         shift
     done
 
-    if (( read )); then
-        msg="$(cat)"
+    if (( wasCmd || !_stderr_errorEnabled )); then
+        return
     fi
 
-    if (( name )); then
-        msg="${_stderr_cmdName}: ${msg}"
+    if (( printName )); then
+        printf 1>&2 '%s: ' "${_stderr_cmdName}"
     fi
 
-    # `printf` to avoid option-parsing weirdness with `echo`.
-    printf 1>&2 '%s\n' "${msg}"
+    if (( readStdin )); then
+        cat 1>&2
+    else
+        # `printf` to avoid option-parsing weirdness with `echo`.
+        printf 1>&2 '%s\n' "$*"
+    fi
+
     _stderr_anyErrors=1
 }
 
@@ -133,7 +138,6 @@ function progress-msg {
         return
     fi
 
-    local msg
     if (( readStdin )); then
         cat 1>&2
     else
