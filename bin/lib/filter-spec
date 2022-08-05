@@ -50,12 +50,13 @@ filterValues=()
 rest-arg --call=parse-specs specs
 function parse-specs {
     local arg
+    local error=0
 
     while (( $# > 0 )); do
         arg="$1"
         if ! [[ ${arg} =~ ^([-_:.a-zA-Z0-9]+)=(.*)$ ]]; then
             error-msg 'Could not parse filter specification:' "${arg}"
-            return 1
+            error=1
         fi
 
         filterNames+=("${BASH_REMATCH[1]}")
@@ -63,6 +64,8 @@ function parse-specs {
 
         shift
     done
+
+    return "${error}"
 }
 
 process-args "$@" || usage "$?"
