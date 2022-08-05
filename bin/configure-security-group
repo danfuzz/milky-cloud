@@ -58,7 +58,7 @@ opt-value --var=name --filter='/./' name
 opt-value --required --var=groupNameOrId --filter='/./' security-group
 
 # Progress messages?
-opt-toggle --call=progress-msg-switch progress
+opt-toggle --call='{ progress-msg --set="$1" }' progress
 
 process-args "$@" || usage "$?"
 

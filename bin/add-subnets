@@ -50,7 +50,7 @@ opt-value --required --var=region --filter=region-from-location loc
 opt-value --var=name --filter='/./' name
 
 # Progress messages?
-opt-toggle --call=progress-msg-switch progress
+opt-toggle --call='{ progress-msg --set="$1" }' progress
 
 # Quiet?
 opt-toggle --var=quiet quiet
@@ -121,7 +121,7 @@ fi
 
 tagSpec="$(lib name-tag-spec 'subnet' "${name}")"
 
-progressArg="$(progress-msg-switch --print-option)"
+progressArg="$(progress-msg --print-option)"
 
 results=()
 error=0

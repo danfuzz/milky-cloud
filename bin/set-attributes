@@ -47,7 +47,7 @@ opt-value --required --var=region --filter=region-from-location loc
 opt-value --required --var=id --filter='/^[-a-z0-9]+$/' id
 
 # Progress messages?
-opt-toggle --call=progress-msg-switch progress
+opt-toggle --call='{ progress-msg --set="$1" }' progress
 
 # Names and values of assignments, as parallel arrays.
 assignNames=()

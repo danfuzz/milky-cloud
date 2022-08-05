@@ -55,7 +55,7 @@ opt-value --var=description --filter='/./' description
 opt-value --var=name --filter='/^[-_a-zA-Z0-9]+$/' name
 
 # Progress messages?
-opt-toggle --call=progress-msg-switch progress
+opt-toggle --call='{ progress-msg --set="$1" }' progress
 
 # Name or ID of VPC to look up.
 opt-value --required --var=vpcNameOrId --filter='/./' vpc
@@ -137,7 +137,7 @@ progress-msg "  name: ${name}"
 error=0
 
 lib configure-security-group \
-    "$(progress-msg-switch --print-option)" \
+    "$(progress-msg --print-option)" \
     --loc="${region}" --security-group="${groupId}" \
 || error="$?"
 
