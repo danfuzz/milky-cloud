@@ -51,8 +51,9 @@ fi
 # Sibling libararies
 #
 
-. "${_milky_cloud_libDir}/arg-processor.sh"  # Argument processor.
-. "${_milky_cloud_libDir}/init-wrappers.sh"  # Simple command wrappers.
+. "${_milky_cloud_libDir}/arg-processor.sh"    # Argument processor.
+. "${_milky_cloud_libDir}/stderr-messages.sh"  # Error and progress messages.
+. "${_milky_cloud_libDir}/init-wrappers.sh"    # Simple command wrappers.
 
 
 #
@@ -100,46 +101,4 @@ function lib {
         echo 1>&2 'No such library script:' "${name}"
         return 1
     fi
-}
-
-# Whether progress messages are enabled.
-_milky_cloud_progressEnabled=0
-
-# Prints a "progress" message to stderr, if such are enabled. Use
-# `progress-msg-switch` to change or check the enabled status of progress
-# messages.
-function progress-msg {
-    if (( _milky_cloud_progressEnabled )); then
-        echo 1>&2 "$@"
-    fi
-}
-
-# Enables, disables, or checks the enabled status of "progress" messages.
-#
-# --disable | 0 -- Disables progress messages.
-# --enable | 1` -- Enables progress messages.
-# --print-option -- Prints `--progress` or `--no-progress` to stdout, reflecting
-#   the enabled status. (This is to make it easy to propagate the progress state
-#   down into another command.)
-# --status -- Prints `1` or `0` to stdout, to indicate enabled status.
-function progress-msg-switch {
-    case "$1" in
-        --enable|1)
-            _milky_cloud_progressEnabled=1
-            ;;
-        --disable|0)
-            _milky_cloud_progressEnabled=0
-            ;;
-        --print-option)
-            (( _milky_cloud_progressEnabled )) \
-            && echo '--progress' \
-            || echo '--no-progress'
-            ;;
-        --status)
-            echo "${_milky_cloud_progressEnabled}"
-            ;;
-        *)
-            echo 1>&2 "Unrecognized argument: $1"
-            return 1
-    esac
 }
