@@ -54,7 +54,7 @@ zoneSuffix=''
 positional-arg --required --var=zoneOrRegion --call=parse-zone-or-region zone-or-region
 function parse-zone-or-region {
     if [[ ! $1 =~ ^([a-z]{2}-[a-z]+-[0-9]+)([a-z]|-[a-z]+-[0-9]+[a-z])?$ ]]; then
-        echo 1>&2 'Invalid value for argument <zone-or-region>:' "$1"
+        error-msg 'Invalid value for argument <zone-or-region>:' "$1"
         exit 1
     fi
 
@@ -78,13 +78,13 @@ fi
 case "${inputType}" in
     region)
         if [[ ${zoneSuffix} != '' ]]; then
-            echo 1>&2 "Region required; got zone: ${zoneOrRegion}"
+            error-msg "Region required; got zone: ${zoneOrRegion}"
             exit 1
         fi
         ;;
     zone)
         if [[ ${zoneSuffix} == '' ]]; then
-            echo 1>&2 "Zone required; got region: ${zoneOrRegion}"
+            error-msg "Zone required; got region: ${zoneOrRegion}"
             exit 1
         fi
         ;;

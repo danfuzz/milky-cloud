@@ -54,7 +54,7 @@ function parse-specs {
     while (( $# > 0 )); do
         arg="$1"
         if ! [[ ${arg} =~ ^([-_:.a-zA-Z0-9]+)=(.*)$ ]]; then
-            echo 1>&2 'Could not parse filter specification:' "${arg}"
+            error-msg 'Could not parse filter specification:' "${arg}"
             return 1
         fi
 

@@ -108,7 +108,7 @@ function cidr-address-words-v4 {
         # `0*` below strips leading zeros, so that the number doesn't get
         # interpreted as octal.
         if ! [[ ${address} =~ ^\.0*([0-9]+)(.*)$ ]]; then
-            echo 1>&2 "${errorMsg}"
+            error-msg "${errorMsg}"
             return 1
         fi
 
@@ -116,7 +116,7 @@ function cidr-address-words-v4 {
         address="${BASH_REMATCH[2]}"
 
         if (( num > 255 )); then
-            echo 1>&2 "${errorMsg}"
+            error-msg "${errorMsg}"
             return 1
         fi
 
@@ -124,7 +124,7 @@ function cidr-address-words-v4 {
     done
 
     if (( ${#result[@]} != 4 )); then
-        echo 1>&2 "${errorMsg}"
+        error-msg "${errorMsg}"
         return 1
     fi
 
@@ -146,7 +146,7 @@ function cidr-address-words-v6 {
     local nums=()
 
     if ! [[ ${address} =~ ^([:0-9a-f]*)(::([:0-9a-f]*))?$ ]]; then
-        echo 1>&2 "${errorMsg}"
+        error-msg "${errorMsg}"
         return 1
     fi
 
@@ -154,7 +154,7 @@ function cidr-address-words-v6 {
         if [[ ${address} =~ ^::(.*)$ ]]; then
             if (( gotGap )); then
                 # Double gap.
-                echo 1>&2 "${errorMsg}"
+                error-msg "${errorMsg}"
                 return 1
             fi
             gotGap=1
@@ -168,7 +168,7 @@ function cidr-address-words-v6 {
                 address="${BASH_REMATCH[1]}"
             fi
         else
-            echo 1>&2 "${errorMsg}"
+            error-msg "${errorMsg}"
             return 1
         fi
     done
@@ -176,13 +176,13 @@ function cidr-address-words-v6 {
     local zeroCount=0
     if (( gotGap )); then
         if (( ${#nums[@]} > 8 )); then
-            echo 1>&2 "${errorMsg}"
+            error-msg "${errorMsg}"
             return 1
         fi
         (( zeroCount = 9 - ${#nums[@]} ))
     else
         if (( ${#nums[@]} != 8 )); then
-            echo 1>&2 "${errorMsg}"
+            error-msg "${errorMsg}"
             return 1
         fi
     fi
@@ -220,7 +220,7 @@ function cidr-from-json {
             address="$(cidr-v6-address "${cidr}")"
             ;;
         *)
-            echo 1>&2 'Unrecognized address type.'
+            error-msg 'Unrecognized address type.'
             return 1
             ;;
     esac
@@ -308,7 +308,7 @@ function json-from-any {
     elif [[ ${value} =~ ^[:./0-9a-f]+$ ]]; then
         json-from-cidr "${value}"
     else
-        echo 1>&2 "Unparseable CIDR: ${value}"
+        error-msg "Unparseable CIDR: ${value}"
         return 1
     fi
 }
@@ -319,7 +319,7 @@ function json-from-cidr {
 
     # Note: The repetition limits are generous enough to cover everything valid.
     if ! [[ ${cidr} =~ ^([.:0-9a-f]{1,100})/([0-9]{0,5})$ ]]; then
-        echo 1>&2 "Unparseable CIDR: ${cidr}"
+        error-msg "Unparseable CIDR: ${cidr}"
         return 1
     fi
 
@@ -341,12 +341,12 @@ function json-from-cidr {
         address=($(cidr-address-words-v4 "${address}")) \
         || return "$?"
     else
-        echo 1>&2 "Unparseable CIDR: ${value}"
+        error-msg "Unparseable CIDR: ${value}"
         return 1
     fi
 
     if (( netmaskBits > totalBits )); then
-        echo 1>&2 "Netmask too large: ${netmaskBits} bits"
+        error-msg "Netmask too large: ${netmaskBits} bits"
         return 1
     fi
 
@@ -385,7 +385,7 @@ function json-validate {
     || return "$?"
 
     if [[ ${result} == 'null' ]]; then
-        echo 1>&2 "Malformed JSON-CIDR: ${value}"
+        error-msg "Malformed JSON-CIDR: ${value}"
         return 1
     fi
 
@@ -446,17 +446,17 @@ function parse-number {
     elif [[ "${num}" =~ ^::([0-9a-fA-F]{1,16})$ ]]; then
         num="0x${BASH_REMATCH[1]}"
     else
-        echo 1>&2 "Unparseable number: ${num}"
+        error-msg "Unparseable number: ${num}"
         return 1
     fi
 
     (( num = num )) # Canonicalize to decimal.
 
     if (( num < min )); then
-        echo 1>&2 "Number too small: ${num}"
+        error-msg "Number too small: ${num}"
         return 1
     elif (( num > max )); then
-        echo 1>&2 "Number too large: ${num}"
+        error-msg "Number too large: ${num}"
         return 1
     fi
 
@@ -472,14 +472,14 @@ function parse-number {
 function command_add-to-network {
     case "$#" in
         0|1)
-            echo 1>&2 'Missing <cidr> and/or <amount> argument.'
+            error-msg 'Missing <cidr> and/or <amount> argument.'
             return 1
             ;;
         2)
             : # It's good.
             ;;
         *)
-            echo 1>&2 'Too many arguments.'
+            error-msg 'Too many arguments.'
             return 1
             ;;
     esac
@@ -512,7 +512,7 @@ function command_add-to-network {
     done
 
     if (( address[0] > 0xffff )); then
-        echo 1>&2 "<amount> too large; address overflowed."
+        error-msg "<amount> too large; address overflowed."
         return 1
     fi
 
@@ -530,14 +530,14 @@ function command_add-to-network {
 function command_address-length {
     case "$#" in
         0)
-            echo 1>&2 'Missing <cidr> argument.'
+            error-msg 'Missing <cidr> argument.'
             return 1
             ;;
         1)
             : # It's good.
             ;;
         *)
-            echo 1>&2 'Too many arguments.'
+            error-msg 'Too many arguments.'
             return 1
             ;;
     esac
@@ -554,14 +554,14 @@ function command_address-length {
 function command_address-words {
     case "$#" in
         0)
-            echo 1>&2 'Missing <cidr> argument.'
+            error-msg 'Missing <cidr> argument.'
             return 1
             ;;
         1)
             : # It's good.
             ;;
         *)
-            echo 1>&2 'Too many arguments.'
+            error-msg 'Too many arguments.'
             return 1
             ;;
     esac
@@ -578,14 +578,14 @@ function command_address-words {
 function command_make-subnets {
     case "$#" in
         0|1)
-            echo 1>&2 'Missing <cidr> and/or <count> argument.'
+            error-msg 'Missing <cidr> and/or <count> argument.'
             return 1
             ;;
         2|3)
             : # It's good.
             ;;
         *)
-            echo 1>&2 'Too many arguments.'
+            error-msg 'Too many arguments.'
             return 1
             ;;
     esac
@@ -611,7 +611,7 @@ function command_make-subnets {
         || return "$?"
 
         if (( newBits > bits )); then
-            echo 1>&2 "Specified <bits> is too small to fit result: ${bits}"
+            error-msg "Specified <bits> is too small to fit result: ${bits}"
             return 1
         fi
 
@@ -636,14 +636,14 @@ function command_make-subnets {
 function command_netmask-length {
     case "$#" in
         0)
-            echo 1>&2 'Missing <cidr> argument.'
+            error-msg 'Missing <cidr> argument.'
             return 1
             ;;
         1)
             : # It's good.
             ;;
         *)
-            echo 1>&2 'Too many arguments.'
+            error-msg 'Too many arguments.'
             return 1
             ;;
     esac
@@ -660,14 +660,14 @@ function command_netmask-length {
 function command_print {
     case "$#" in
         0)
-            echo 1>&2 'Missing <cidr> argument.'
+            error-msg 'Missing <cidr> argument.'
             return 1
             ;;
         1)
             : # It's good.
             ;;
         *)
-            echo 1>&2 'Too many arguments.'
+            error-msg 'Too many arguments.'
             return 1
             ;;
     esac
@@ -681,14 +681,14 @@ function command_print {
 function command_widen-to {
     case "$#" in
         0|1)
-            echo 1>&2 'Missing <cidr> and/or <bits> argument.'
+            error-msg 'Missing <cidr> and/or <bits> argument.'
             return 1
             ;;
         2)
             : # It's good.
             ;;
         *)
-            echo 1>&2 'Too many arguments.'
+            error-msg 'Too many arguments.'
             return 1
             ;;
     esac
@@ -706,10 +706,10 @@ function command_widen-to {
     netmaskBits="$(jget "${cidr}" '.netmaskBits')"
 
     if (( bits < netmaskBits )); then
-        echo 1>&2 "Cannot shrink netmask!: ${netmaskBits} to ${bits}"
+        error-msg "Cannot shrink netmask!: ${netmaskBits} to ${bits}"
         return 1
     elif (( bits > totalBits )); then
-        echo 1>&2 "Resulting netmask too long: ${bits}"
+        error-msg "Resulting netmask too long: ${bits}"
         return 1
     fi
 
@@ -730,7 +730,7 @@ function command_widen-to {
 
 commandFunc="command_${command}"
 if ! declare -F "${commandFunc}" >/dev/null; then
-    echo 1>&2 "No such command: ${command}"
+    error-msg "No such command: ${command}"
     exit 1
 fi
 
