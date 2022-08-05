@@ -11,7 +11,7 @@ _stderr_cmdName="$(readlink -f "$0")" || return "$?"
 _stderr_cmdName="${_stderr_cmdName##*/}"
 
 # Whether error messages are enabled.
-_stderr_errorEnabled=0
+_stderr_errorEnabled=1
 
 # Whether progress messages are enabled.
 _stderr_progressEnabled=0
