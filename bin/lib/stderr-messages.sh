@@ -102,6 +102,7 @@ function progress-msg {
                 (( _stderr_progressEnabled )) \
                 && echo '--progress' \
                 || echo '--no-progress'
+                wasCmd=1
                 ;;
             --set=1|--set=0)
                 _stderr_progressEnabled="${1#*=}"
