@@ -77,7 +77,7 @@ opt-value --var=keyName --filter='/./' key-name
 opt-value --var=name --filter='/./' name
 
 # Progress messages?
-opt-toggle --call=progress-msg-switch progress
+opt-toggle --call='{ progress-msg --set="$1" }' progress
 
 # Name or ID of the security group to be in.
 opt-value --var=groupNameOrId --filter='/./' security-group
