@@ -71,7 +71,7 @@ function region-from-location {
 #
 
 # Load the argument processor library.
-. "${_milky_cloud_libDir}/arg-processor"
+. "${_milky_cloud_libDir}/arg-processor.sh"
 
 # Calls through to an arbitrary library script.
 function lib {
