@@ -124,7 +124,7 @@ function progress-msg-switch {
             echo "${_stderr_progressEnabled}"
             ;;
         *)
-            echo 1>&2 "Unrecognized argument: $1"
+            error-msg "Unrecognized argument: $1"
             return 1
     esac
 }
