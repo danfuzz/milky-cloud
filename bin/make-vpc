@@ -233,7 +233,9 @@ if (( error )); then
 fi
 
 if (( !error )); then
-    progress-msg "VPC ${vpcId} is ready for action!"
+    progress-msg "VPC is ready for action!"
+    progress-msg "  id:   ${vpcId}"
+    progress-msg "  name: ${name}"
 fi
 
 echo "${vpcId}"
