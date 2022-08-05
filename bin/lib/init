@@ -9,23 +9,23 @@ if [[ ${_milky_cloud_libDir} != '' ]]; then
     return 1
 fi
 
-# Figure out the symlink-resolved name and directory of the main program (the
-# includer of this library).
-_milky_cloud_progName="$(readlink -f "$0")" || return "$?"
-_milky_cloud_progDir="${progName%/*}"
-_milky_cloud_progName="${progName##*/}"
+# Figure out the symlink-resolved name and directory of the main command (the
+# top-level script that is running).
+_milky_cloud_cmdName="$(readlink -f "$0")" || return "$?"
+_milky_cloud_cmdDir="${cmdName%/*}"
+_milky_cloud_cmdName="${cmdName##*/}"
 
 # Figure out the symlink-resolved directory of this script.
 _milky_cloud_libDir="$(readlink -f "${BASH_SOURCE[0]}")" || return "$?"
 _milky_cloud_libDir="${_milky_cloud_libDir%/*}"
 
-# Figure out the "main" directory. If `progDir` is the same as `libDir`, then
+# Figure out the "main" directory. If `cmdDir` is the same as `libDir`, then
 # we're running a library script, and the main directory is the parent of
-# `libDir`. Otherwise, the main directory is `progDir`.
-if [[ ${_milky_cloud_progDir} == ${_milky_cloud_libDir} ]]; then
+# `libDir`. Otherwise, the main directory is `cmdDir`.
+if [[ ${_milky_cloud_cmdDir} == ${_milky_cloud_libDir} ]]; then
     _milky_cloud_mainDir="$(cd "${_milky_cloud_libDir}/.."; /bin/pwd)"
 else
-    _milky_cloud_mainDir="${_milky_cloud_progDir}"
+    _milky_cloud_mainDir="${_milky_cloud_cmdDir}"
 fi
 
 
@@ -72,6 +72,18 @@ function region-from-location {
 
 # Load the argument processor library.
 . "${_milky_cloud_libDir}/arg-processor.sh"
+
+# Gets the directory of this command, that is, the directory of the main script
+# that is running.
+function this-cmd-dir {
+    echo "${_milky_cloud_cmdDir}"
+}
+
+# Gets the name of this command, that is, the name of the main script that is
+# running.
+function this-cmd-name {
+    echo "${_milky_cloud_cmdName}"
+}
 
 # Calls through to an arbitrary library script.
 function lib {
