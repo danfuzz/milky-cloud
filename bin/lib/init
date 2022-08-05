@@ -1,2 +1,0 @@
-# TODO: Remove this file, which is temporary scaffolding.
-. "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/init.sh" || return "$?"
