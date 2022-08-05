@@ -30,6 +30,24 @@ fi
 
 
 #
+# Prerequisites checker
+#
+# This is arranged to only do prerequisite checks once per high-level script
+# call, instead of re-re-...-doing it multiple times.
+#
+
+if [[ ${MILKY_CLOUD_PREREQUISITES_DONE} != 1 ]]; then
+    . "${_milky_cloud_libDir}/init-check-prereqs.sh" \
+    || {
+        echo 1>&2 'Failed one or more prerequisite checks!'
+        return 1
+    }
+
+    export MILKY_CLOUD_PREREQUISITES_DONE=1
+fi
+
+
+#
 # Sibling libararies
 #
 
@@ -125,19 +143,3 @@ function progress-msg-switch {
             return 1
     esac
 }
-
-
-#
-# Library initialization
-#
-
-# Calls the prerequisite checker if it doesn't seem to have yet been run in this
-# session.
-if [[ ${MILKY_CLOUD_PREREQUISITES_DONE} != 1 ]]; then
-    if lib check-prerequisites; then
-        export MILKY_CLOUD_PREREQUISITES_DONE=1
-    else
-        echo 1>&2 'Failed one or more prerequisite checks!'
-        exit 1
-    fi
-fi
