@@ -89,7 +89,7 @@ function do-find {
     case "${vpcId}" in
         ambiguous)
             error-msg 'Ambiguous name or ID matches all of:'
-            jget 1>&2 --output=raw "${idResult}" '.[] | "  " + .'
+            jget --output=raw "${idResult}" '.[] | "  " + .' | error-msg --read
             return 1
             ;;
         none)
