@@ -121,7 +121,7 @@ fi
 
 tagSpec="$(lib name-tag-spec 'subnet' "${name}")"
 
-progressArg="$(progress-msg --print-option)"
+progressArg="--progress=$(progress-msg --status)"
 
 results=()
 error=0
