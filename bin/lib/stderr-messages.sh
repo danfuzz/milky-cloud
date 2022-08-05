@@ -10,6 +10,9 @@
 _stderr_cmdName="$(readlink -f "$0")" || return "$?"
 _stderr_cmdName="${_stderr_cmdName##*/}"
 
+# Whether error messages are enabled.
+_stderr_errorEnabled=0
+
 # Whether progress messages are enabled.
 _stderr_progressEnabled=0
 
@@ -17,6 +20,33 @@ _stderr_progressEnabled=0
 #
 # Library functions
 #
+
+# Prints an error message to stderr, if such are enabled.
+#
+# Note: Error messages are _enabled_ by default.
+function error-msg {
+    if (( _stderr_errorEnabled )); then
+        echo 1>&2 "$@"
+    fi
+}
+
+# Enables or disables error messages.
+#
+# --disable | 0 -- Disables progress messages.
+# --enable | 1` -- Enables progress messages.
+function error-msg-switch {
+    case "$1" in
+        --enable|1)
+            _stderr_errorEnabled=1
+            ;;
+        --disable|0)
+            _stderr_errorEnabled=0
+            ;;
+        *)
+            echo 1>&2 "Unrecognized argument: $1"
+            return 1
+    esac
+}
 
 # Prints a "progress" message to stderr, if such are enabled. Use
 # `progress-msg-switch` to change or check the enabled status of progress
