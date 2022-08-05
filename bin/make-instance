@@ -117,8 +117,7 @@ fi
 
 # Figure out the correct AMI.
 
-amiInfo="$(
-    ${progDir}/find-ami --loc="${zone}" --instance-type="${instanceType}")" \
+amiInfo="$(lib find-ami --loc="${zone}" --instance-type="${instanceType}")" \
 || exit "$?"
 
 jget 1>&2 --output=raw "${amiInfo}" '
