@@ -3,7 +3,7 @@
 # Version 2.0. Details: <http://www.apache.org/licenses/LICENSE-2.0>
 
 if [[ ${_milky_cloud_libDir} != '' ]]; then
-    echo 1>&2 'Warning: Not reinitializing library!'
+    error-msg 'Warning: Not reinitializing library!'
     return 1
 fi
 
@@ -81,7 +81,7 @@ function this-cmd-path {
 # Calls through to an arbitrary library script.
 function lib {
     if (( $# == 0 )); then
-        echo 1>&2 'Missing library script name.'
+        error-msg 'Missing library script name.'
         return 1
     fi
 
@@ -89,7 +89,7 @@ function lib {
     shift
 
     if ! [[ ${name} =~ ^[-a-z]+$ ]]; then
-        echo 1>&2 'Weird script name:' "${name}"
+        error-msg 'Weird script name:' "${name}"
         return 1
     elif [[ -x "${_milky_cloud_libDir}/${name}" ]]; then
         # It's in the internal helper library.
@@ -98,7 +98,7 @@ function lib {
         # It's an exposed script.
         "${_milky_cloud_mainDir}/${name}" "$@"
     else
-        echo 1>&2 'No such library script:' "${name}"
+        error-msg 'No such library script:' "${name}"
         return 1
     fi
 }
