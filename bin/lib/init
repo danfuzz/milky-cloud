@@ -9,17 +9,23 @@ if [[ ${_milky_cloud_libDir} != '' ]]; then
     return 1
 fi
 
+# Figure out the symlink-resolved name and directory of the main program (the
+# includer of this library).
+_milky_cloud_progName="$(readlink -f "$0")" || return "$?"
+_milky_cloud_progDir="${progName%/*}"
+_milky_cloud_progName="${progName##*/}"
+
 # Figure out the symlink-resolved directory of this script.
-_milky_cloud_libDir="$(readlink -f "${BASH_SOURCE[0]}")" || exit "$?"
+_milky_cloud_libDir="$(readlink -f "${BASH_SOURCE[0]}")" || return "$?"
 _milky_cloud_libDir="${_milky_cloud_libDir%/*}"
 
-# Figure out the "main" directory. If the directory of `$0` is the same as the
-# directory of this script, then we're running a library script, and the "main"
-# directory is one up. Otherwise, the main directory is the directory of `$0`.
-_milky_cloud_mainDir="$(readlink -f "$0")" || exit "$?"
-_milky_cloud_mainDir="${_milky_cloud_mainDir%/*}"
-if [[ ${_milky_cloud_mainDir} == ${_milky_cloud_libDir} ]]; then
+# Figure out the "main" directory. If `progDir` is the same as `libDir`, then
+# we're running a library script, and the main directory is the parent of
+# `libDir`. Otherwise, the main directory is `progDir`.
+if [[ ${_milky_cloud_progDir} == ${_milky_cloud_libDir} ]]; then
     _milky_cloud_mainDir="$(cd "${_milky_cloud_libDir}/.."; /bin/pwd)"
+else
+    _milky_cloud_mainDir="${_milky_cloud_progDir}"
 fi
 
 
