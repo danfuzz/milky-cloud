@@ -68,6 +68,9 @@ function region-from-location {
 # Library functions: Others
 #
 
+# Load the simple command wrappers.
+. "${_milky_cloud_libDir}/init-wrappers.sh"
+
 # Load the argument processor library.
 . "${_milky_cloud_libDir}/arg-processor.sh"
 
