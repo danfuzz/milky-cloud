@@ -25,7 +25,8 @@ _stderr_progressEnabled=0
 #
 
 # Prints an error message to stderr, if such are enabled. Use option `--no-name`
-# to suppress printing of the top-level command name on the first message.
+# to suppress printing of the top-level command name on the first message. Use
+# `--read` to read messages from stdin.
 #
 # Note: Error messages are _enabled_ by default.
 function error-msg {
@@ -35,12 +36,30 @@ function error-msg {
 
     local msg="$*"
     local name="$(( !_stderr_anyErrors ))"
+    local read=0
 
-    if [[ $1 == '--no-name' ]]; then
+    while [[ $1 =~ ^-- ]]; do
+        case "$1" in
+            --no-name)
+                name=0
+                ;;
+            --read)
+                read=1
+                ;;
+            --)
+                shift
+                break
+                ;;
+            *)
+                echo 1>&2 "Unrecognized option: $1"
+                return 1
+                ;;
+        esac
         shift
-        name=0
-    elif [[ $1 == '--' ]]; then
-        shift
+    done
+
+    if (( read )); then
+        msg="$(cat)"
     fi
 
     if (( name )); then
