@@ -96,17 +96,26 @@ function error-msg-switch {
 #
 # Note: Progress messages are _disabled by default.
 function progress-msg {
-    if (( !_stderr_progressEnabled )); then
-        return
-    fi
-
-    local msg="$*"
-    local read=0
+    local readStdin=0
+    local wasCmd=0
 
     while [[ $1 =~ ^-- ]]; do
         case "$1" in
             --read)
-                read=1
+                readStdin=1
+                ;;
+            --print-option)
+                (( _stderr_progressEnabled )) \
+                && echo '--progress' \
+                || echo '--no-progress'
+                ;;
+            --set=1|--set=0)
+                _stderr_progressEnabled="${1#*=}"
+                wasCmd=1
+                ;;
+            --status)
+                echo "${_stderr_progressEnabled}"
+                wasCmd=1
                 ;;
             --)
                 shift
@@ -120,12 +129,17 @@ function progress-msg {
         shift
     done
 
-    if (( read )); then
-        msg="$(cat)"
+    if (( wasCmd || !_stderr_progressEnabled )); then
+        return
     fi
 
-    # `printf` to avoid option-parsing weirdness with `echo`.
-    printf 1>&2 '%s\n' "${msg}"
+    local msg
+    if (( readStdin )); then
+        cat 1>&2
+    else
+        # `printf` to avoid option-parsing weirdness with `echo`.
+        printf 1>&2 '%s\n' "$*"
+    fi
 }
 
 # Enables, disables, or checks the enabled status of "progress" messages.
