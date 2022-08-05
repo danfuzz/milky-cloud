@@ -100,7 +100,7 @@ function opt-action {
     || return 1
 
     _argproc_define-no-value-arg --option \
-        "${specName}" "${optFilter}" "${optCall}" "${optVar}" "${specAbbrev}" "${specValue}"
+        "${specName}" "${specValue}" "${optFilter}" "${optCall}" "${optVar}" "${specAbbrev}"
 
     if [[ ${optVar} != '' ]]; then
         # Set up the default initializer.
@@ -143,7 +143,7 @@ function opt-choice {
         fi
 
         _argproc_define-no-value-arg --option \
-            "${specName}" "${optFilter}" "${optCall}" "${optVar}" "${specAbbrev}" "${specValue}"
+            "${specName}" "${specValue}" "${optFilter}" "${optCall}" "${optVar}" "${specAbbrev}"
 
         allNames+=("${specName}")
     done
@@ -153,12 +153,12 @@ function opt-choice {
     fi
 }
 
-# Declares a "toggle" option, which does not accept a value on the commandline.
-# No `<value>` is allowed in the argument spec. The toggle state of off or on is
-# always indicated by a value of `0` or `1` (respectively). In addition to the
-# main long-form option `--<name>`, this function also defines `--no-<name>` to
-# turn the toggle off. If left unspecified, the default variable value for a
-# toggle option is `0`.
+# Declares a "toggle" option, which allows setting of a value to `0` or `1`. No
+# `<value>` is allowed in the argument spec. The main long form option name can
+# be used without a value to indicate "on" (`1`), or it can be used as
+# `--<name>=1` or `--<name>=0` to indicate a specific state. In addition, the
+# long form `--no-<name>` can be used to indicate "off" (`0`).
+# The default variable value for a toggle option is `0`.
 function opt-toggle {
     local optCall=''
     local optFilter=''
@@ -177,10 +177,11 @@ function opt-toggle {
         _argproc_initStatements+=("${optVar}=0")
     fi
 
-    _argproc_define-no-value-arg --option \
-        "${specName}" "${optFilter}" "${optCall}" "${optVar}" "${specAbbrev}" '1'
-    _argproc_define-no-value-arg --option \
-        "no-${specName}" "${optFilter}" "${optCall}" "${optVar}" '' '0'
+    # Extra filter on the positive option, so it can take a value.
+    _argproc_define-value-taking-arg --option "${specName}" \
+        '=1' "/^[01]$/\n${optFilter}" "${optCall}" "${optVar}" \
+    _argproc_define-no-value-arg --option "no-${specName}" \
+        '0' "${optFilter}" "${optCall}" "${optVar}" ''
 
     if [[ ${specAbbrev} != '' ]]; then
         _argproc_define-abbrev "${specAbbrev}" "${specName}"
@@ -188,9 +189,11 @@ function opt-toggle {
 }
 
 # Declares a "value" option, which requires a value when passed on a
-# commandline. No `<abbrev>` or `<value>` is allowed in the argument spec. If
-# left unspecified, the default variable value for a value option is `''` (the
-# empty string). This definer also accepts the `--required` option.
+# commandline. If a <value> is passed in the spec, then the resulting option is
+# value-optional, with the no-value form using the given <value>. No <abbrev> is
+# allowed in the argument spec. If left unspecified, the default variable value
+# for a value option is `''` (the empty string). This definer also accepts the
+# `--required` option.
 function opt-value {
     local optCall=''
     local optDefault=''
@@ -202,7 +205,8 @@ function opt-value {
     || return 1
 
     local specName=''
-    _argproc_parse-spec "${args[0]}" \
+    local specValue=''
+    _argproc_parse-spec --value-eq "${args[0]}" \
     || return 1
 
     if [[ ${optVar} != '' ]]; then
@@ -210,8 +214,8 @@ function opt-value {
         _argproc_initStatements+=("${optVar}=$(_argproc_quote "${optDefault}")")
     fi
 
-    _argproc_define-value-required-arg --option \
-        "${specName}" "${optFilter}" "${optCall}" "${optVar}"
+    _argproc_define-value-taking-arg --option \
+        "${specName}" "${specValue}" "${optFilter}" "${optCall}" "${optVar}"
 
     if (( optRequired )); then
         _argproc_add-required-arg-postcheck "${specName}"
@@ -241,8 +245,8 @@ function positional-arg {
         _argproc_initStatements+=("${optVar}=$(_argproc_quote "${optDefault}")")
     fi
 
-    _argproc_define-value-required-arg \
-        "${specName}" "${optFilter}" "${optCall}" "${optVar}"
+    _argproc_define-value-taking-arg \
+        "${specName}" '' "${optFilter}" "${optCall}" "${optVar}"
 
     if (( optRequired )); then
         _argproc_add-required-arg-postcheck "${specName}"
@@ -484,8 +488,8 @@ function _argproc_define-abbrev {
     }'
 }
 
-# Defines an argument activation function which prohibits passing a value, as
-# the value is "built into" the argument spec.
+# Defines an activation function for an argument/option which prohibits getting
+# passed a value.
 function _argproc_define-no-value-arg {
     if [[ $1 == '--option' ]]; then
         shift
@@ -496,11 +500,11 @@ function _argproc_define-no-value-arg {
     fi
 
     local longName="$1"
-    local filter="$2"
-    local callFunc="$3"
-    local varName="$4"
-    local abbrevChar="$5"
-    local value="$6"
+    local value="$2"
+    local filter="$3"
+    local callFunc="$4"
+    local varName="$5"
+    local abbrevChar="$6"
 
     _argproc_set-arg-description "${longName}" option || return 1
 
@@ -526,8 +530,9 @@ function _argproc_define-no-value-arg {
     fi
 }
 
-# Defines an argument/option activation function which requires passing a value.
-function _argproc_define-value-required-arg {
+# Defines an activation function for an argument/option which can or must be
+# passed a value.
+function _argproc_define-value-taking-arg {
     local isOption=0
     if [[ $1 == '--option' ]]; then
         isOption=1
@@ -535,9 +540,10 @@ function _argproc_define-value-required-arg {
     fi
 
     local longName="$1"
-    local filter="$2"
-    local callFunc="$3"
-    local varName="$4"
+    local eqDefault="$2"
+    local filter="$3"
+    local callFunc="$4"
+    local varName="$5"
 
     local handlerName
     if (( isOption )); then
@@ -553,10 +559,20 @@ function _argproc_define-value-required-arg {
         _argproc_handler-body "${longName}" "${desc}" "${filter}" "${callFunc}" "${varName}"
     )"
 
+    local ifNoValue=''
+    if [[ ${eqDefault} == '' ]]; then
+        # No default value, therefore value required.
+        ifNoValue='
+            error-msg "Value required for '"${desc}"'."
+            return 1'
+    else
+        eqDefault="$(_argproc_quote "${eqDefault:1}")" # `:1` to drop the `=`.
+        ifNoValue="set -- ${eqDefault}"
+    fi
+
     eval 'function '"${handlerName}"' {
         if (( $# < 1 )); then
-            error-msg "Value required for '"${desc}"'."
-            return 1
+            '"${ifNoValue}"'
         fi
         '"${handlerBody}"'
     }'
@@ -570,37 +586,41 @@ function _argproc_define-value-required-arg {
 function _argproc_handler-body {
     local longName="$1"
     local desc="$2"
-    local filter="$3"
+    local filters="$3"
     local callFunc="$4"
     local varName="$5"
     local result=()
 
-    if [[ ${filter} =~ ^/(.*)/$ ]]; then
-        # Add a loop to perform the regex check on each argument.
-        filter="${BASH_REMATCH[1]}"
-        result+=(
-            "$(printf '
-                local _argproc_value
-                for _argproc_value in "$@"; do
-                    if ! [[ ${_argproc_value} =~ %s ]]; then
-                        error-msg "Invalid value for %s: ${_argproc_value}"
-                        return 1
-                    fi
-                done' \
-                "${filter}" "${desc}")"
-        )
-    elif [[ ${filter} != '' ]]; then
-        # Add a loop to call the filter function on each argument.
-        result+=(
-            "$(printf '
-                local _argproc_value _argproc_args=()
-                for _argproc_value in "$@"; do
-                    _argproc_args+=("$(%s "${_argproc_value}")") || return 1
-                done
-                set -- "${_argproc_args[@]}"' \
-                "${filter}")"
-        )
-    fi
+    while [[ ${filters} =~ ^$'\n'*([^$'\n']*)'\n'*(.*)$ ]]; do
+        local f="${BASH_REMATCH[1]}"
+        filters="${BASH_REMATCH[2]}"
+        if [[ ${f} =~ ^/(.*)/$ ]]; then
+            # Add a loop to perform the regex check on each argument.
+            f="${BASH_REMATCH[1]}"
+            result+=(
+                "$(printf '
+                    local _argproc_value
+                    for _argproc_value in "$@"; do
+                        if ! [[ ${_argproc_value} =~ %s ]]; then
+                            error-msg "Invalid value for %s: ${_argproc_value}"
+                            return 1
+                        fi
+                    done' \
+                    "${f}" "${desc}")"
+            )
+        else
+            # Add a loop to call the filter function on each argument.
+            result+=(
+                "$(printf '
+                    local _argproc_value _argproc_args=()
+                    for _argproc_value in "$@"; do
+                        _argproc_args+=("$(%s "${_argproc_value}")") || return 1
+                    done
+                    set -- "${_argproc_args[@]}"' \
+                    "${f}")"
+            )
+        fi
+    done
 
     if [[ ${callFunc} =~ ^\{(.*)\}$ ]]; then
         # Add a compound statement for the code block.
@@ -756,12 +776,17 @@ function _argproc_janky-args {
 function _argproc_parse-spec {
     local abbrevOk=0
     local valueOk=0
-    while [[ $1 =~ ^--(value|abbrev) ]]; do
-        if [[ $1 == '--abbrev' ]]; then
-            abbrevOk=1
-        else
-            valueOk=1
-        fi
+    local valueWithEq=0
+    while [[ $1 =~ ^-- ]]; do
+        case "$1" in
+            --abbrev)   abbrevOk=1;               ;;
+            --value)    valueOk=1;                ;;
+            --value-eq) valueOk=1; valueWithEq=1; ;;
+            *)
+                error-msg "Unrecognized option: $1"
+                return 1
+                ;;
+        esac
         shift
     done
 
@@ -784,9 +809,15 @@ function _argproc_parse-spec {
     fi
 
     if (( valueOk )); then
-        specHasValue="$([[ ${value} == '' ]]; echo $?)"
-        if (( specHasValue )); then
-            specValue="${value:1}" # `:1` to drop the equal sign.
+        if (( !valueWithEq )); then
+            specHasValue="$([[ ${value} == '' ]]; echo "$?")"
+        fi
+
+        if [[ ${value} != '' ]]; then
+            if (( !valueWithEq )); then
+                value="${value:1}" # `:1` to drop the equal sign.
+            fi
+            specValue="${value}"
         fi
     elif [[ ${value} != '' ]]; then
         error-msg "Value not allowed in spec: ${spec}"
