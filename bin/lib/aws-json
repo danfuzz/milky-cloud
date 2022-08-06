@@ -52,9 +52,6 @@ function usage {
     exit "$@"
 }
 
-# Error during argument processing?
-argError=0
-
 # AWS command and subcommand. These are expected before any dashed options.
 if ! ( (( $# >= 2 )) && [[ $1 =~ ^[a-z] ]] && [[ $2 =~ ^[a-z] ]] ); then
     error-msg 'Missing AWS command and/or subcommand.'
