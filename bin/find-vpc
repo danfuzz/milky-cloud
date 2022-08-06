@@ -30,11 +30,11 @@ function usage {
       Displays this message.
     '
 
-    exit "$1"
+    exit "$@"
 }
 
 # Want help?
-opt-action --call=usage help/h=0
+opt-action --call='{ usage }' help/h
 
 # Region, passed as either region per se or availability zone.
 opt-value --required --var=region --filter=region-from-location loc

@@ -37,11 +37,11 @@ function usage {
       Displays this message.
     '
 
-    exit "$1"
+    exit "$@"
 }
 
 # Want help?
-opt-action --call=usage help/h=0
+opt-action --call='{ usage }' help/h
 
 # Output style.
 opt-value --var=outputStyle --init=json \

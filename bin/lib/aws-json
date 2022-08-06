@@ -49,11 +49,8 @@ function usage {
       Displays this message.
     '
 
-    exit "$1"
+    exit "$@"
 }
-
-# Error during argument processing?
-argError=0
 
 # AWS command and subcommand. These are expected before any dashed options.
 if ! ( (( $# >= 2 )) && [[ $1 =~ ^[a-z] ]] && [[ $2 =~ ^[a-z] ]] ); then
@@ -66,7 +63,7 @@ else
 fi
 
 # Want help?
-opt-action --call=usage help/h=0
+opt-action --call='{ usage }' help/h
 
 # Region, passed as either region per se or availability zone.
 opt-value --var=region --filter=region-from-location loc
