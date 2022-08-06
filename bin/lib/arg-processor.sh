@@ -32,10 +32,9 @@
 # * `--filter=/<regex>/` -- Matches each argument value against the regex. If
 #   the regex doesn't match, the argument is rejected.
 # * `--var=<name>` -- Sets the named variable to the argument value(s). The
-#   variable is always initialized to a default value, which is itself
-#   optionally specified via `--default=<value>`. If `--default` isn't used (or
-#   isn't available), then the default-for-the-default depends on the specific
-#   function.
+#   variable is always initialized to _some_, which is itself optionally
+#   specified via `--init=<value>`. If `--init` isn't used (or isn't available),
+#   then the default initialized value depends on the specific function.
 #
 # Value-accepting argument definers allow `--enum=<spec>` as an alternate form
 # of filter. In this case `<spec>` must be a space-separated list of names --
@@ -81,15 +80,15 @@ _argproc_preReturnStatements=()
 #
 
 # Declares an "action" option, which takes no value on a commandline. If left
-# unspecified, the default variable value for an action option is `0`, and the
-# default activation value is `1`.
+# unspecified, the initial variable value for an action option is `0`, and the
+# activation value is `1`.
 function opt-action {
     local optCall=''
-    local optDefault='0'
+    local optInit='0'
     local optFilter=''
     local optVar=''
     local args=("$@")
-    _argproc_janky-args call default filter var \
+    _argproc_janky-args call filter init var \
     || return 1
 
     local specName=''
@@ -103,29 +102,29 @@ function opt-action {
         "${specName}" "${specValue}" "${optFilter}" "${optCall}" "${optVar}" "${specAbbrev}"
 
     if [[ ${optVar} != '' ]]; then
-        # Set up the default initializer.
-        _argproc_initStatements+=("${optVar}=$(_argproc_quote "${optDefault}")")
+        # Set up the variable initializer.
+        _argproc_initStatements+=("${optVar}=$(_argproc_quote "${optInit}")")
     fi
 }
 
 # Declares a "choice" option set, consisting of one or more options. On a
 # commandline, no choice option accepts a value (because the option name itself
-# implies the value). If left unspecified, the default variable value for a
+# implies the value). If left unspecified, the initial variable value for a
 # choice option is `''` (the empty string). This definer also accepts the
 # `--required` option.
 function opt-choice {
     local optCall=''
-    local optDefault=''
     local optFilter=''
+    local optInit=''
     local optRequired=0
     local optVar=''
     local args=("$@")
-    _argproc_janky-args --multi-arg call default filter required var \
+    _argproc_janky-args --multi-arg call filter init required var \
     || return 1
 
     if [[ ${optVar} != '' ]]; then
-        # Set up the default initializer.
-        _argproc_initStatements+=("${optVar}=$(_argproc_quote "${optDefault}")")
+        # Set up the variable initializer.
+        _argproc_initStatements+=("${optVar}=$(_argproc_quote "${optInit}")")
     fi
 
     local allNames=()
@@ -158,7 +157,7 @@ function opt-choice {
 # be used without a value to indicate "on" (`1`), or it can be used as
 # `--<name>=1` or `--<name>=0` to indicate a specific state. In addition, the
 # long form `--no-<name>` can be used to indicate "off" (`0`).
-# The default variable value for a toggle option is `0`.
+# The initial variable value for a toggle option is `0`.
 function opt-toggle {
     local optCall=''
     local optFilter=''
@@ -173,7 +172,7 @@ function opt-toggle {
     || return 1
 
     if [[ ${optVar} != '' ]]; then
-        # Set up the default initializer.
+        # Set up the variable initializer.
         _argproc_initStatements+=("${optVar}=0")
     fi
 
@@ -191,17 +190,17 @@ function opt-toggle {
 # Declares a "value" option, which requires a value when passed on a
 # commandline. If a <value> is passed in the spec, then the resulting option is
 # value-optional, with the no-value form using the given <value>. No <abbrev> is
-# allowed in the argument spec. If left unspecified, the default variable value
+# allowed in the argument spec. If left unspecified, the initial variable value
 # for a value option is `''` (the empty string). This definer also accepts the
 # `--required` option.
 function opt-value {
     local optCall=''
-    local optDefault=''
     local optFilter=''
+    local optInit=''
     local optRequired=0
     local optVar=''
     local args=("$@")
-    _argproc_janky-args call default enum filter required var \
+    _argproc_janky-args call enum filter init required var \
     || return 1
 
     local specName=''
@@ -210,8 +209,8 @@ function opt-value {
     || return 1
 
     if [[ ${optVar} != '' ]]; then
-        # Set up the default initializer.
-        _argproc_initStatements+=("${optVar}=$(_argproc_quote "${optDefault}")")
+        # Set up the variable initializer.
+        _argproc_initStatements+=("${optVar}=$(_argproc_quote "${optInit}")")
     fi
 
     _argproc_define-value-taking-arg --option \
@@ -223,17 +222,18 @@ function opt-value {
 }
 
 # Declares a positional argument. No `<abbrev>` or `<value>` is allowed in the
-# argument spec. Unlike options, a positional argument name is _only_ used for
+# argument spec. If left unspecified, the initial variable value is `''` (the
+# empty string). Unlike options, a positional argument name is _only_ used for
 # error messages and internal bookkeeping. This definer also accepts the
 # `--required` option.
 function positional-arg {
     local optCall=''
-    local optDefault=''
     local optFilter=''
+    local optInit=''
     local optRequired=0
     local optVar=''
     local args=("$@")
-    _argproc_janky-args call default enum filter required var \
+    _argproc_janky-args call enum filter init required var \
     || return 1
 
     local specName=''
@@ -241,8 +241,8 @@ function positional-arg {
     || return 1
 
     if [[ ${optVar} != '' ]]; then
-        # Set up the default initializer.
-        _argproc_initStatements+=("${optVar}=$(_argproc_quote "${optDefault}")")
+        # Set up the variable initializer.
+        _argproc_initStatements+=("${optVar}=$(_argproc_quote "${optInit}")")
     fi
 
     _argproc_define-value-taking-arg \
@@ -363,7 +363,8 @@ function require-exactly-one-arg-of {
 
 # Declares a "rest" argument, which gets all the otherwise-untaken positional
 # arguments, during parsing. If this is not declared, argument processing will
-# report an error in the presence of any "rest" arguments.
+# report an error in the presence of any "rest" arguments. The initial variable
+# value is `()` (the empty array).
 function rest-arg {
     local optCall=''
     local optFilter=''
@@ -377,7 +378,7 @@ function rest-arg {
     || return 1
 
     if [[ ${optVar} != '' ]]; then
-        # Set up the default initializer.
+        # Set up the variable initializer.
         _argproc_initStatements+=("${optVar}=()")
     fi
 
@@ -693,9 +694,9 @@ function _argproc_janky-args {
                     && optCall="${BASH_REMATCH[1]}" \
                     || argError=1
                     ;;
-                default)
+                init)
                     [[ ${value} =~ ^=(.*)$ ]] \
-                    && optDefault="${BASH_REMATCH[1]}" \
+                    && optInit="${BASH_REMATCH[1]}" \
                     || argError=1
                     ;;
                 enum)

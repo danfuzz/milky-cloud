@@ -44,7 +44,7 @@ function usage {
 opt-action --call=usage help/h=0
 
 # Output style.
-opt-value --var=outputStyle --default=json \
+opt-value --var=outputStyle --init=json \
     --enum='compact json lines none raw words' output
 
 # Value to operate on.
