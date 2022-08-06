@@ -66,7 +66,7 @@ else
 fi
 
 # Want help?
-opt-action --call=usage help/h=0
+opt-action --call='{ usage }' help/h
 
 # Region, passed as either region per se or availability zone.
 opt-value --var=region --filter=region-from-location loc

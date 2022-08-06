@@ -34,7 +34,7 @@ function usage {
 }
 
 # Want help?
-opt-action --call=usage help/h=0
+opt-action --call='{ usage }' help/h
 
 # Output style.
 opt-value --var=outputStyle --init=json --enum='compact json' output
