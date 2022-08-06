@@ -58,7 +58,7 @@ function usage {
       Display this message.
     '
 
-    exit "$1"
+    exit "$@"
 }
 
 # Want help?

@@ -36,7 +36,7 @@ function usage {
       Displays this message.
     '
 
-    exit "$1"
+    exit "$@"
 }
 
 # Want help?
