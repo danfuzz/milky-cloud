@@ -28,22 +28,23 @@ _stderr_progressEnabled=0
 #
 # --no-name -- Suppress printing of the top-level command name on the first
 #   message.
-# --read -- Read messages from stdin.
+# --exec -- Execute the arguments as a command, instead of treating them as
+#   arguments to print.
 # --set=0|1 -- Enable or disable error message printing.
 #
 # Note: Error messages are _enabled_ by default.
 function error-msg {
+    local doExec=0
     local printName="$(( !_stderr_anyErrors ))"
-    local readStdin=0
     local wasCmd=0
 
     while [[ $1 =~ ^-- ]]; do
         case "$1" in
+            --exec)
+                doExec=1
+                ;;
             --no-name)
                 printName=0
-                ;;
-            --read)
-                readStdin=1
                 ;;
             --set=1|--set=0)
                 _stderr_stderrEnabled="${1#*=}"
@@ -69,8 +70,8 @@ function error-msg {
         printf 1>&2 '%s: ' "${_stderr_cmdName}"
     fi
 
-    if (( readStdin )); then
-        cat 1>&2
+    if (( doExec )); then
+        "$@" 1>&2
     else
         # `printf` to avoid option-parsing weirdness with `echo`.
         printf 1>&2 '%s\n' "$*"
@@ -81,20 +82,21 @@ function error-msg {
 
 # Prints a "progress" message to stderr, if such are enabled.
 #
-# --read -- Read messages from stdin.
+# --exec -- Execute the arguments as a command, instead of treating them as
+#   arguments to print.
 # --set=0|1 -- Enable or disable error message printing.
 # --status -- Prints `1` or `0` to stdout, to indicate enabled status. (This is
 #   to make it easy to propagate the progress state down into another command.)
 #
 # Note: Progress messages are _disabled by default.
 function progress-msg {
-    local readStdin=0
+    local doExec=0
     local wasCmd=0
 
     while [[ $1 =~ ^-- ]]; do
         case "$1" in
-            --read)
-                readStdin=1
+            --exec)
+                doExec=1
                 ;;
             --set=1|--set=0)
                 _stderr_progressEnabled="${1#*=}"
@@ -120,8 +122,8 @@ function progress-msg {
         return
     fi
 
-    if (( readStdin )); then
-        cat 1>&2
+    if (( doExec )); then
+        "$@" 1>&2
     else
         # `printf` to avoid option-parsing weirdness with `echo`.
         printf 1>&2 '%s\n' "$*"
