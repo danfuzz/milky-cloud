@@ -43,10 +43,10 @@ function usage {
 opt-action --call=usage help/h=0
 
 # Input type.
-opt-value --var=inputType --default=any --enum='any region zone' input
+opt-value --var=inputType --init=any --enum='any region zone' input
 
 # Item to output.
-opt-value --var=outputItem --default=none --enum='none region zone zone-suffix' output
+opt-value --var=outputItem --init=none --enum='none region zone zone-suffix' output
 
 # Location to parse, and parsed bits.
 region=''

@@ -68,7 +68,7 @@ opt-action --call=usage help/h=0
 opt-value --required --var=zone --call=parse-zone loc
 
 # Instance type.
-opt-value --var=instanceType --default='t3.nano' instance-type
+opt-value --var=instanceType --init='t3.nano' instance-type
 
 # Name for the SSH keypair that allows for login access.
 opt-value --var=keyName --filter='/./' key-name

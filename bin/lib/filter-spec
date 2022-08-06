@@ -38,7 +38,7 @@ function usage {
 }
 
 # Output style.
-opt-value --var=outputStyle --default=json --enum='compact json' output
+opt-value --var=outputStyle --init=json --enum='compact json' output
 
 # Want help?
 opt-action --call=usage help/h=0
