@@ -72,7 +72,7 @@ subnetId="$(jget --output=raw "${result}" '
 case "${subnetId}" in
     ambiguous)
         error-msg 'Ambiguous specification matches all of:'
-        jget --output=raw "${result}" '.[] | "  " + .' | error-msg --read
+        error-msg --exec jget --output=raw "${result}" '.[] | "  " + .'
         exit 1
         ;;
     none)

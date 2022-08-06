@@ -266,6 +266,7 @@ function positional-arg {
 function print-usage {
     local msg="$1"
 
+    error-msg --no-name --exec \
     awk <<<"${msg}" -v name="${_argproc_cmdName}" \
     '
     BEGIN {
@@ -301,8 +302,7 @@ function print-usage {
         gsub(/\${name}/, name);
         print;
     }
-    ' \
-    | error-msg --no-name --read
+    '
 }
 
 # Processes all of the given arguments, according to the configured handlers.

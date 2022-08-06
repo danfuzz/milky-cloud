@@ -90,7 +90,7 @@ if (( count == 0 )); then
     exit 1
 elif (( count != 1 )); then
     error-msg 'Ambiguous name or ID matches all of:'
-    jget --output=raw "${result}" '.all[] | "  " + .' | error-msg --read
+    error-msg --exec jget --output=raw "${result}" '.all[] | "  " + .'
     exit 1
 fi
 

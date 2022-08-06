@@ -119,13 +119,13 @@ fi
 amiInfo="$(lib find-ami --loc="${zone}" --instance-type="${instanceType}")" \
 || exit "$?"
 
+progress-msg --exec \
 jget --output=raw "${amiInfo}" '
     "Using AMI:",
     "  desc: " + .Description,
     "  name: " + .Name,
     "  id:   " + .ImageId
-' \
-| progress-msg --read
+'
 
 # Resolve the VPC, security group, and subnet IDs, if necessary.
 
