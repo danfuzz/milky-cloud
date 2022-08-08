@@ -2,40 +2,34 @@
 # Licensed AS IS and WITHOUT WARRANTY under the Apache License, Version 2.0.
 # Details: <http://www.apache.org/licenses/LICENSE-2.0>
 
-if [[ ${_milky_cloud_libDir} != '' ]]; then
+if [[ ${_init_libDir} != '' ]]; then
     error-msg 'Warning: Not reinitializing library!'
     return 1
 fi
 
 #
-# Global variable setup
+# Global setup
 #
 
 # The symlink-resolved path of the command that is running (that is, the
 # top-level script).
-_milky_cloud_cmdPath="$(readlink -f "$0")" || return "$?"
+_init_cmdPath="$(readlink -f "$0")" || return "$?"
 
 # Figure out the symlink-resolved directory of this script.
-_milky_cloud_libDir="$(readlink -f "${BASH_SOURCE[0]}")" || return "$?"
-_milky_cloud_libDir="${_milky_cloud_libDir%/*}"
+_init_libDir="$(readlink -f "${BASH_SOURCE[0]}")" || return "$?"
+_init_libDir="${_init_libDir%/*}"
 
 # Figure out the "main" directory. If `cmdDir` is the same as `libDir`, then
 # we're running a library script, and the main directory is the parent of
 # `libDir`. Otherwise, the main directory is `cmdDir`.
-if [[ ${_milky_cloud_cmdDir} == ${_milky_cloud_libDir} ]]; then
-    _milky_cloud_mainDir="$(cd "${_milky_cloud_libDir}/.."; /bin/pwd)"
+if [[ ${_init_cmdDir} == ${_init_libDir} ]]; then
+    _init_mainDir="$(cd "${_init_libDir}/.."; /bin/pwd)"
 else
-    _milky_cloud_mainDir="${_milky_cloud_cmdPath%/*}"
+    _init_mainDir="${_init_cmdPath%/*}"
 fi
 
-
-#
-# Sibling libararies
-#
-
-. "${_milky_cloud_libDir}/stderr-messages.sh"  # Error and progress messages.
-. "${_milky_cloud_libDir}/arg-processor.sh"    # Argument processor.
-. "${_milky_cloud_libDir}/init-wrappers.sh"    # Simple command wrappers.
+# Load product-specific initialization code (including loading other libraries).
+. "${_init_libDir}/init-product.sh" # Product-specific init code.
 
 
 #
@@ -45,14 +39,15 @@ fi
 # call, instead of re-re-...-doing it multiple times.
 #
 
-if [[ ${MILKY_CLOUD_PREREQUISITES_DONE} != 1 ]]; then
-    . "${_milky_cloud_libDir}/init-check-prereqs.sh" \
+_init_envVarName="$(_init_product-name | tr a-z- A-Z_)_PREREQUISITES_DONE"
+if [[ ${!_init_envVarName} != 1 ]]; then
+    _init_check-prerequisites \
     || {
         error-msg 'Failed one or more prerequisite checks!'
         return 1
     }
 
-    export MILKY_CLOUD_PREREQUISITES_DONE=1
+    eval "export ${_init_envVarName}=1"
 fi
 
 
@@ -63,19 +58,19 @@ fi
 # Gets the directory of this command, "this command" being the main script that
 # is running.
 function this-cmd-dir {
-    echo "${_milky_cloud_cmdPath%/*}"
+    echo "${_init_cmdPath%/*}"
 }
 
 # Gets the name of this command, that is, "this command" being the main script
 # that is running.
 function this-cmd-name {
-    echo "${_milky_cloud_cmdPath##*/}"
+    echo "${_init_cmdPath##*/}"
 }
 
 # Gets the full path of this command, "this command" being the main script that
 # is running.
 function this-cmd-path {
-    echo "${_milky_cloud_cmdPath}"
+    echo "${_init_cmdPath}"
 }
 
 # Calls through to an arbitrary library script.
@@ -91,12 +86,12 @@ function lib {
     if ! [[ ${name} =~ ^[-a-z]+$ ]]; then
         error-msg 'Weird script name:' "${name}"
         return 1
-    elif [[ -x "${_milky_cloud_libDir}/${name}" ]]; then
+    elif [[ -x "${_init_libDir}/${name}" ]]; then
         # It's in the internal helper library.
-        "${_milky_cloud_libDir}/${name}" "$@"
-    elif [[ -x "${_milky_cloud_mainDir}/${name}" ]]; then
+        "${_init_libDir}/${name}" "$@"
+    elif [[ -x "${_init_mainDir}/${name}" ]]; then
         # It's an exposed script.
-        "${_milky_cloud_mainDir}/${name}" "$@"
+        "${_init_mainDir}/${name}" "$@"
     else
         error-msg 'No such library script:' "${name}"
         return 1

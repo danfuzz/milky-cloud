@@ -2,16 +2,31 @@
 # Licensed AS IS and WITHOUT WARRANTY under the Apache License, Version 2.0.
 # Details: <http://www.apache.org/licenses/LICENSE-2.0>
 
-# Note: No library init here. The library init uses this script, so we'd be
-# setting ourselves up for infinite recursion.
-
 #
-# Main script
+# Per-product definitions needed by the product-agnostic top-level library
+# initialization script `init.sh`
 #
 
-# Do the checks. This is a function and not just top-level code, so we can avoid
-# polluting the global variable namespace.
-function check-prereqs {
+#
+# Sibling libraries
+#
+
+. "${_init_libDir}/stderr-messages.sh"  # Error and progress messages.
+. "${_init_libDir}/arg-processor.sh"    # Argument processor.
+. "${_init_libDir}/init-wrappers.sh"    # Simple command wrappers.
+
+
+#
+# Library functions
+#
+
+# Gets the name of this product (or "product").
+function _init_product-name {
+    echo 'milky-cloud'
+}
+
+# Performs any prerequisite checks needed by this product.
+function _init_check-prerequisites {
     local error=0
 
     if ! which aws >/dev/null 2>&1; then
@@ -38,6 +53,3 @@ function check-prereqs {
 
     return "${error}"
 }
-
-check-prereqs || return "$?"
-unset -f check-prereqs
