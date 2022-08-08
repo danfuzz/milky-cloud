@@ -1,6 +1,6 @@
 # Copyright 2022 Dan Bornstein.
-# Licensed AS IS and WITHOUT WARRANTY under the Apache License,
-# Version 2.0. Details: <http://www.apache.org/licenses/LICENSE-2.0>
+# Licensed AS IS and WITHOUT WARRANTY under the Apache License, Version 2.0.
+# Details: <http://www.apache.org/licenses/LICENSE-2.0>
 
 # Note: No library init here. The library init uses this script, so we'd be
 # setting ourselves up for infinite recursion.

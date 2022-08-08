@@ -1,6 +1,6 @@
 # Copyright 2022 Dan Bornstein.
-# Licensed AS IS and WITHOUT WARRANTY under the Apache License,
-# Version 2.0. Details: <http://www.apache.org/licenses/LICENSE-2.0>
+# Licensed AS IS and WITHOUT WARRANTY under the Apache License, Version 2.0.
+# Details: <http://www.apache.org/licenses/LICENSE-2.0>
 
 if [[ ${_milky_cloud_libDir} != '' ]]; then
     error-msg 'Warning: Not reinitializing library!'
