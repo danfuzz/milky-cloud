@@ -156,14 +156,15 @@ function opt-choice {
 # `<value>` is allowed in the argument spec. The main long form option name can
 # be used without a value to indicate "on" (`1`), or it can be used as
 # `--<name>=1` or `--<name>=0` to indicate a specific state. In addition, the
-# long form `--no-<name>` can be used to indicate "off" (`0`).
-# The initial variable value for a toggle option is `0`.
+# long form `--no-<name>` can be used to indicate "off" (`0`). If left
+# unspecified, the initial variable value for a toggle option is `0`.
 function opt-toggle {
     local optCall=''
     local optFilter=''
+    local optInit=0
     local optVar=''
     local args=("$@")
-    _argproc_janky-args call filter var \
+    _argproc_janky-args call filter init var \
     || return 1
 
     local specName=''
@@ -173,7 +174,7 @@ function opt-toggle {
 
     if [[ ${optVar} != '' ]]; then
         # Set up the variable initializer.
-        _argproc_initStatements+=("${optVar}=0")
+        _argproc_initStatements+=("${optVar}=$(_argproc_quote "${optInit}")")
     fi
 
     # Extra filter on the positive option, so it can take a value.
