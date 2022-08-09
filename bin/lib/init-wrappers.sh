@@ -23,6 +23,11 @@ function jget {
     lib json-get "$@"
 }
 
+# Calls `lib json-length`.
+function jlength {
+    lib json-get "$@"
+}
+
 # Calls `lib json-val`.
 function jval {
     lib json-val "$@"
