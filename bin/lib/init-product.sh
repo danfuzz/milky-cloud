@@ -11,9 +11,9 @@
 # Sibling libraries
 #
 
-. "${_init_libDir}/stderr-messages.sh"  # Error and progress messages.
-. "${_init_libDir}/arg-processor.sh"    # Argument processor.
-. "${_init_libDir}/init-wrappers.sh"    # Simple command wrappers.
+. "${_init_libDir}/stderr-messages.sh" || return "$?"
+. "${_init_libDir}/arg-processor.sh" || return "$?"
+. "${_init_libDir}/init-wrappers.sh" || return "$?"
 
 
 #
