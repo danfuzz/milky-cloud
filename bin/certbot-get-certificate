@@ -1,0 +1,144 @@
+#!/bin/bash
+#
+# Copyright 2022 Dan Bornstein.
+# Licensed AS IS and WITHOUT WARRANTY under the Apache License, Version 2.0.
+# Details: <http://www.apache.org/licenses/LICENSE-2.0>
+
+# Load the helper libraries.
+. "$(dirname "$(readlink -f "$0")")/lib/init.sh" || exit "$?"
+
+
+#
+# Argument parsing
+#
+
+function usage {
+    print-usage $'
+    Usage:
+
+    ${name} [<opt> ...]
+      Runs Certbot to get a certificate, without actually installing it. This
+      uses the DNS challenge, implemented "manually" here to call out to other
+      scripts in this project which use Route53. (Why not use Certbot\'s Route53
+      plugin? Because as of this writing, it is easier to reimplement it than to
+      get the plugins, because reasons.)
+
+      --dir=<path>
+        Directory to use for logs and temporary files. Defaults to `tmp-certbot`
+        under the current directory. The directory will be created if it
+        doesn\'t exist.
+      --domain=<domain-name>
+        Domain name to get a certificate for. This is required, and can be
+        specified more than once to get multiple certificates.
+      --email=<email-address>
+        Email address to use when making API requests. This is required. Per
+        Certbot / LetsEncrypt docs, this is just used for urgent communication.
+      --staging
+        Use the staging server.
+
+    ${name} [--help | -h]
+      Displays this message.
+    '
+
+    exit "$@"
+}
+
+# Special logic for callbacks from `certbot` to skip the usual argument parsing
+# and just call the right hook.
+runHook=''
+if [[ ${RUN_CERTBOT_HOOK} == 1 ]]; then
+    # Certbot sets `CERTBOT_AUTH_OUTPUT` only when calling the cleanup script.
+    if [[ ${CERTBOT_AUTH_OUTPUT-unset} == 'unset' ]]; then
+        runHook=authentication
+    else
+        runHook=cleanup
+    fi
+fi
+
+if [[ ${runHook} == '' ]]; then
+    # Want help?
+    opt-action --call='{ usage }' help/h
+
+    # Directory to use.
+    opt-value --var=dir --init='./tmp-certbot' dir
+
+    # Site to get a certificate for.
+    domainArgs=()
+    opt-value --required --call=add-domain --filter='/^([*][.])?[-.a-z0-9]+$/' domain
+    function add-domain {
+        domainArgs+=(--domain="$1")
+    }
+
+    # Email address.
+    opt-value --required --var=email --filter='/^[-_.+@a-z0-9]+$/' email
+
+    # Use the staging server?
+    opt-toggle --var=useStaging staging
+
+    process-args "$@" || usage "$?"
+fi
+
+
+#
+# Helper functions
+#
+
+# The "authentication" hook. This is (in effect) a callback from `certbot`.
+function authentication-hook {
+    info-msg '####### AUTHENTICATION HOOK CALLED'
+    env | grep CERTBOT | info-msg --exec cat
+    info-msg
+
+    validationData="${CERTBOT_VALIDATION}"
+    domain="${CERTBOT_DOMAIN}"
+
+    # TODO: Create a TXT record for `_acme-challenge.$domain`.
+
+
+    info-msg '####### AUTHENTICATION HOOK DONE'
+
+    exit 1
+}
+
+# The "cleanup" hook. This is (in effect) a callback from `certbot`.
+function cleanup-hook {
+    echo '####### CLEANUP HOOK CALLED'
+    #env | grep CERTBOT | info-msg --exec cat
+
+    domain="${CERTBOT_DOMAIN}"
+    # TODO: Remove any TXT records for `_acme-challenge.$domain`.
+
+    echo '####### CLEANUP HOOK DONE'
+}
+
+
+#
+# Main script
+#
+
+# Just run the requested callback hook, if it looks like we were called from
+# Certbot.
+if [[ ${runHook} != '' ]]; then
+    "${runHook}-hook"
+    exit "$?"
+fi
+
+# Not a callback. Do the main call.
+
+if [[ ! -d "${dir}" ]]; then
+    mkdir -p "${dir}" || exit "$?"
+fi
+
+extraOpts=()
+if (( useStaging )); then
+    extraOpts+=(--staging)
+fi
+
+thisCmd="$(this-cmd-path)"
+RUN_CERTBOT_HOOK=1 \
+certbot certonly \
+    --config-dir=. --logs-dir="${dir}" --work-dir="${dir}" \
+    --manual --noninteractive --agree-tos --email="${email}" \
+    --preferred-challenges=dns \
+    --manual-auth-hook="${thisCmd}" --manual-cleanup-hook="${thisCmd}" \
+    "${extraOpts[@]}" "${domainArgs[@]}"
