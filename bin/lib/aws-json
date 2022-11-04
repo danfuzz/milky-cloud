@@ -24,9 +24,15 @@ function usage {
     to the command. When post-processing, the original result becomes the sole
     input from stdin.
 
+    Of the options, exactly one of `--global`, `--loc`, or `--skeleton` must be
+    used.
+
     <cmd> <subcommand>
       The AWS command and subcommand to call, e.g. `ec2 run-instances`.
 
+    --global
+      Indicate that this command is expected to work without specifying a
+      region or zone.
     --loc=<region-or-zone>
       What region to make the call in. If specified as an availability zone,
       only the region portion matters. Either this option or `--skeleton` must
@@ -74,7 +80,10 @@ opt-value --filter='/./' --var=printCommandTo print-command-to
 # Just print argument "skeleton" ?
 opt-action --var=skeleton skeleton
 
-require-exactly-one-arg-of loc skeleton
+# Indicate that this call should not pass a region argument.
+opt-action --var=global global
+
+require-exactly-one-arg-of global loc skeleton
 
 # Output style (result post-processor option).
 outputStyle=json
@@ -169,7 +178,7 @@ dashArgs=(--no-cli-pager --output=json)
 
 if (( skeleton )); then
     dashArgs+=(--generate-cli-skeleton)
-else
+elif (( !global )); then
     dashArgs+=(--region="${region}")
 fi
 
