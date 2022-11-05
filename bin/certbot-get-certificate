@@ -89,11 +89,13 @@ function authentication-hook {
     env | grep CERTBOT | info-msg --exec cat
     info-msg
 
-    validationData="${CERTBOT_VALIDATION}"
-    domain="${CERTBOT_DOMAIN}"
+    local validationData="${CERTBOT_VALIDATION}"
+    local domain="${CERTBOT_DOMAIN}"
 
-    # TODO: Create a TXT record for `_acme-challenge.$domain`.
+    # TODO: Create a TXT record for `_acme-challenge.$domain.`.
+    make-change-payload CREATE "${domain}" "${validationData}"
 
+    # TODO: Use `route53 get-change` to figure out when the record is ready.
 
     info-msg '####### AUTHENTICATION HOOK DONE'
 
@@ -105,10 +107,101 @@ function cleanup-hook {
     echo '####### CLEANUP HOOK CALLED'
     #env | grep CERTBOT | info-msg --exec cat
 
-    domain="${CERTBOT_DOMAIN}"
+    local domain="${CERTBOT_DOMAIN}"
+    local remainingChallenges="${CERTBOT_REMAINING_CHALLENGES}"
+    local validationData="${CERTBOT_VALIDATION}"
+
+    local zoneId
+    zoneId="$(find-zone-id "${domain}")" \
+    || return "$?"
+
+    lib aws-json route53 list-resource-record-sets --global \
+        zoneId="${zoneId}" \
+        '{ HostedZoneId: $zoneId }' \
+        :: '.ResourceRecordSets[] | select(.Type == "TXT")'
+
     # TODO: Remove any TXT records for `_acme-challenge.$domain`.
+    # list-resource-record-sets
+    # change-resource-record-sets
+
+    if [[ ${remainingChallenges} != 0 ]]; then
+        # No more challenges. Do the "extra cleanup" work.
+        extra-cleanup || return "$?"
+    fi
 
     echo '####### CLEANUP HOOK DONE'
+}
+
+# "Extra clean" cleanup hook: Remove any stray records leftover from old
+# Certbot requests.
+function extra-cleanup {
+    echo '####### DOING EXTRA CLEANUP'
+
+    local allDomains="${CERTBOT_ALL_DOMAINS}"
+    allDomains=($(tr <<<"${allDomains}" ',' '\n' | sort -u))
+
+    local domain zoneId
+    for domain in "${allDomains[@]}"; do
+        echo "Domain >>>${domain}<<<"
+        zoneId="$(find-zone-id "${domain}")" \
+        || return "$1"
+        echo "Zone ID >>>${zoneId}<<<"
+
+        lib aws-json route53 list-resource-record-sets --global \
+            zoneId="${zoneId}" \
+            '{ HostedZoneId: $zoneId }' \
+            :: '.ResourceRecordSets[] | select(.Type == "TXT")'
+    done
+}
+
+# Finds the zone ID for a given domain name.
+function find-zone-id {
+    local domain="$1"
+
+    # Extract the main domain, and append `.` to make it officially "absolute."
+    [[ ${domain} =~ [^.]+[.][^.]+$ ]] || return "$1"
+    domain="${BASH_REMATCH[0]}."
+
+    local zoneId
+    zoneId="$(
+        lib aws-json route53 list-hosted-zones --global :: --output=raw \
+            domain="${domain}" \
+            '.HostedZones[] | select(.Name == $domain) | .Id'
+    )" \
+    || return "$?"
+
+    if [[ ${zoneId} == '' ]]; then
+        error-msg "Could not find zone ID for domain: ${domain}"
+        return 1
+    fi
+
+    echo "${zoneId}"
+}
+
+# Makes a payload for a DNS change request.
+function make-change-payload {
+    local action="$1"
+    local domain="$2"
+    local data="$3"
+
+    jval \
+        action="${action}" \
+        name="_acme-challenge.${domain}." \
+        data="${validationData}" \
+    '{
+        Comment: "Created by Certbot helper script",
+        Changes: [
+            {
+                Action: $action,
+                ResourceRecordSet: {
+                    Name: $name,
+                    Type: "TXT",
+                    TTL: 60,
+                    ResourceRecords: [{ Value: $data }]
+                }
+            }
+        ]
+    }'
 }
 
 
