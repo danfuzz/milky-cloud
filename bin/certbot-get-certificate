@@ -230,7 +230,7 @@ fi
 thisCmd="$(this-cmd-path)"
 RUN_CERTBOT_HOOK=1 \
 certbot certonly \
-    --config-dir=. --logs-dir="${dir}" --work-dir="${dir}" \
+    --config-dir="${dir}" --logs-dir="${dir}" --work-dir="${dir}" \
     --manual --noninteractive --agree-tos --email="${email}" \
     --preferred-challenges=dns \
     --manual-auth-hook="${thisCmd}" --manual-cleanup-hook="${thisCmd}" \
