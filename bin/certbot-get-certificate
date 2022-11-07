@@ -150,8 +150,6 @@ function cleanup-hook {
 # "Extra clean" cleanup hook: Remove any stray records leftover from old
 # Certbot requests.
 function extra-cleanup {
-    echo '####### DOING EXTRA CLEANUP'
-
     local allDomains="${CERTBOT_ALL_DOMAINS}"
     allDomains=($(
         tr <<<"${allDomains}" ',' '\n' \
@@ -161,14 +159,11 @@ function extra-cleanup {
         ' \
         | sort -u
     ))
-    echo "ALL DOMAINS >>>${allDomains[@]}<<<"
 
     local domain zoneId
     for domain in "${allDomains[@]}"; do
-        echo "Domain >>>${domain}<<<"
         zoneId="$(find-zone-id "${domain}")" \
         || return "$?"
-        echo "Zone ID >>>${zoneId}<<<"
 
         local payload
         payload="$(lib aws-json route53 list-resource-record-sets --global \
@@ -183,7 +178,7 @@ function extra-cleanup {
             then {
               Comment: "Via Cerbot wrapper extra-cleanup script",
               Changes: map({
-                Action:            "DELETE",
+                Action: "DELETE",
                 ResourceRecordSet: .
               })
             }
@@ -194,6 +189,7 @@ function extra-cleanup {
         || return "$?"
 
         if [[ ${payload} != 'null' ]]; then
+            echo "Cleaning up leftover challenges for domain: ${domain}"
             lib aws-json route53 change-resource-record-sets --global \
                 zoneId="${zoneId}" \
                 payload:json="${payload}" \
