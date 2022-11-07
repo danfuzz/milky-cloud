@@ -92,8 +92,19 @@ function authentication-hook {
     local validationData="${CERTBOT_VALIDATION}"
     local domain="${CERTBOT_DOMAIN}"
 
-    # TODO: Create a TXT record for `_acme-challenge.$domain.`.
-    make-change-payload CREATE "${domain}" "${validationData}"
+    local payload="$(make-change-payload CREATE "${domain}" "${validationData}")"
+
+    echo '############## PAYLOAD'
+    jval "${payload}"
+    echo '############## END PAYLOAD'
+
+    lib aws-json route53 change-resource-record-sets --global \
+        zoneId="${zoneId}" \
+        payload:json="${payload}" \
+        '{
+            HostedZoneId: $zoneId,
+            ChangeBatch: $payload
+        }'
 
     # TODO: Use `route53 get-change` to figure out when the record is ready.
 
@@ -115,21 +126,25 @@ function cleanup-hook {
     zoneId="$(find-zone-id "${domain}")" \
     || return "$?"
 
-    lib aws-json route53 list-resource-record-sets --global \
+    local payload="$(make-change-payload DELETE "${domain}" "${validationData}")"
+
+    local error
+    lib aws-json route53 change-resource-record-sets --global \
         zoneId="${zoneId}" \
-        '{ HostedZoneId: $zoneId }' \
-        :: '.ResourceRecordSets[] | select(.Type == "TXT")'
+        payload:json="${payload}" \
+        '{
+            HostedZoneId: $zoneId,
+            ChangeBatch: $payload
+        }'
+    error="$?"
 
-    # TODO: Remove any TXT records for `_acme-challenge.$domain`.
-    # list-resource-record-sets
-    # change-resource-record-sets
-
-    if [[ ${remainingChallenges} != 0 ]]; then
+    if [[ ${remainingChallenges} == 0 ]]; then
         # No more challenges. Do the "extra cleanup" work.
         extra-cleanup || return "$?"
     fi
 
     echo '####### CLEANUP HOOK DONE'
+    return "${error}"
 }
 
 # "Extra clean" cleanup hook: Remove any stray records leftover from old
@@ -138,19 +153,56 @@ function extra-cleanup {
     echo '####### DOING EXTRA CLEANUP'
 
     local allDomains="${CERTBOT_ALL_DOMAINS}"
-    allDomains=($(tr <<<"${allDomains}" ',' '\n' | sort -u))
+    allDomains=($(
+        tr <<<"${allDomains}" ',' '\n' \
+        | awk '
+            /[.].*[.]/ { $0 = substr($0, match($0, /[^.]*[.][^.]*$/)) }
+            { print }
+        ' \
+        | sort -u
+    ))
+    echo "ALL DOMAINS >>>${allDomains[@]}<<<"
 
     local domain zoneId
     for domain in "${allDomains[@]}"; do
         echo "Domain >>>${domain}<<<"
         zoneId="$(find-zone-id "${domain}")" \
-        || return "$1"
+        || return "$?"
         echo "Zone ID >>>${zoneId}<<<"
 
-        lib aws-json route53 list-resource-record-sets --global \
+        local payload
+        payload="$(lib aws-json route53 list-resource-record-sets --global \
             zoneId="${zoneId}" \
             '{ HostedZoneId: $zoneId }' \
-            :: '.ResourceRecordSets[] | select(.Type == "TXT")'
+            :: '
+              .ResourceRecordSets
+            | map(select(.Type == "TXT"))
+            | map(select(.Name | test("^_acme-challenge[.]")))
+            |
+            if length > 0
+            then {
+              Comment: "Via Cerbot wrapper extra-cleanup script",
+              Changes: map({
+                Action:            "DELETE",
+                ResourceRecordSet: .
+              })
+            }
+            else null
+            end
+            '
+        )" \
+        || return "$?"
+
+        if [[ ${payload} != 'null' ]]; then
+            lib aws-json route53 change-resource-record-sets --global \
+                zoneId="${zoneId}" \
+                payload:json="${payload}" \
+                '{
+                    HostedZoneId: $zoneId,
+                    ChangeBatch: $payload
+                }' \
+            || return "$?"
+        fi
     done
 }
 
@@ -184,12 +236,15 @@ function make-change-payload {
     local domain="$2"
     local data="$3"
 
+    # Note: The Route53 API requires the `Value` passed in for a `TXT` record to
+    # be surrounded by double quotes (for an at least _somewhat_ okay reason),
+    # hence the `| @json` below.
     jval \
         action="${action}" \
         name="_acme-challenge.${domain}." \
         data="${validationData}" \
     '{
-        Comment: "Created by Certbot helper script",
+        Comment: "Via Certbot wrapper script",
         Changes: [
             {
                 Action: $action,
@@ -197,7 +252,7 @@ function make-change-payload {
                     Name: $name,
                     Type: "TXT",
                     TTL: 60,
-                    ResourceRecords: [{ Value: $data }]
+                    ResourceRecords: [{ Value: ($data | @json) }]
                 }
             }
         ]
