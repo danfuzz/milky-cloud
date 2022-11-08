@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright 2022 Dan Bornstein.
+# Copyright 2022 the Bashy-lib Authors (Dan Bornstein et alia).
 # Licensed AS IS and WITHOUT WARRANTY under the Apache License, Version 2.0.
 # Details: <http://www.apache.org/licenses/LICENSE-2.0>
 
@@ -26,17 +26,26 @@ function usage {
       spaces) to form the final expression to be evaluated.
 
       <assignment>
-        <name>=<value> Assign `$name` to be the indicated string value.
-        <name>:json=<value> Assign `$name` to be the indicated parsed JSON value.
+        <name>:<type>[:file]=<value> -- Assign `$name` to be the indicated value.
+          With optional `:file`, <value> is interpreted as a filesystem path, and
+          the so-named file is read; without it, <value> is just taken to be the
+          text to be interpreted and assigned. <type> determines the interpretation:
+
+          `json` -- Interpret <value> as JSON text.
+          `raw` -- Interpret <value> as a raw string. This is the default if
+            type is not specified.
 
       --input=<style>
         `none` -- Do not read from stdin. This is the default.
-        `raw` -- Read newline-terminated of text from stdin to form pipeline input.
-        `raw0` -- Read NUL-terminated (`\\0`) lines of text from stdin to form
-           pipeline input.
-        `read` -- Read values from stdin individually to form pipeline input.
-        `slurp` -- Read all values from stdin into a single array, producing a
-          single-value pipeline input.
+        `raw[:slurp]` -- Read newline-terminated lines of text from stdin to form
+           pipeline input. With `:slurp`, produces an array of all lines as the
+           sole input.
+        `raw0[:slurp]` -- Read NUL-terminated (`\\0`) strings of text from stdin
+           to form pipeline input. With `:slurp`, produces an single array of all
+           strings as the sole input.
+        `read` -- Read JSON values from stdin individually to form pipeline input.
+        `slurp` -- Read a series of JSON values from stdin into a single array,
+          producing a single-value pipeline input.
       --output=<style>
         `compact` -- Output in compact (single line) JSON form.
         `json` -- Output in multiline JSON form. This is the default.
@@ -62,7 +71,9 @@ function usage {
 opt-action --call='{ usage }' help/h
 
 # Input style.
-opt-value --var=inputStyle --init=none --enum='none raw raw0 read slurp' input
+opt-value --var=inputStyle --init=none \
+    --enum='none raw raw:slurp raw0 raw0:slurp read slurp' \
+    input
 
 # Output style.
 opt-value --var=outputStyle --init=json \
@@ -80,21 +91,23 @@ rest-arg --call=parse-rest jval-exprs
 function parse-rest {
     # Parse assignments.
     while (( $# > 0 )); do
-        arg="$1"
+        local arg="$1"
         if [[ ${arg} == '--' ]]; then
             shift
             break
         fi
 
-        [[ ${arg} =~ ^([_a-zA-Z0-9]+)(:[a-z]+)?=(.*)$ ]] \
+        [[ ${arg} =~ ^([_a-zA-Z0-9]+)(:[a-z]+(:[a-z]+)?)?=(.*)$ ]] \
         || break
 
         varNames+=("${BASH_REMATCH[1]}")
-        varValues+=("${BASH_REMATCH[3]}")
+        varValues+=("${BASH_REMATCH[4]}")
 
-        varType="${BASH_REMATCH[2]}"
+        local varType="${BASH_REMATCH[2]}"
         if [[ ${varType} == '' ]]; then
-            varType='string'
+            varType='raw'
+        elif [[ ${varType} == ':file' ]]; then
+            varType='raw:file'
         else
             varType="${varType:1}" # `:1` to drop the initial `:`.
         fi
@@ -103,6 +116,15 @@ function parse-rest {
 
         shift
     done
+
+    # Report an error if the next argument loosely looks like an assignment,
+    # because it is probably a bug in the caller.
+    if [[ $1 =~ ^[-_:a-zA-Z0-9]+= ]]; then
+        local problem="${BASH_REMATCH[0]}"
+        error-msg 'Invalid assignment left-hand side:'
+        error-msg "  ${problem}"
+        return 1
+    fi
 
     # Construct the value expression from the remaining arguments.
     if (( $# == 0 )); then
@@ -128,10 +150,26 @@ case "${inputStyle}" in
     raw)
         jqArgs+=('--raw-input')
         ;;
+    raw:slurp)
+        jqArgs+=('--raw-input' '--slurp')
+        rawSlurpHelper='
+            split("\n")
+            |
+            if .[length - 1] == ""
+                then .[:length - 1]
+                else .
+            end'
+        valueExpression="${rawSlurpHelper} | (${valueExpression})"
+        ;;
     raw0)
         jqArgs+=('--raw-input' '--slurp')
         raw0Helper='split("\u0000") | .[]'
         valueExpression="${raw0Helper} | (${valueExpression})"
+        ;;
+    raw0:slurp)
+        jqArgs+=('--raw-input' '--slurp')
+        raw0SlurpHelper='split("\u0000")'
+        valueExpression="${raw0SlurpHelper} | (${valueExpression})"
         ;;
     read)
         : # No additional arguments needed.
@@ -149,8 +187,8 @@ case "${outputStyle}" in
         jqArgs+=('--raw-output' '--compact-output')
         lineHelper='
             if type == "string" and test("[\n\r]"; "m")
-            then (. | @json)
-            else .
+                then (. | @json)
+                else .
             end'
         valueExpression="(${valueExpression}) | ${lineHelper}"
         ;;
@@ -173,13 +211,25 @@ case "${outputStyle}" in
         ;;
 esac
 
-for (( i = 0; i < ${#varTypes[@]}; i++ )); do
+for (( i = 0; i < ${#varNames[@]}; i++ )); do
+    varName="${varNames[${i}]}"
     varType="${varTypes[${i}]}"
+    varValue="${varValues[${i}]}"
+
+    if [[ ${varType} =~ ^([^:]+):file$ ]]; then
+        varType="${BASH_REMATCH[1]}"
+        if [[ ! -r "${varValue}" ]]; then
+            error-msg "Not readable: ${varValue}"
+            exit 1
+        fi
+        varValue="$(cat "${varValue}")" || exit "$?"
+    fi
+
     case "${varType}" in
         json)
             jqArgs+=('--argjson')
             ;;
-        string)
+        raw)
             jqArgs+=('--arg')
             ;;
         *)
@@ -188,13 +238,13 @@ for (( i = 0; i < ${#varTypes[@]}; i++ )); do
             ;;
     esac
 
-    jqArgs+=("${varNames[${i}]}" "${varValues[${i}]}")
+    jqArgs+=("${varName}" "${varValue}")
 done
 
 # Note: `jq` doesn't recognize `--` as an end-of-options sign, but generally
-# speaking there's no ambiguity between a valid `jq` option and its program
-# text. Nonetheless, we prepend an extra space if the program begins with a
-# dash, just in case the user of this script passed in something wacky.
+# speaking there's no ambiguity between a valid `jq` option and actually useful
+# program text. Nonetheless, we prepend an extra space if the program begins
+# with a dash, just in case the user of this script passed in something wacky.
 if [[ ${valueExpression} =~ ^- ]]; then
     valueExpression=" ${valueExpression}"
 fi
