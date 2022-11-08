@@ -1,4 +1,4 @@
-# arg-processor v1.1 -- Copyright 2022 Dan Bornstein.
+# Copyright 2022 the Bashy-lib Authors (Dan Bornstein et alia).
 # Licensed AS IS and WITHOUT WARRANTY under the Apache License, Version 2.0.
 # Details: <http://www.apache.org/licenses/LICENSE-2.0>
 
@@ -179,7 +179,7 @@ function opt-toggle {
 
     # Extra filter on the positive option, so it can take a value.
     _argproc_define-value-taking-arg --option "${specName}" \
-        '=1' $'/^[01]$/\n'"${optFilter}" "${optCall}" "${optVar}" \
+        '=1' $'/^[01]$/\n'"${optFilter}" "${optCall}" "${optVar}"
     _argproc_define-no-value-arg --option "no-${specName}" \
         '0' "${optFilter}" "${optCall}" "${optVar}" ''
 
@@ -701,10 +701,10 @@ function _argproc_janky-args {
                     || argError=1
                     ;;
                 enum)
-                    if [[ ${value} =~ ^=(' '*([-_a-zA-Z0-9]+' '*)+)$ ]]; then
+                    if [[ ${value} =~ ^=(' '*([-_:a-zA-Z0-9]+' '*)+)$ ]]; then
                         # Re-form as a filter expression.
                         optFilter=''
-                        while [[ ${value} =~ ([-_a-zA-Z0-9]+)' '*(.*)$ ]]; do
+                        while [[ ${value} =~ ([-_:a-zA-Z0-9]+)' '*(.*)$ ]]; do
                             optFilter+="|${BASH_REMATCH[1]}"
                             value="${BASH_REMATCH[2]}"
                         done
