@@ -7,7 +7,7 @@
 #     git subtree add --prefix=upstream-deps/<name> <repo-url> HEAD
 
 # Load the helper libraries.
-. "$(dirname "$(readlink -f "$0")")/../lib/init.sh" || exit "$?"
+. "$(dirname "$(readlink -f "$0")")/../bin/lib/init.sh" || exit "$?"
 
 #
 # Argument parsing
@@ -46,13 +46,13 @@ process-args "$@" || usage "$?"
 # Main script
 #
 
-upstreamDir="$(this-cmd-dir)"
+upstreamDir="$(basename "$(this-cmd-dir)")"
 
 if (( doPull )); then
-    cd "${upstreamDir}"
+    cd "$(base-dir)"
 
     git subtree pull \
-        --prefix='bashy-lib' \
+        --prefix="${upstreamDir}/bashy-lib" \
         git@github.com:danfuzz/bashy-lib HEAD \
     || exit "$?"
 fi
@@ -60,7 +60,7 @@ fi
 if (( doCopy )); then
     # Copy upstream bashy-lib files into place.
     destDir="$(base-dir)/bin/lib"
-    cd "${upstreamDir}/bashy-lib/lib"
+    cd "$(this-cmd-dir)/bashy-lib/lib"
     find . -type f '!' -name 'init-product.sh' \
         -exec cp '{}' "${destDir}" ';'
 fi
