@@ -1,4 +1,4 @@
-# Copyright 2022 Dan Bornstein.
+# Copyright 2022 the Bashy-lib Authors (Dan Bornstein et alia).
 # Licensed AS IS and WITHOUT WARRANTY under the Apache License, Version 2.0.
 # Details: <http://www.apache.org/licenses/LICENSE-2.0>
 
@@ -28,6 +28,10 @@ if [[ ${_init_cmdDir} == ${_init_libDir} ]]; then
 else
     _init_mainDir="${_init_cmdPath%/*}"
 fi
+
+# Load the "built-in" core libraries.
+. "${_init_libDir}/stderr-messages.sh" || return "$?"
+. "${_init_libDir}/arg-processor.sh" || return "$?"
 
 # Load product-specific initialization code (including loading other libraries).
 . "${_init_libDir}/init-product.sh" # Product-specific init code.
@@ -68,20 +72,20 @@ function main-scripts-dir {
     echo "${_init_mainDir}"
 }
 
-# Gets the directory of this command, "this command" being the main script that
-# is running.
+# Gets the directory of this command, "this command" being the (outer) script
+# that is running.
 function this-cmd-dir {
     echo "${_init_cmdDir}"
 }
 
-# Gets the name of this command, that is, "this command" being the main script
-# that is running.
+# Gets the name of this command, that is, "this command" being the (outer)
+# script that is running.
 function this-cmd-name {
     echo "${_init_cmdPath##*/}"
 }
 
-# Gets the full path of this command, "this command" being the main script that
-# is running.
+# Gets the full path of this command, "this command" being the (outer) script
+# that is running.
 function this-cmd-path {
     echo "${_init_cmdPath}"
 }
