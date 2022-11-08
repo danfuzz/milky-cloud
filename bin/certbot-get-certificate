@@ -1,0 +1,348 @@
+#!/bin/bash
+#
+# Copyright 2022 Dan Bornstein.
+# Licensed AS IS and WITHOUT WARRANTY under the Apache License, Version 2.0.
+# Details: <http://www.apache.org/licenses/LICENSE-2.0>
+
+# Load the helper libraries.
+. "$(dirname "$(readlink -f "$0")")/lib/init.sh" || exit "$?"
+
+
+#
+# Argument parsing
+#
+
+function usage {
+    print-usage $'
+    Usage:
+
+    ${name} [<opt> ...]
+      Runs Certbot to get a certificate, without actually installing it. This
+      uses the DNS challenge, implemented "manually" here to call out to other
+      scripts in this project which use Route53. (Why not use Certbot\'s Route53
+      plugin? Because as of this writing, it is easier to reimplement it than to
+      get the plugins, because reasons.)
+
+      --out=<path>
+        Directory to use to store certs. Defaults to `out/certs` under the
+        current directory. The directory will be created if it doesn\'t exist.
+      --domain=<domain-name>
+        Domain name to get a certificate for. This is required, and can be
+        specified more than once to get a certificate with alternate subjects.
+        (The first domain listed is the primary.)
+      --force-renewal
+        Force renewal of a certificate, even if not yet near expiration.
+      --email=<email-address>
+        Email address to use when making API requests. This is required. Per
+        Certbot / LetsEncrypt docs, this is just used for urgent communication.
+      --staging
+        Use the staging server.
+      --work-dir=<path>
+        Directory to use for Certbot intermediate file storage, including logs.
+        Defaults to `out/certbot` under the current directory. The directory
+        will be created if it doesn\'t exist.
+
+    ${name} [--help | -h]
+      Displays this message.
+    '
+
+    exit "$@"
+}
+
+# Special logic for callbacks from `certbot` to skip the usual argument parsing
+# and just call the right hook.
+runHook=''
+if [[ ${RUN_CERTBOT_HOOK} == 1 ]]; then
+    # Certbot sets `CERTBOT_AUTH_OUTPUT` only when calling the cleanup script.
+    if [[ ${CERTBOT_AUTH_OUTPUT-unset} == 'unset' ]]; then
+        runHook=authentication
+    else
+        runHook=cleanup
+    fi
+fi
+
+if [[ ${runHook} == '' ]]; then
+    # Want help?
+    opt-action --call='{ usage }' help/h
+
+    # Directory to use for final output.
+    opt-value --var=outDir --init='out/certs' out
+
+    # Site to get a certificate for.
+    domainArgs=()
+    opt-value --required --call=add-domain --filter='/^([*][.])?[-.a-z0-9]+$/' domain
+    function add-domain {
+        domainArgs+=(--domain="$1")
+    }
+
+    # Email address.
+    opt-value --required --var=email --filter='/^[-_.+@a-z0-9]+$/' email
+
+    # Force certificate renewal?
+    opt-toggle --var=forceRenewal force-renewal
+
+    # Use the staging server?
+    opt-toggle --var=useStaging staging
+
+    # Directory to use for Certbot intermediate files.
+    opt-value --var=workDir --init='out/certbot' work-dir
+
+    process-args "$@" || usage "$?"
+fi
+
+
+#
+# Helper functions
+#
+
+# The "authentication" hook. This is (in effect) a callback from `certbot`.
+function authentication-hook {
+    local validationData="${CERTBOT_VALIDATION}"
+    local domain="${CERTBOT_DOMAIN}"
+
+    local zoneId
+    zoneId="$(find-zone-id "${domain}")" \
+    || return "$?"
+
+    local payload
+    payload="$(make-change-payload UPSERT "${domain}" "${validationData}")" \
+    || return "$?"
+
+    local changeId
+    changeId="$(lib aws-json route53 change-resource-record-sets --global \
+        zoneId="${zoneId}" \
+        payload:json="${payload}" \
+        '{
+            HostedZoneId: $zoneId,
+            ChangeBatch: $payload
+        }' \
+        :: --output=raw '.ChangeInfo.Id')" \
+    || return "$?"
+
+    local i status
+    for (( i = 0; i < 30; i++ )); do
+        status="$(lib aws-json route53 get-change --global \
+            id="${changeId}" \
+            '{ Id: $id }' \
+            :: --output=raw '.ChangeInfo.Status'
+        )" \
+        || return "$?"
+        if [[ ${status} == 'INSYNC' ]]; then
+            break
+        fi
+        sleep 1
+    done
+
+    if [[ ${status} != 'INSYNC' ]]; then
+        info-msg 'DNS change failed to propagate. There may be trouble!'
+    fi
+}
+
+# The "cleanup" hook. This is (in effect) a callback from `certbot`.
+function cleanup-hook {
+    local domain="${CERTBOT_DOMAIN}"
+    local remainingChallenges="${CERTBOT_REMAINING_CHALLENGES}"
+    local validationData="${CERTBOT_VALIDATION}"
+
+    local zoneId
+    zoneId="$(find-zone-id "${domain}")" \
+    || return "$?"
+
+    local payload="$(make-change-payload DELETE "${domain}" "${validationData}")"
+
+    local error
+    lib aws-json route53 change-resource-record-sets --global \
+        zoneId="${zoneId}" \
+        payload:json="${payload}" \
+        '{
+            HostedZoneId: $zoneId,
+            ChangeBatch: $payload
+        }' \
+        :: --output=none
+    error="$?"
+
+    if [[ ${remainingChallenges} == 0 ]]; then
+        # No more challenges. Do the "extra cleanup" work.
+        extra-cleanup || return "$?"
+    fi
+
+    return "${error}"
+}
+
+# "Extra clean" cleanup hook: Remove any stray records leftover from old
+# Certbot requests.
+function extra-cleanup {
+    local allDomains="${CERTBOT_ALL_DOMAINS}"
+    allDomains=($(
+        tr <<<"${allDomains}" ',' '\n' \
+        | awk '
+            /[.].*[.]/ { $0 = substr($0, match($0, /[^.]*[.][^.]*$/)) }
+            { print }
+        ' \
+        | sort -u
+    ))
+
+    local domain zoneId
+    for domain in "${allDomains[@]}"; do
+        zoneId="$(find-zone-id "${domain}")" \
+        || return "$?"
+
+        local payload
+        payload="$(lib aws-json route53 list-resource-record-sets --global \
+            zoneId="${zoneId}" \
+            '{ HostedZoneId: $zoneId }' \
+            :: '
+              .ResourceRecordSets
+            | map(select(.Type == "TXT"))
+            | map(select(.Name | test("^_acme-challenge[.]")))
+            |
+            if length > 0
+            then {
+              Comment: "Via Cerbot wrapper extra-cleanup script",
+              Changes: map({
+                Action: "DELETE",
+                ResourceRecordSet: .
+              })
+            }
+            else null
+            end
+            '
+        )" \
+        || return "$?"
+
+        if [[ ${payload} != 'null' ]]; then
+            echo "Cleaning up leftover challenges for domain: ${domain}"
+            lib aws-json route53 change-resource-record-sets --global \
+                zoneId="${zoneId}" \
+                payload:json="${payload}" \
+                '{
+                    HostedZoneId: $zoneId,
+                    ChangeBatch: $payload
+                }' \
+                :: --output=none \
+            || return "$?"
+        fi
+    done
+}
+
+# Finds the zone ID for a given domain name.
+function find-zone-id {
+    local domain="$1"
+
+    # Extract the main domain, and append `.` to make it officially "absolute."
+    [[ ${domain} =~ [^.]+[.][^.]+$ ]] || return "$1"
+    domain="${BASH_REMATCH[0]}."
+
+    local zoneId
+    zoneId="$(
+        lib aws-json route53 list-hosted-zones --global :: --output=raw \
+            domain="${domain}" \
+            '.HostedZones[] | select(.Name == $domain) | .Id'
+    )" \
+    || return "$?"
+
+    if [[ ${zoneId} == '' ]]; then
+        error-msg "Could not find zone ID for domain: ${domain}"
+        return 1
+    fi
+
+    echo "${zoneId}"
+}
+
+# Makes a payload for a DNS change request.
+function make-change-payload {
+    local action="$1"
+    local domain="$2"
+    local data="$3"
+
+    # Note: The Route53 API requires the `Value` passed in for a `TXT` record to
+    # be surrounded by double quotes (for an at least _somewhat_ okay reason),
+    # hence the `| @json` below.
+    jval \
+        action="${action}" \
+        name="_acme-challenge.${domain}." \
+        data="${validationData}" \
+    '{
+        Comment: "Via Certbot wrapper script",
+        Changes: [
+            {
+                Action: $action,
+                ResourceRecordSet: {
+                    Name: $name,
+                    Type: "TXT",
+                    TTL: 60,
+                    ResourceRecords: [{ Value: ($data | @json) }]
+                }
+            }
+        ]
+    }'
+}
+
+
+#
+# Main script
+#
+
+# Just run the requested callback hook, if it looks like we were called from
+# Certbot.
+if [[ ${runHook} != '' ]]; then
+    "${runHook}-hook"
+    exit "$?"
+fi
+
+# Not a callback. Do the main call.
+
+if [[ ! -d ${workDir} ]]; then
+    mkdir -p "${workDir}" || exit "$?"
+fi
+
+extraOpts=()
+if (( useStaging )); then
+    extraOpts+=(--staging)
+fi
+if (( forceRenewal )); then
+    extraOpts+=(--force-renewal)
+fi
+
+thisCmd="$(this-cmd-path)"
+RUN_CERTBOT_HOOK=1 \
+certbot certonly \
+    --config-dir="${workDir}" --logs-dir="${workDir}" --work-dir="${workDir}" \
+    --manual --noninteractive --agree-tos --email="${email}" \
+    --preferred-challenges=dns \
+    --manual-auth-hook="${thisCmd}" --manual-cleanup-hook="${thisCmd}" \
+    "${extraOpts[@]}" "${domainArgs[@]}" \
+|| exit "$?"
+
+
+if [[ ! -d ${outDir} ]]; then
+    mkdir -p "${outDir}" || exit "$?"
+fi
+outDir="$(readlink -f "${outDir}")"
+
+copyCommands="$(
+    cd "${workDir}/live"
+    find . '(' -type f -o -type l ')' -name '*.pem' -print0 \
+    | jval --input=raw0:slurp --output=raw \
+        liveDir="${workDir}/live" \
+        outDir="${outDir}" '
+        map(capture("^[.]/(?<path>(?<dir>.*)/[^/]+)$"))
+        |
+        {
+            dirs: (map($outDir + "/" + .dir) | unique),
+            paths: map(.path)
+        }
+        |
+        [
+            (.dirs | map(["rm", "-rf", (. | @sh)]))[],
+            (.dirs | map(["mkdir", "-p", (. | @sh)]))[],
+            (.paths | map(["cp", ($liveDir + "/" + ., $outDir + "/" + . | @sh)]))[]
+        ]
+        |
+        map(join(" "))
+        |
+        join("\n")
+        '
+)" \
+|| exit "$?"
+eval "${copyCommands}"
