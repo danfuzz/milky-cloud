@@ -324,6 +324,7 @@ copyCommands="$(
     cd "${tmpDir}/live"
     find . '(' -type f -o -type l ')' -name '*.pem' -print0 \
     | jval --input=raw0:slurp --output=raw \
+        liveDir="${tmpDir}/live" \
         outDir="${outDir}" '
         map(capture("^[.]/(?<path>(?<dir>.*)/[^/]+)$"))
         |
@@ -335,7 +336,7 @@ copyCommands="$(
         [
             (.dirs | map(["rm", "-rf", (. | @sh)]))[],
             (.dirs | map(["mkdir", "-p", (. | @sh)]))[],
-            (.paths | map(["cp", (., $outDir + "/" + . | @sh)]))[]
+            (.paths | map(["cp", ($liveDir + "/" + ., $outDir + "/" + . | @sh)]))[]
         ]
         |
         map(join(" "))
@@ -344,4 +345,4 @@ copyCommands="$(
         '
 )" \
 || exit "$?"
-printf '%s\n' "${copyCommands}"
+eval "${copyCommands}"
