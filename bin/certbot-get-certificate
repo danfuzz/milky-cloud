@@ -23,10 +23,9 @@ function usage {
       plugin? Because as of this writing, it is easier to reimplement it than to
       get the plugins, because reasons.)
 
-      --dir=<path>
-        Directory to use for logs and temporary files. Defaults to `tmp-certbot`
-        under the current directory. The directory will be created if it
-        doesn\'t exist.
+      --out=<path>
+        Directory to use to store certs. Defaults to `out/certs` under the
+        current directory.
       --domain=<domain-name>
         Domain name to get a certificate for. This is required, and can be
         specified more than once to get a certificate with alternate subjects.
@@ -38,6 +37,10 @@ function usage {
         Certbot / LetsEncrypt docs, this is just used for urgent communication.
       --staging
         Use the staging server.
+      --tmp-dir=<path>
+        Directory to use for logs and temporary files. Defaults to `tmp-certbot`
+        under the current directory. The directory will be created if it
+        doesn\'t exist.
 
     ${name} [--help | -h]
       Displays this message.
@@ -62,8 +65,8 @@ if [[ ${runHook} == '' ]]; then
     # Want help?
     opt-action --call='{ usage }' help/h
 
-    # Directory to use.
-    opt-value --var=dir --init='./tmp-certbot' dir
+    # Directory to use for output.
+    opt-value --var=outDir out
 
     # Site to get a certificate for.
     domainArgs=()
@@ -80,6 +83,9 @@ if [[ ${runHook} == '' ]]; then
 
     # Use the staging server?
     opt-toggle --var=useStaging staging
+
+    # Directory to use for temporary files.
+    opt-value --var=tmpDir --init='./tmp-certbot' tmp-dir
 
     process-args "$@" || usage "$?"
 fi
@@ -286,8 +292,8 @@ fi
 
 # Not a callback. Do the main call.
 
-if [[ ! -d "${dir}" ]]; then
-    mkdir -p "${dir}" || exit "$?"
+if [[ ! -d ${tmpDir} ]]; then
+    mkdir -p "${tmpDir}" || exit "$?"
 fi
 
 extraOpts=()
@@ -301,8 +307,41 @@ fi
 thisCmd="$(this-cmd-path)"
 RUN_CERTBOT_HOOK=1 \
 certbot certonly \
-    --config-dir="${dir}" --logs-dir="${dir}" --work-dir="${dir}" \
+    --config-dir="${tmpDir}" --logs-dir="${tmpDir}" --work-dir="${tmpDir}" \
     --manual --noninteractive --agree-tos --email="${email}" \
     --preferred-challenges=dns \
     --manual-auth-hook="${thisCmd}" --manual-cleanup-hook="${thisCmd}" \
-    "${extraOpts[@]}" "${domainArgs[@]}"
+    "${extraOpts[@]}" "${domainArgs[@]}" \
+|| exit "$?"
+
+if [[ ${outDir} == '' ]]; then
+    outDir="./out/certs"
+fi
+mkdir -p "${outDir}" || exit "$?"
+outDir="$(readlink -f "${outDir}")"
+
+copyCommands="$(
+    cd "${tmpDir}/live"
+    find . '(' -type f -o -type l ')' -name '*.pem' -print0 \
+    | jval --input=raw0:slurp --output=raw \
+        outDir="${outDir}" '
+        map(capture("^[.]/(?<path>(?<dir>.*)/[^/]+)$"))
+        |
+        {
+            dirs: (map($outDir + "/" + .dir) | unique),
+            paths: map(.path)
+        }
+        |
+        [
+            (.dirs | map(["rm", "-rf", (. | @sh)]))[],
+            (.dirs | map(["mkdir", "-p", (. | @sh)]))[],
+            (.paths | map(["cp", (., $outDir + "/" + . | @sh)]))[]
+        ]
+        |
+        map(join(" "))
+        |
+        join("\n")
+        '
+)" \
+|| exit "$?"
+printf '%s\n' "${copyCommands}"
