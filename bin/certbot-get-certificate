@@ -92,7 +92,11 @@ function authentication-hook {
     local validationData="${CERTBOT_VALIDATION}"
     local domain="${CERTBOT_DOMAIN}"
 
-    local payload="$(make-change-payload CREATE "${domain}" "${validationData}")"
+    local zoneId
+    zoneId="$(find-zone-id "${domain}")" \
+    || return "$?"
+
+    local payload="$(make-change-payload UPSERT "${domain}" "${validationData}")"
 
     echo '############## PAYLOAD'
     jval "${payload}"
@@ -115,9 +119,6 @@ function authentication-hook {
 
 # The "cleanup" hook. This is (in effect) a callback from `certbot`.
 function cleanup-hook {
-    echo '####### CLEANUP HOOK CALLED'
-    #env | grep CERTBOT | info-msg --exec cat
-
     local domain="${CERTBOT_DOMAIN}"
     local remainingChallenges="${CERTBOT_REMAINING_CHALLENGES}"
     local validationData="${CERTBOT_VALIDATION}"
@@ -135,7 +136,8 @@ function cleanup-hook {
         '{
             HostedZoneId: $zoneId,
             ChangeBatch: $payload
-        }'
+        }' \
+        :: --output=none
     error="$?"
 
     if [[ ${remainingChallenges} == 0 ]]; then
@@ -143,7 +145,6 @@ function cleanup-hook {
         extra-cleanup || return "$?"
     fi
 
-    echo '####### CLEANUP HOOK DONE'
     return "${error}"
 }
 
@@ -197,6 +198,7 @@ function extra-cleanup {
                     HostedZoneId: $zoneId,
                     ChangeBatch: $payload
                 }' \
+                :: --output=none \
             || return "$?"
         fi
     done
