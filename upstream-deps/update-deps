@@ -1,7 +1,8 @@
 #!/bin/bash
 #
-# Copyright 2022 the Milk-prod Authors (Dan Bornstein et alia).
-# This code is PROPRIETARY and UNLICENSED.
+# Copyright 2022 Dan Bornstein.
+# Licensed AS IS and WITHOUT WARRANTY under the Apache License, Version 2.0.
+# Details: <http://www.apache.org/licenses/LICENSE-2.0>
 
 # Note: To add a new upstream dependency:
 #     git subtree add --prefix=upstream-deps/<name> <repo-url> HEAD
