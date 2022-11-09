@@ -26,6 +26,7 @@ function usage {
         `zone` -- Require an availability zone.
       --output=<style>
         `none` -- Do not produce any output. This is the default.
+        `json` -- Output parsed details, in JSON form.
         `region` -- Output the region.
         `zone` -- Output the availability zone (which will be the same as the
           input). This implies `--input=zone`.
@@ -46,7 +47,7 @@ opt-action --call='{ usage }' help/h
 opt-value --var=inputType --init=any --enum='any region zone' input
 
 # Item to output.
-opt-value --var=outputItem --init=none --enum='none region zone zone-suffix' output
+opt-value --var=outputItem --init=none --enum='none json region zone zone-suffix' output
 
 # Location to parse, and parsed bits.
 region=''
@@ -92,6 +93,23 @@ esac
 
 # Output whatever is requested, if anything.
 case "${outputItem}" in
+    json)
+        jval \
+            location="${zoneOrRegion}" \
+            region="${region}" \
+            zoneSuffix="${zoneSuffix}" '
+        {
+            location: $location,
+            region:   $region
+        }
+        |
+        if $zoneSuffix == "" then .
+        else . + {
+            zone:       $location,
+            zoneSuffix: $zoneSuffix
+        }
+        end'
+        ;;
     region)
         echo "${region}"
         ;;
