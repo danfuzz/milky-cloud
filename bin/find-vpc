@@ -22,6 +22,9 @@ function usage {
       --loc=<region-or-zone>
         Where to look. Must be specified. If specified as an availability zone,
         only the region portion matters.
+      --not-found-ok
+        Do not report an error -- just don\'t print any output -- if there is
+        no VPC with the given name or ID.
       --output=<style> :: `compact` `id` `json`
         What to output, as with `json-val`, except that `id` prints just the ID
         of the VPC as a plain string. `id` is the default.
@@ -38,6 +41,9 @@ opt-action --call='{ usage }' help/h
 
 # Region, passed as either region per se or availability zone.
 opt-value --required --var=region --filter=region-from-location loc
+
+# Ok if no VPC found?
+opt-toggle --var=notFoundOk not-found-ok
 
 # What to print.
 opt-value --var=outputStyle --init=id --enum='compact id json' output
@@ -93,8 +99,12 @@ function do-find {
             return 1
             ;;
         none)
-            error-msg 'No such VPC.'
-            return 1
+            if (( notFoundOk )); then
+                return
+            else
+                error-msg 'No such VPC.'
+                return 1
+            fi
             ;;
     esac
 
