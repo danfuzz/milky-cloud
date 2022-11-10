@@ -1,0 +1,107 @@
+#!/bin/bash
+#
+# Copyright 2022 Dan Bornstein.
+# Licensed AS IS and WITHOUT WARRANTY under the Apache License, Version 2.0.
+# Details: <http://www.apache.org/licenses/LICENSE-2.0>
+
+# Load the helper libraries.
+. "$(dirname "$(readlink -f "$0")")/lib/init.sh" || exit "$?"
+
+#
+# Argument parsing
+#
+
+function usage {
+    print-usage $'
+    Usage:
+
+    ${name} [<opt> ...]
+      Controls one or more instances.
+
+      --do=<action> :: `reboot` `start` `stop` `terminate`
+        What action to perform. Must be specified.
+      --loc=<region-or-zone>
+        Where to look for instances. Must be specified.
+      --id=<id-or-name>
+        ID or name of the instance(s) to control, as with `find-instance` (see
+        which).
+      --multiple
+        Allow multiple matching instances.
+      --not-found-ok
+        Do not report an error if there are no matching instances.
+      --vpc=<name-or-id>
+        VPC where the instance must reside, named as with `find-vpc` (see which).
+        If not specified, then this command will find an instance in any VPC (in
+        the given location).
+
+    ${name} [--help | -h]
+      Displays this message.
+    '
+
+    exit "$@"
+}
+
+# Want help?
+opt-action --call='{ usage }' help/h
+
+# What to do to the instance(s).
+opt-value --required --var=action --enum='reboot start stop terminate' do
+
+# Name or ID to look up.
+opt-value --var=nameOrId --init='*' id
+
+# Location (region or availability zone).
+opt-value --required --var=location --filter='/[-a-z0-9]+/' loc
+
+# Multiple results?
+opt-toggle --var=multipleResults multiple
+
+# Ok if no instances found?
+opt-toggle --var=notFoundOk not-found-ok
+
+# VPC to require.
+opt-value --var=vpcNameOrId --filter='/./' vpc
+
+process-args "$@" || usage "$?"
+
+
+#
+# Main script
+#
+
+progress-msg --enable
+
+findArgs=(--loc="${location}" --output=id)
+if (( multipleResults )); then
+    findArgs+=(--multiple)
+fi
+if (( notFoundOk )); then
+    findArgs+=(--not-found-ok)
+fi
+if [[ ${vpcNameOrId} != '' ]]; then
+    findArgs+=(--vpc="${vpcNameOrId}")
+fi
+findArgs+=("${nameOrId}")
+
+ids=($(lib find-instance "${findArgs[@]}")) \
+|| exit "$?"
+
+case "${action}" in
+    reboot)    gerund='Rebooting'   ;;
+    start)     gerund='Starting'    ;;
+    stop)      gerund='Stopping'    ;;
+    terminate) gerund='Terminating' ;;
+esac
+
+progress-msg "${gerund} instance(s):"
+progress-msg --exec printf '  %s\n' "${ids[@]}"
+
+ids="$(jval ids:json="$(jarray --input=strings "${ids[@]}")" \
+    '{ InstanceIds: $ids }'
+)"
+
+ec2-json "${action}-instances" --loc="${location}" "${ids}" \
+    :: --output=none \
+|| exit "$?"
+
+progress-msg 'Done!'
