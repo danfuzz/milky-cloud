@@ -37,16 +37,6 @@ function _init_check-prerequisites {
         error=1
     fi
 
-    if [[ ${AWS_ACCESS_KEY_ID} == '' ]]; then
-        error-msg 'Missing `AWS_ACCESS_KEY_ID` environment variable.'
-        error=1
-    fi
-
-    if [[ ${AWS_SECRET_ACCESS_KEY} == '' ]]; then
-        error-msg 'Missing `AWS_SECRET_ACCESS_KEY` environment variable.'
-        error=1
-    fi
-
     # TODO: Should probably do more stuff!
 
     return "${error}"
