@@ -30,6 +30,8 @@ function usage {
       --output=<style> :: `compact` `id` `json`
         What to output, as with `json-val`, except that `id` prints just the ID
         of the VPC as a plain string. `id` is the default.
+      --terminated-ok
+        Match instances that are terminated. By default, these are excluded.
       --vpc=<name-or-id>
         VPC where the instance must reside, named as with `find-vpc` (see which).
         If not specified, then this command will find an instance in any VPC (in
@@ -56,6 +58,9 @@ opt-toggle --var=notFoundOk not-found-ok
 
 # What to print.
 opt-value --var=outputStyle --init=id --enum='compact id json' output
+
+# Show terminated instances?
+opt-toggle --var=terminatedOk terminated-ok
 
 # VPC to require.
 opt-value --var=vpcNameOrId --filter='/./' vpc
@@ -108,14 +113,23 @@ resultArray="$(ec2-json describe-instances --loc="${location}" \
     :: '[.Reservations[] | .Instances[] | {
         id:             .InstanceId,
         name:           (.Tags | map(select(.Key == "Name") | .Value)[0]),
-        privateAddress: (.PrivateIpAddress // null),
-        publicAddress:  (.PublicIpAddress // null),
+        privateAddress: .PrivateIpAddress,
+        publicAddress:  .PublicIpAddress,
         state:          .State.Name,
         subnet:         .SubnetId,
         vpc:            .VpcId
     }]'
 )" \
 || exit "$?"
+
+if (( !terminatedOk )); then
+    # It's more straightforward to filter out terminated instances as a
+    # post-processing step than to try to construct a filter for them, because
+    # the AWS API doesn't have a way to say "not this value" in its filters.
+    resultArray="$(jget "${resultArray}" \
+        'map(select(.state != "terminated"))')" \
+    || exit "$?"
+fi
 
 resultLength="$(jlength "${resultArray}")" \
 || exit "$?"
