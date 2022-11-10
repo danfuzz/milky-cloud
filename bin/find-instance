@@ -16,14 +16,17 @@ function usage {
     Usage:
 
     ${name} [<opt> ...] <name-or-id>
-      Finds an instance by name or ID, with optional extra criteria, and prints
-      some information about it, in JSON form.
+      Finds one or more instances by name or ID, with optional extra criteria, and
+      prints some information about them, in JSON form.
 
       --loc=<region-or-zone>
         Where to look. Must be specified.
+      --multiple
+        Allow multiple matching instances. When specified, the result is a JSON
+        array instead of a single object. Implies `--not-found-ok`.
       --not-found-ok
-        Do not report an error -- just don\'t print any output -- if there is
-        no matching instance.
+        Do not report an error -- just don\'t print any output -- if there are
+        no matching instances.
       --vpc=<name-or-id>
         VPC where the instance must reside, named as with `find-vpc` (see which).
         If not specified, then this command will find an instance in any VPC (in
@@ -41,6 +44,9 @@ opt-action --call='{ usage }' help/h
 
 # Location (region or availability zone).
 opt-value --required --var=location --filter='/[-a-z0-9]+/' loc
+
+# Multiple results?
+opt-toggle --var=multipleResults multiple
 
 # Ok if no instance found?
 opt-toggle --var=notFoundOk not-found-ok
@@ -91,6 +97,44 @@ if [[ ${zone} != '' ]]; then
     filters+=(availability-zone="${zone}")
 fi
 
-ec2-json describe-instances --loc="${location}" \
+
+ec2Command=(ec2-json describe-instances --loc="${location}" \
     "$(lib filter-spec "${filters[@]}")" \
-    :: '[.Reservations[] | .Instances[] | { InstanceId, SubnetId, VpcId, Tags }]'
+    :: '[.Reservations[] | .Instances[] | {
+        id:     .InstanceId,
+        subnet: .SubnetId,
+        vpc:    .VpcId,
+        name:   (.Tags | map(select(.Key == "Name") | .Value)[0])
+    }]'
+)
+
+if (( multipleResults )); then
+    "${ec2Command[@]}"
+else
+    resultArray="$(ec2-json describe-instances --loc="${location}" \
+        "$(lib filter-spec "${filters[@]}")" \
+        :: '[.Reservations[] | .Instances[] | {
+            id:     .InstanceId,
+            subnet: .SubnetId,
+            vpc:    .VpcId,
+            name:   (.Tags | map(select(.Key == "Name") | .Value)[0])
+        }]'
+    )" \
+    || exit "$?"
+
+    resultLength="$(jlength "${resultArray}")"
+
+    if (( resultLength == 0 )); then
+        if (( notFoundOk )); then
+            exit
+        fi
+        error-msg 'No matching instances found.'
+        exit 1
+    elif (( resultLength > 1 )); then
+        error-msg 'Ambiguous search matches all of:'
+        error-msg --exec jget --output=raw "${resultArray}" '.[] | "  " + .id'
+        exit 1
+    fi
+
+    jget "${resultArray}" '.[0]'
+fi
