@@ -254,6 +254,12 @@ if [[ ${printCommandTo} != '' ]]; then
         '
 fi
 
+if [[ (${AWS_ACCESS_KEY_ID} =~ ^SECRET) || (${AWS_SECRET_ACCESS_KEY} =~ ^SECRET) ]]; then
+    # AWS credentials are kept out of the environment. Grab them!
+    secretEval="$(lib secret-access --env --output=eval)" || exit "$?"
+    eval "${secretEval}"
+fi
+
 result="$("${fullCommand[@]}")" \
 || {
     error-msg 'Trouble running AWS command.'
