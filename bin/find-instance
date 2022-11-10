@@ -1,0 +1,140 @@
+#!/bin/bash
+#
+# Copyright 2022 Dan Bornstein.
+# Licensed AS IS and WITHOUT WARRANTY under the Apache License, Version 2.0.
+# Details: <http://www.apache.org/licenses/LICENSE-2.0>
+
+# Load the helper libraries.
+. "$(dirname "$(readlink -f "$0")")/lib/init.sh" || exit "$?"
+
+#
+# Argument parsing
+#
+
+function usage {
+    print-usage $'
+    Usage:
+
+    ${name} [<opt> ...] <name-or-id>
+      Finds one or more instances by name or ID, with optional extra criteria, and
+      prints some information about them, in JSON form.
+
+      --loc=<region-or-zone>
+        Where to look. Must be specified.
+      --multiple
+        Allow multiple matching instances. When specified, the result is a JSON
+        array instead of a single object. Implies `--not-found-ok`.
+      --not-found-ok
+        Do not report an error -- just don\'t print any output -- if there are
+        no matching instances.
+      --vpc=<name-or-id>
+        VPC where the instance must reside, named as with `find-vpc` (see which).
+        If not specified, then this command will find an instance in any VPC (in
+        the given location).
+
+    ${name} [--help | -h]
+      Displays this message.
+    '
+
+    exit "$@"
+}
+
+# Want help?
+opt-action --call='{ usage }' help/h
+
+# Location (region or availability zone).
+opt-value --required --var=location --filter='/[-a-z0-9]+/' loc
+
+# Multiple results?
+opt-toggle --var=multipleResults multiple
+
+# Ok if no instance found?
+opt-toggle --var=notFoundOk not-found-ok
+
+# VPC to require.
+opt-value --var=vpcNameOrId --filter='/./' vpc
+
+# Name or ID to look up.
+positional-arg --required --var=nameOrId name-or-id
+
+process-args "$@" || usage "$?"
+
+
+#
+# Main script
+#
+
+locJson="$(lib parse-location --output=json "${location}")" \
+|| exit "$?"
+region="$(jget --output=raw "${locJson}" '.region')"
+zone="$(jget --output=raw "${locJson}" '.zone // ""')"
+
+instanceId=
+instanceName=
+if [[ ${nameOrId} =~ ^i-[*0-9a-f]+$ ]]; then
+    instanceId="${nameOrId}"
+else
+    instanceName="${nameOrId}"
+fi
+
+vpcId=
+if [[ ${vpcNameOrId} != '' ]]; then
+    vpcId="$(lib find-vpc --loc="${location}" "${vpcNameOrId}")" \
+    || exit "$?"
+fi
+
+filters=()
+if [[ ${instanceId} != '' ]]; then
+    filters+=(instance-id="${instanceId}")
+fi
+if [[ ${instanceName} != '' ]]; then
+    filters+=(tag:Name="${instanceName}")
+fi
+if [[ ${vpcId} != '' ]]; then
+    filters+=(vpc-id="${vpcId}")
+fi
+if [[ ${zone} != '' ]]; then
+    filters+=(availability-zone="${zone}")
+fi
+
+
+ec2Command=(ec2-json describe-instances --loc="${location}" \
+    "$(lib filter-spec "${filters[@]}")" \
+    :: '[.Reservations[] | .Instances[] | {
+        id:     .InstanceId,
+        subnet: .SubnetId,
+        vpc:    .VpcId,
+        name:   (.Tags | map(select(.Key == "Name") | .Value)[0])
+    }]'
+)
+
+if (( multipleResults )); then
+    "${ec2Command[@]}"
+else
+    resultArray="$(ec2-json describe-instances --loc="${location}" \
+        "$(lib filter-spec "${filters[@]}")" \
+        :: '[.Reservations[] | .Instances[] | {
+            id:     .InstanceId,
+            subnet: .SubnetId,
+            vpc:    .VpcId,
+            name:   (.Tags | map(select(.Key == "Name") | .Value)[0])
+        }]'
+    )" \
+    || exit "$?"
+
+    resultLength="$(jlength "${resultArray}")"
+
+    if (( resultLength == 0 )); then
+        if (( notFoundOk )); then
+            exit
+        fi
+        error-msg 'No matching instances found.'
+        exit 1
+    elif (( resultLength > 1 )); then
+        error-msg 'Ambiguous search matches all of:'
+        error-msg --exec jget --output=raw "${resultArray}" '.[] | "  " + .id'
+        exit 1
+    fi
+
+    jget "${resultArray}" '.[0]'
+fi
