@@ -33,6 +33,10 @@ function usage {
         Availability zone to launch the instance in. Must be specified.
       --name=<name>
         Name tag for the resulting instance.
+      --output=<style> :: `id` `json` `none`
+        What to print on successful output. `id` is just the plain ID (no quotes).
+        `json` is the same as what is printed by `find-instance`. Defaults to
+        `id`.
       --security-group=<name-or-id>
         Name or ID of the security group to use for network access control. If
         specified, this is used to derive the VPC to use, and in conjunction with
@@ -75,6 +79,9 @@ opt-value --var=keyName --filter='/./' key-name
 
 # Name for the instance.
 opt-value --var=name --filter='/./' name
+
+# Output style.
+opt-value --var=outputStyle --init='id' --enum='id json none' output
 
 # Progress messages?
 opt-toggle --call='{ progress-msg --set="$1" }' progress
@@ -168,8 +175,10 @@ progress-msg 'Launching...'
 #
 # Note: Public IP and DNS are de facto (or at least usually) not set in the
 # output from `ec2 run-instances`, that is, they aren't known at the moment of
-# launch.
-result="$(ec2-json run-instances \
+# launch. However, they seem to become set very soon thereafter, which is why
+# JSON output makes a new EC2 call instead of trying to manipulate the results
+# of this call.
+instanceId="$(ec2-json run-instances \
     --loc="${zone}" \
     amiInfo:json="${amiInfo}" \
     zone="${zone}" \
@@ -192,19 +201,17 @@ result="$(ec2-json run-instances \
         + if $subnetId == "" then {} else { SubnetId: $subnetId } end
         + if $userData == "" then {} else { UserData: $userData } end
     ' \
-    :: \
-    '
-        .Instances[0]
-        |
-        {
-            InstanceId: .InstanceId,
-            PrivateDnsName: .PrivateDnsName,
-            PrivateIpAddress: .PrivateIpAddress
-        }
-    '
+    :: --output=raw '.Instances[0].InstanceId'
 )" \
 || exit "$?"
 
 progress-msg 'Launched!'
 
-jget "${result}" '.'
+case "${outputStyle}" in
+    id)
+        echo "${instanceId}"
+        ;;
+    json)
+        lib find-instance --output=json --loc="${zone}" "${instanceId}"
+        ;;
+esac
