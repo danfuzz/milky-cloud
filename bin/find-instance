@@ -17,7 +17,7 @@ function usage {
 
     ${name} [<opt> ...] <name-or-id>
       Finds one or more instances by name or ID, with optional extra criteria, and
-      prints some information about them, in JSON form.
+      prints some information about them.
 
       --loc=<region-or-zone>
         Where to look. Must be specified.
@@ -25,8 +25,11 @@ function usage {
         Allow multiple matching instances. When specified, the result is a JSON
         array instead of a single object. Implies `--not-found-ok`.
       --not-found-ok
-        Do not report an error -- just don\'t print any output -- if there are
-        no matching instances.
+        Do not report an error if there are no matching instances. Instead, print
+        nothing or an empty JSON array (as appropriate, per specified options).
+      --output=<style> :: `compact` `id` `json`
+        What to output, as with `json-val`, except that `id` prints just the ID
+        of the VPC as a plain string. `id` is the default.
       --vpc=<name-or-id>
         VPC where the instance must reside, named as with `find-vpc` (see which).
         If not specified, then this command will find an instance in any VPC (in
@@ -50,6 +53,9 @@ opt-toggle --var=multipleResults multiple
 
 # Ok if no instance found?
 opt-toggle --var=notFoundOk not-found-ok
+
+# What to print.
+opt-value --var=outputStyle --init=id --enum='compact id json' output
 
 # VPC to require.
 opt-value --var=vpcNameOrId --filter='/./' vpc
@@ -97,8 +103,7 @@ if [[ ${zone} != '' ]]; then
     filters+=(availability-zone="${zone}")
 fi
 
-
-ec2Command=(ec2-json describe-instances --loc="${location}" \
+resultArray="$(ec2-json describe-instances --loc="${location}" \
     "$(lib filter-spec "${filters[@]}")" \
     :: '[.Reservations[] | .Instances[] | {
         id:     .InstanceId,
@@ -106,35 +111,34 @@ ec2Command=(ec2-json describe-instances --loc="${location}" \
         vpc:    .VpcId,
         name:   (.Tags | map(select(.Key == "Name") | .Value)[0])
     }]'
-)
+)" \
+|| exit "$?"
 
-if (( multipleResults )); then
-    "${ec2Command[@]}"
-else
-    resultArray="$(ec2-json describe-instances --loc="${location}" \
-        "$(lib filter-spec "${filters[@]}")" \
-        :: '[.Reservations[] | .Instances[] | {
-            id:     .InstanceId,
-            subnet: .SubnetId,
-            vpc:    .VpcId,
-            name:   (.Tags | map(select(.Key == "Name") | .Value)[0])
-        }]'
-    )" \
-    || exit "$?"
+resultLength="$(jlength "${resultArray}")" \
+|| exit "$?"
 
-    resultLength="$(jlength "${resultArray}")"
-
-    if (( resultLength == 0 )); then
-        if (( notFoundOk )); then
-            exit
-        fi
-        error-msg 'No matching instances found.'
-        exit 1
-    elif (( resultLength > 1 )); then
-        error-msg 'Ambiguous search matches all of:'
-        error-msg --exec jget --output=raw "${resultArray}" '.[] | "  " + .id'
-        exit 1
-    fi
-
-    jget "${resultArray}" '.[0]'
+if (( (resultLength == 0) && !(multipleResults || notFoundOk) )); then
+    error-msg 'No matching instances found.'
+    exit 1
+elif (( (resultLength > 1) && !multipleResults )); then
+    error-msg 'Ambiguous search matches all of:'
+    error-msg --exec jget --output=raw "${resultArray}" '.[] | "  " + .id'
+    exit 1
 fi
+
+case "${outputStyle}" in
+    id)
+        jget --output=raw "${resultArray}" '.[] | .id'
+        ;;
+    compact|json)
+        if (( multipleResults )); then
+            jget --output="${outputStyle}" "${resultArray}"
+        else
+            jget --output="${outputStyle}" "${resultArray}" '.[0] // empty'
+        fi
+        ;;
+    *)
+        error-msg "Unrecognized output style: ${output}"
+        exit 1
+        ;;
+esac
