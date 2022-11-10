@@ -17,13 +17,14 @@ function usage {
 
     ${name} [<opt> ...] <name-or-id>
       Finds one or more instances by name or ID, with optional extra criteria, and
-      prints some information about them.
+      prints some information about them. <name-or-id> accepts `*` as a wildcard
+      character.
 
       --loc=<region-or-zone>
         Where to look. Must be specified.
       --multiple
         Allow multiple matching instances. When specified, the result is a JSON
-        array instead of a single object. Implies `--not-found-ok`.
+        array instead of a single object.
       --not-found-ok
         Do not report an error if there are no matching instances. Instead, print
         nothing or an empty JSON array (as appropriate, per specified options).
@@ -134,7 +135,7 @@ fi
 resultLength="$(jlength "${resultArray}")" \
 || exit "$?"
 
-if (( (resultLength == 0) && !(multipleResults || notFoundOk) )); then
+if (( (resultLength == 0) && !notFoundOk )); then
     error-msg 'No matching instances found.'
     exit 1
 elif (( (resultLength > 1) && !multipleResults )); then
