@@ -5,7 +5,7 @@
 # Details: <http://www.apache.org/licenses/LICENSE-2.0>
 
 # Load the helper libraries.
-. "$(dirname "$(readlink -f "$0")")/init.sh" || exit "$?"
+. "$(dirname "$(readlink -f "$0")")/lib/init.sh" || exit "$?"
 
 #
 # Argument parsing
@@ -193,8 +193,8 @@ fi
 
 # Run the special case handler which manipulates the arguments to `aws`, if such
 # a handler is defined (in a sibling file to this script).
-specialCaseHandler="$(this-cmd-path)_${command}_${subcommand}"
-if [[ -x ${specialCaseHandler} ]]; then
+specialCaseHandler="$(lib --path --quiet "$(this-cmd-name)_${command}_${subcommand}")"
+if [[ ${specialCaseHandler} != '' ]]; then
     commandParts="$("${specialCaseHandler}" "$(make-command-parts-json)")" \
     || exit 1
 
