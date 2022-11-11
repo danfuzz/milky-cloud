@@ -1,0 +1,60 @@
+#!/bin/bash
+#
+# Copyright 2022 Dan Bornstein.
+# Licensed AS IS and WITHOUT WARRANTY under the Apache License, Version 2.0.
+# Details: <http://www.apache.org/licenses/LICENSE-2.0>
+
+# Load the helper libraries.
+. "$(dirname "$(readlink -f "$0")")/lib/init.sh" || exit "$?"
+
+
+#
+# Argument parsing
+#
+
+function usage {
+    print-usage $'
+    Usage:
+
+    ${name} [<opt> ...] <file-path>
+      Extracts the public key from a private key PEM file. Prints in both PEM and
+      SSH formats.
+
+    ${name} [--help | -h]
+      Displays this message.
+    '
+
+    exit "$@"
+}
+
+# Want help?
+opt-action --call='{ usage }' help/h
+
+# File path.
+positional-arg --required --var=path file-path
+
+process-args "$@" || usage "$?"
+
+
+#
+# Main script
+#
+
+if [[ ! -r "${path}" ]]; then
+    error-msg "Not readable: ${path}"
+    exit 1
+fi
+
+# PEM format.
+openssl pkey -in "${path}" -pubout
+
+echo ''
+
+# SSH format. `ssh-keygen` won't let you operate on a file that has `g+r` or
+# `o+r` permissions (well intentioned but highly misguided), so we always make
+# a temporary copy and thwack its perms.
+tmpName="${path}-tmp-copy-$$"
+cat "${path}" >"${tmpName}" \
+&& chmod 600 "${tmpName}" \
+&& ssh-keygen -y -f "${tmpName}"
+rm -f "${tmpName}"
