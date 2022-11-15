@@ -97,7 +97,7 @@ function find-secret {
     local sourcePath="$1"
 
     local secretCacheDir="${HOME}/.ssh/secret-cache"
-    local secretFileName="$(tr <<<"${sourcePath}" ' /' '__')"
+    local secretFileName="$(tr <<<"${sourcePath}" ' /:' '___')"
     local secretPath="${secretCacheDir}/${secretFileName}"
 
     if [[ ! -r "${secretPath}" ]]; then
