@@ -245,7 +245,7 @@ function make-change-payload {
     jval \
         action="${action}" \
         name="_acme-challenge.${domain}." \
-        data="${validationData}" \
+        data="${data}" \
     '{
         Comment: "Via Certbot wrapper script",
         Changes: [
