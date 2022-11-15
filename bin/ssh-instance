@@ -62,7 +62,7 @@ opt-value --var=secretSourcePath --filter='/./' secret
 positional-arg --required --var=userAtInstance user-at-instance
 
 # Command and arguments.
-rest-arg --var=commands command
+rest-arg --var=command command
 
 process-args "$@" || usage "$?"
 
@@ -127,7 +127,7 @@ fi
 
 instanceZone=''
 instanceName=''
-if [[ ${instance} =~ ^([^/]+/([^/]+)$ ]]; then
+if [[ ${instance} =~ ^([^/]+)/([^/]+)$ ]]; then
     # The instance is in the AWS-lookup form.
     instance="$(find-instance "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}")" \
     || exit "$?"
@@ -144,12 +144,21 @@ if [[ ${keyPath} != '' ]]; then
     sshCommand+=('-i' "${keyPath}")
 fi
 
+if [[ -t 0 ]]; then
+    # Stdin is a TTY, so tell that to SSH. (This should only make a difference
+    # if running a command, not just logging in.)
+    sshCommand+=('-t')
+fi
+
 if [[ ${user} != '' ]]; then
     sshCommand+=("${user}@${instance}")
 else
     sshCommand+=("${instance}")
 fi
 
-# TODO: Command and args.
+if (( ${#command[@]} != 0 )); then
+    # Apply "armor" to the command name and all arguments.
+    sshCommand+=($(printf '%q ' "${command[@]}"))
+fi
 
 exec "${sshCommand[@]}"
