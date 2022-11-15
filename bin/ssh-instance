@@ -87,7 +87,7 @@ function find-instance {
     )" \
     || return "$?"
 
-    jget "${infoJson}" '.publicAddress'
+    jget --output=raw "${infoJson}" '.publicAddress'
 }
 
 # Finds the indicated secret via `secret-access`, which is presumed to be a
