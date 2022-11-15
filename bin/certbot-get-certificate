@@ -229,24 +229,8 @@ function extra-cleanup {
 function find-zone-id {
     local domain="$1"
 
-    # Extract the main domain, and append `.` to make it officially "absolute."
-    [[ ${domain} =~ [^.]+[.][^.]+$ ]] || return "$1"
-    domain="${BASH_REMATCH[0]}."
-
-    local zoneId
-    zoneId="$(
-        lib aws-json route53 list-hosted-zones --global :: --output=raw \
-            domain="${domain}" \
-            '.HostedZones[] | select(.Name == $domain) | .Id'
-    )" \
+    lib find-dns-zone --output=id "${domain}" \
     || return "$?"
-
-    if [[ ${zoneId} == '' ]]; then
-        error-msg "Could not find zone ID for domain: ${domain}"
-        return 1
-    fi
-
-    echo "${zoneId}"
 }
 
 # Makes a payload for a DNS change request.
