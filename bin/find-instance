@@ -111,11 +111,12 @@ fi
 
 resultArray="$(ec2-json describe-instances --loc="${location}" \
     "$(lib filter-spec "${filters[@]}")" \
-    :: '[.Reservations[] | .Instances[] | {
+    :: '[.Reservations[].Instances[] | {
         id:             .InstanceId,
         name:           (.Tags | map(select(.Key == "Name") | .Value)[0]),
         privateAddress: .PrivateIpAddress,
         publicAddress:  .PublicIpAddress,
+        ipv6Address:    (.NetworkInterfaces[].Ipv6Addresses[0].Ipv6Address),
         state:          .State.Name,
         subnet:         .SubnetId,
         vpc:            .VpcId
