@@ -1,0 +1,164 @@
+#!/bin/bash
+#
+# Copyright 2022 Dan Bornstein.
+# Licensed AS IS and WITHOUT WARRANTY under the Apache License, Version 2.0.
+# Details: <http://www.apache.org/licenses/LICENSE-2.0>
+
+# Load the helper libraries.
+. "$(dirname "$(readlink -f "$0")")/lib/init.sh" || exit "$?"
+
+
+#
+# Argument parsing
+#
+
+function usage {
+    print-usage $'
+    Usage:
+
+    ${name} [<opt> ...] [<user>@]<instance> [<command> <arg> ...]
+      Logs into the indicated instance (by name or IP address), either
+      interactively or to execute a command.
+
+      The <instance> can be specified as a DNS name, an IP address, or the form
+      `<region-or-zone>/<name>`. The last option indicates that the instance
+      is to be looked up by `Name` tag.
+
+      If a <user> is not specified, this command will fall back to the default SSH
+      behavior (of using `~/.ssh/config` and defaulting to the local userid).
+
+      If a <command> and <arg>s are specified, these are passed through to the
+      instance such that they are unparsed by any intermediate shell (e.g., spaces
+      in arguments don\'t cause arguments to be split), _unlike_ the usual (and
+      quite annoying) baseline SSH behavior.
+
+      If neither `--key` nor `--secret` is specified, this command will fall back
+      to the default SSH behavior (of using `~/.ssh/config` and defaulting to
+      `~/.ssh/id_*`).
+
+    --key=<path>
+      Filesystem path to the private key (identity file).
+    --secret=\'<source> <path>\'
+      Secret source and path for the private key. it is expected to be in the
+      space-separated form used by `secret-access` (see which).
+
+    ${name} [--help | -h]
+      Displays this message.
+    '
+
+    exit "$@"
+}
+
+# Want help?
+opt-action --call='{ usage }' help/h
+
+# Path to the key file.
+opt-value --var=keyPath --filter='/./' key
+
+# Secret vault path to the key file.
+opt-value --var=secretSourcePath --filter='/./' secret
+
+# Instance name with optional userid.
+positional-arg --required --var=userAtInstance user-at-instance
+
+# Command and arguments.
+rest-arg --var=command command
+
+process-args "$@" || usage "$?"
+
+if [[ (${keyPath} != '') && (${secretSourcePath} != '') ]]; then
+    error-msg 'Can only specify at most one of --key or --secret.'
+    exit 1
+fi
+
+
+#
+# Helper functions
+#
+
+# Finds an instance.
+function find-instance {
+    local instanceLoc="$1"
+    local instanceName="$2"
+
+    local infoJson
+    infoJson="$(
+        lib find-instance --output=json --loc="${instanceLoc}" "${instanceName}"
+    )" \
+    || return "$?"
+
+    jget --output=raw "${infoJson}" '.publicAddress'
+}
+
+# Finds the indicated secret via `secret-access`, which is presumed to be a
+# private key file, if not already cached. Caches it into `~/.ssh/` in a
+# hopefully-not-objectionably-named file, and prints the name of the file.
+function find-secret {
+    local sourcePath="$1"
+
+    local secretCacheDir="${HOME}/.ssh/secret-cache"
+    local secretFileName="$(tr <<<"${sourcePath}" ' /:' '___')"
+    local secretPath="${secretCacheDir}/${secretFileName}"
+
+    if [[ ! -r "${secretPath}" ]]; then
+        local secretValue
+        secretValue="$(lib secret-access --output=text x="${sourcePath}")" \
+        || return "$?"
+
+        mkdir -p "${secretCacheDir}"
+        cat <<<"${secretValue}" >"${secretPath}"
+        chmod 600 "${secretPath}"
+    fi
+
+    readlink -f "${secretPath}"
+}
+
+
+#
+# Main script
+#
+
+user=''
+instance="${userAtInstance}"
+if [[ ${userAtInstance} =~ ^([^@]+)@([^@]+)$ ]]; then
+    user="${BASH_REMATCH[1]}"
+    instance="${BASH_REMATCH[2]}"
+fi
+
+instanceZone=''
+instanceName=''
+if [[ ${instance} =~ ^([^/]+)/([^/]+)$ ]]; then
+    # The instance is in the AWS-lookup form.
+    instance="$(find-instance "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}")" \
+    || exit "$?"
+fi
+
+if [[ ${secretSourcePath} != '' ]]; then
+    keyPath="$(find-secret "${secretSourcePath}")" \
+    || exit "$?"
+fi
+
+sshCommand=(ssh)
+
+if [[ ${keyPath} != '' ]]; then
+    sshCommand+=('-i' "${keyPath}")
+fi
+
+if [[ -t 0 ]]; then
+    # Stdin is a TTY, so tell that to SSH. (This should only make a difference
+    # if running a command, not just logging in.)
+    sshCommand+=('-t')
+fi
+
+if [[ ${user} != '' ]]; then
+    sshCommand+=("${user}@${instance}")
+else
+    sshCommand+=("${instance}")
+fi
+
+if (( ${#command[@]} != 0 )); then
+    # Apply "armor" to the command name and all arguments.
+    sshCommand+=($(printf '%q ' "${command[@]}"))
+fi
+
+exec "${sshCommand[@]}"
