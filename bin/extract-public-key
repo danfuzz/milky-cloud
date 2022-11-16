@@ -58,3 +58,15 @@ cat "${path}" >"${tmpName}" \
 && chmod 600 "${tmpName}" \
 && ssh-keygen -y -f "${tmpName}"
 rm -f "${tmpName}"
+
+# AWS format for fingerprint for _imported_ keys. (The same key will have a
+# different fingerprint if it was generated directly by AWS.)
+echo ''
+echo 'AWS imported fingerprint:'
+openssl pkey -in "${path}" -pubout -outform DER | openssl md5 -c
+
+# AWS format for internally-generated keys. (It's a hash of the _private_ key,
+# not the public key as would normally be expected.)
+echo ''
+echo 'AWS internally-generated fingerprint:'
+openssl pkcs8 -in "${path}" -nocrypt -topk8 -outform DER | openssl sha1 -c
