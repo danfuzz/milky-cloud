@@ -17,24 +17,34 @@ function usage {
     Usage:
 
     ${name} [<opt> ...]
-      Runs Certbot to get a certificate, without actually installing it. This
+      Runs Certbot to get a certificate, saving it to a local directory. This
       uses the DNS challenge, implemented "manually" here to call out to other
       scripts in this project which use Route53. (Why not use Certbot\'s Route53
       plugin? Because as of this writing, it is easier to reimplement it than to
       get the plugins, because reasons.)
 
-      --out=<path>
-        Directory to use to store certs. Defaults to `out/certs` under the
-        current directory. The directory will be created if it doesn\'t exist.
+      After a successful run of this command, it is safe to delete the specified
+      work directory. All certificates and Cerbot account information will have
+      been stored in the output directory. (The Certbot account information will
+      get re-used on subsequent invocations.)
+
       --domain=<domain-name>
         Domain name to get a certificate for. This is required, and can be
         specified more than once to get a certificate with alternate subjects.
-        (The first domain listed is the primary.)
-      --force-renewal
-        Force renewal of a certificate, even if not yet near expiration.
+        (The first domain listed is the primary.) Wildcards are allowed, in the
+        form `*.domain.name`.
       --email=<email-address>
         Email address to use when making API requests. This is required. Per
         Certbot / LetsEncrypt docs, this is just used for urgent communication.
+      --min-lifetime-days=<count>
+        Cause this command to _not_ actually get a new certificate if there are
+        at least <count> days left before an existing certificate expires. If
+        this option is not used, then the command will always get a new
+        certificate.
+      --out=<path>
+        Directory to use to store certs and Certbot account information. Defaults
+        to `out/certs` under the current directory. The directory will be created
+        if it doesn\'t exist.
       --staging
         Use the staging server.
       --work-dir=<path>
@@ -68,18 +78,25 @@ if [[ ${runHook} == '' ]]; then
     # Directory to use for final output.
     opt-value --var=outDir --init='out/certs' out
 
-    # Site to get a certificate for.
+    # Domain(s) to get a certificate for.
+    certName='' # Primary name (minus wildcard, if any).
     domainArgs=()
     opt-value --required --call=add-domain --filter='/^([*][.])?[-.a-z0-9]+$/' domain
     function add-domain {
         domainArgs+=(--domain="$1")
+        if [[ ${certName} == '' ]]; then
+            # Drop the wildcard off of the domain, if any, to produce the main
+            # certificate name.
+            [[ $1 =~ ^([*][.])?(.*)$ ]]
+            certName="${BASH_REMATCH[2]}"
+        fi
     }
 
     # Email address.
     opt-value --required --var=email --filter='/^[-_.+@a-z0-9]+$/' email
 
-    # Force certificate renewal?
-    opt-toggle --var=forceRenewal force-renewal
+    # Minimum days of validity for an existing certificate.
+    opt-value --var=minLifetimeDays --filter='/^[0-9]{1,4}$/' min-lifetime-days
 
     # Use the staging server?
     opt-toggle --var=useStaging staging
@@ -280,53 +297,74 @@ if [[ ! -d ${workDir} ]]; then
     mkdir -p "${workDir}" || exit "$?"
 fi
 
-extraOpts=()
-if (( useStaging )); then
-    extraOpts+=(--staging)
-fi
-if (( forceRenewal )); then
-    extraOpts+=(--force-renewal)
-fi
-
-thisCmd="$(this-cmd-path)"
-RUN_CERTBOT_HOOK=1 \
-certbot certonly \
-    --config-dir="${workDir}" --logs-dir="${workDir}" --work-dir="${workDir}" \
-    --manual --noninteractive --agree-tos --email="${email}" \
-    --preferred-challenges=dns \
-    --manual-auth-hook="${thisCmd}" --manual-cleanup-hook="${thisCmd}" \
-    "${extraOpts[@]}" "${domainArgs[@]}" \
-|| exit "$?"
-
-
 if [[ ! -d ${outDir} ]]; then
     mkdir -p "${outDir}" || exit "$?"
 fi
 outDir="$(readlink -f "${outDir}")"
 
-copyCommands="$(
-    cd "${workDir}/live"
-    find . '(' -type f -o -type l ')' -name '*.pem' -print0 \
-    | jval --input=raw0:slurp --output=raw \
-        liveDir="${workDir}/live" \
-        outDir="${outDir}" '
-        map(capture("^[.]/(?<path>(?<dir>.*)/[^/]+)$"))
-        |
-        {
-            dirs: (map($outDir + "/" + .dir) | unique),
-            paths: map(.path)
-        }
-        |
-        [
-            (.dirs | map(["rm", "-rf", (. | @sh)]))[],
-            (.dirs | map(["mkdir", "-p", (. | @sh)]))[],
-            (.paths | map(["cp", ($liveDir + "/" + ., $outDir + "/" + . | @sh)]))[]
-        ]
-        |
-        map(join(" "))
-        |
-        join("\n")
-        '
-)" \
+accountOutDir="${outDir}/certbot-accounts"
+certOutDir="${outDir}/${certName}"
+fullChainOut="${certOutDir}/fullchain.pem"
+
+# Check for expiration, if so requested.
+if [[ (${minLifetimeDays} != '') && -r "${fullChainOut}" ]]; then
+    minLifetimeSecs=$(( minLifetimeDays * 24 * 60 * 60 ))
+    openssl >/dev/null 2>&1 \
+        x509 -in "${fullChainOut}" -checkend "${minLifetimeSecs}"
+    if (( $? == 0 )); then
+        info-msg "Not renewing existing certificate; it has at least ${minLifetimeDays} days left."
+        exit
+    else
+        info-msg "Renewing existing certificate; it has no more than ${minLifetimeDays} days left."
+    fi
+fi
+
+# Clean out any pre-existing bits about the to-be-produced certificate from the
+# Certbot work directory.
+rm -rf "${workDir}/archive/${certName}"
+rm -rf "${workDir}/live/${certName}"
+rm -rf "${workDir}/renewal/${certName}.conf"
+
+# Copy the pre-existing Certbot account info (if any) into the work directory.
+if [[ -d "${accountOutDir}" ]]; then
+    mkdir -p "${workDir}/accounts"
+    lib rsync-local "${accountOutDir}/" "${workDir}/accounts" \
+    || exit "$?"
+fi
+
+extraOpts=()
+if (( useStaging )); then
+    extraOpts+=(--staging)
+fi
+
+# Note: We use `--force-renewal`, because by the time we're here this script has
+# already decided that the certificate needs renewing. (It probably doesn't
+# matter, though, because we clean the salient bits out of the work directory,
+# above.)
+thisCmd="$(this-cmd-path)"
+RUN_CERTBOT_HOOK=1 \
+certbot certonly \
+    --config-dir="${workDir}" --logs-dir="${workDir}" --work-dir="${workDir}" \
+    --manual --noninteractive --agree-tos --email="${email}" \
+    --preferred-challenges=dns --force-renewal \
+    --manual-auth-hook="${thisCmd}" --manual-cleanup-hook="${thisCmd}" \
+    --cert-name="${certName}" \
+    "${extraOpts[@]}" "${domainArgs[@]}" \
 || exit "$?"
-eval "${copyCommands}"
+
+# Copy the result files into place.
+mkdir -p "${certOutDir}"
+(
+    cd "${workDir}/live/${certName}"
+    find . '(' -type f -o -type l ')' -name '*.pem' \
+        -exec cp '{}' "${certOutDir}" ';'
+)
+
+# Copy Certbot account info back into the output area.
+mkdir -p "${accountOutDir}"
+lib rsync-local "${workDir}/accounts/" "${accountOutDir}" \
+|| exit "$?"
+
+info-msg
+info-msg 'Certificate files stored to:'
+info-msg "  ${certOutDir}"
