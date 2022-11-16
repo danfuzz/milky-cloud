@@ -16,9 +16,21 @@ function usage {
     print-usage $'
     Usage:
 
-    ${name} [<opt> ...] <file-path>
-      Extracts the public key from a private key PEM file. Prints in both PEM and
-      SSH formats.
+    ${name} [<opt> ...] [<file-path>]
+      Extracts the public key from a private key PEM file or converts a public
+      key PEM file to different formats. If no path is given, this command will
+      read from stdin.
+
+    --output=<style>
+      What to output.
+      `aws-fingerprint` -- AWS fingerprint for the key, for keys imported into
+        AWS.
+      `aws-generated-fingerprint` -- AWS fingerprint for the key, for keys that
+        AWS generates internally. This is based on the contents of the _private_
+        key, and as such cannot be used when passing a public key to this command.
+      `public-key` -- Public key in PEM format. This is the default.
+      `ssh-auth` -- Public key in SSH format, usable for example in
+        `.ssh/authorized_keys` files.
 
     ${name} [--help | -h]
       Displays this message.
@@ -30,10 +42,78 @@ function usage {
 # Want help?
 opt-action --call='{ usage }' help/h
 
+# What to output.
+opt-value --var=outputStyle --init=public-key \
+    --enum='aws-fingerprint aws-generated-fingerprint public-key ssh-auth' \
+    output
+
 # File path.
-positional-arg --required --var=path file-path
+positional-arg --init='/dev/stdin' --var=path file-path
 
 process-args "$@" || usage "$?"
+
+
+#
+# Helper functions
+#
+
+# Extracts an imported-style AWS fingerprint.
+function do-aws-fingerprint {
+    local keyType="$1"
+    local keyFile="$2"
+
+    local opts=()
+    if [[ ${keyType} == 'public' ]]; then
+        opts=(-pubin)
+    fi
+
+    openssl pkey <<<"${keyFile}" -pubout -outform DER "${opts[@]}" \
+    | openssl md5 -c
+}
+
+# Extracts an internal-style AWS fingerprint.
+function do-aws-generated-fingerprint {
+    local keyType="$1"
+    local keyFile="$2"
+
+    if [[ ${keyType} == 'public' ]]; then
+        error-msg 'Internally-generated AWS form requires a private (not public) key.'
+        return 1
+    fi
+
+    openssl pkcs8 <<<"${keyFile}" -nocrypt -topk8 -outform DER \
+    | openssl sha1 -c
+}
+
+# Extracts a PEM public key.
+function do-public-key {
+    local keyType="$1"
+    local keyFile="$2"
+
+    local opts=()
+    if [[ ${keyType} == 'public' ]]; then
+        opts=(-pubin)
+    fi
+
+    openssl pkey <<<"${keyFile}" -pubout "${opts[@]}"
+}
+
+# Extracts an SSH-style public key.
+function do-ssh-auth {
+    local keyType="$1"
+    local keyFile="$2"
+
+    # Convert it to a PEM public key first (which will be a no-op if it's
+    # already a public key). We do this because `ssh-keygen` will complain if
+    # you pass a private key via a file that has `g+r` or `o+r` permissions
+    # (including stdin); this is well-intentioned but highly misguided. We
+    # sidestep the problem by doing the private-to-public conversion first
+    # (right here), and _then_ calling on `ssh-keygen` just to switch the
+    # format.
+    keyFile="$(do-public-key "${keyType}" "${keyFile}")"
+
+    ssh-keygen <<<"${keyFile}" -i -mPKCS8 -f /dev/stdin
+}
 
 
 #
@@ -45,28 +125,17 @@ if [[ ! -r "${path}" ]]; then
     exit 1
 fi
 
-# PEM format.
-openssl pkey -in "${path}" -pubout
+# Extract only the _first_ PEM-looking block from the file.
+keyFile="$(awk <"${path}" '
+    BEGIN { found = 0; }
+    !found && /^-----BEGIN / { found = 1; }
+    found { print; }
+    found && /^-----END / { exit; }
+')"
 
-echo ''
+keyType='private'
+if [[ ${keyFile} =~ ^$'-----BEGIN PUBLIC KEY-----\n' ]]; then
+    keyType='public'
+fi
 
-# SSH format. `ssh-keygen` won't let you operate on a file that has `g+r` or
-# `o+r` permissions (well intentioned but highly misguided), so we always make
-# a temporary copy and thwack its perms.
-tmpName="${path}-tmp-copy-$$"
-cat "${path}" >"${tmpName}" \
-&& chmod 600 "${tmpName}" \
-&& ssh-keygen -y -f "${tmpName}"
-rm -f "${tmpName}"
-
-# AWS format for fingerprint for _imported_ keys. (The same key will have a
-# different fingerprint if it was generated directly by AWS.)
-echo ''
-echo 'AWS imported fingerprint:'
-openssl pkey -in "${path}" -pubout -outform DER | openssl md5 -c
-
-# AWS format for internally-generated keys. (It's a hash of the _private_ key,
-# not the public key as would normally be expected.)
-echo ''
-echo 'AWS internally-generated fingerprint:'
-openssl pkcs8 -in "${path}" -nocrypt -topk8 -outform DER | openssl sha1 -c
+"do-${outputStyle}" "${keyType}" "${keyFile}"
