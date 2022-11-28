@@ -21,8 +21,8 @@ function usage {
       interactively or to execute a command.
 
       The <instance> can be specified as a DNS name, an IP address, or the form
-      `<region-or-zone>/<name>`. The last option indicates that the instance
-      is to be looked up by `Name` tag.
+      `<region-or-zone>:<name>`. The last option indicates that the instance
+      is to be looked up by its AWS `Name` tag.
 
       If a <user> is not specified, this command will fall back to the default SSH
       behavior (of using `~/.ssh/config` and defaulting to the local userid).
@@ -30,7 +30,7 @@ function usage {
       If a <command> and <arg>s are specified, these are passed through to the
       instance such that they are unparsed by any intermediate shell (e.g., spaces
       in arguments don\'t cause arguments to be split), _unlike_ the usual (and
-      quite annoying) baseline SSH behavior.
+      often annoying and surprising) baseline SSH behavior.
 
       If neither `--key` nor `--secret` is specified, this command will fall back
       to the default SSH behavior (of using `~/.ssh/config` and defaulting to
@@ -125,9 +125,7 @@ if [[ ${userAtInstance} =~ ^([^@]+)@([^@]+)$ ]]; then
     instance="${BASH_REMATCH[2]}"
 fi
 
-instanceZone=''
-instanceName=''
-if [[ ${instance} =~ ^([^/]+)/([^/]+)$ ]]; then
+if [[ ${instance} =~ ^([^:]+):([^:]+)$ ]]; then
     # The instance is in the AWS-lookup form.
     instance="$(find-instance "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}")" \
     || exit "$?"
