@@ -318,7 +318,7 @@ instanceId="$(ec2-json run-instances \
 progress-msg 'Launched!'
 progress-msg "Instance ID: ${instanceId}"
 
-if (( waitUntilRunning || extractHostKeys )); then
+if (( waitUntilRunning || extractHostKey )); then
     wait-until-running "${instanceId}" \
     || exit "$?"
 fi
