@@ -28,7 +28,9 @@ function usage {
       --key-name=<name>
         Name of the keypair to use for SSH access. If not specified, then
         something else will have to have set up SSH access (e.g. the user data
-        script, or something baked into the AMI).
+        script, or something baked into the AMI). Detail: This causes the public
+        key of the indicate keypair to be listed in `.ssh/authorized_keys` for
+        the default userid on the new instance.
       --loc=<availability-zone>
         Availability zone to launch the instance in. Must be specified.
       --name=<name>
