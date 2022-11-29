@@ -23,6 +23,10 @@ function usage {
       for the specified availability zone (which, TBQH, is probably not what you
       want).
 
+      --extract-host-key
+        Using the EC2 console, extract the host public key for the ED25519
+        algorithm (which has gloriously short keys). This implies
+        `--wait-until-running`.
       --instance-type=<type>
         What type of instance to install. Defaults to `t3.nano`, for convenience.
       --key-name=<name>
@@ -59,6 +63,8 @@ function usage {
         Name or ID of the VPC to launch into. If specified, then the instance
         will be in the default security group of the indicated VPC. It is not
         valid to specify both this option and `--security-group`.
+      --wait-until-running
+        After launching, wait until the instance is in state `running`.
 
     ${name} [--help | -h]
       Display this message.
@@ -72,6 +78,9 @@ opt-action --call='{ usage }' help/h
 
 # Availability zone.
 opt-value --required --var=zone --call=parse-zone loc
+
+# Extract host public key for ED25519?
+opt-toggle --var=extractHostKey extract-host-key
 
 # Instance type.
 opt-value --var=instanceType --init='t3.nano' instance-type
@@ -100,6 +109,9 @@ opt-value --var=userDataFile --filter='/./' user-data-file
 # Name or ID of the VPC to be in.
 opt-value --var=vpcNameOrId --filter='/./' vpc
 
+# Wait until the instance is running?
+opt-toggle --var=waitUntilRunning wait-until-running
+
 process-args "$@" || usage "$?"
 
 if [[ (${userData} != '') && (${userDataFile} != '') ]]; then
@@ -111,6 +123,102 @@ if [[ (${groupNameOrId} != '') && (${vpc} != '') ]]; then
     error-msg 'Cannot specify both --security-group and --vpc.'
     exit 1
 fi
+
+
+#
+# Helper functions
+#
+
+# Extracts the host public key for ED25519 from the console logs.
+function extract-host-key {
+    local instanceId="$1"
+    local keyAlgorithm='ed25519'
+
+    progress-msg 'Extracting host public key...'
+
+    local attempt=0
+    local key=''
+    while [[ ${key} == '' ]]; do
+        (( attempt++ ))
+        if (( attempt != 1 )); then
+            if (( attempt == 2 )); then
+                progress-msg 'This can take a while...'
+            elif (( (attempt % 6) == 0 )); then
+                progress-msg 'Still waiting for console output...'
+            fi
+            sleep 10
+        fi
+        local key
+        key="$(
+            ec2-json get-console-output --loc="${zone}" \
+                id="${instanceId}" \
+                '{ InstanceId: $id }' \
+                :: --output=raw \
+                    alg="${keyAlgorithm}" \
+                '
+                  (.Output // "")
+                | split("\n")
+                | (index("-----BEGIN SSH HOST KEY KEYS-----") + 1) as $startIndex
+                | index("-----END SSH HOST KEY KEYS-----") as $endIndex
+                | .[$startIndex:$endIndex]
+                | map(split(" ") | select(.[0] == "ssh-" + $alg) | .[1])
+                | .[0] // ""
+                '
+        )" \
+        || return "$?"
+    done
+
+    progress-msg "Got ${keyAlgorithm} key:"
+    progress-msg "  ${key}"
+
+    local tag="host-public-key-${keyAlgorithm}"
+    ec2-json create-tags --loc="${zone}" \
+        id="${instanceId}" \
+        key="${key}" \
+        tag="${tag}" \
+        '{
+            Resources: [$id],
+            Tags: [{ Key: $tag, Value: $key}]
+        }' \
+    || return "$?"
+
+    progress-msg "Key stored as instance tag ${tag}."
+}
+
+# Waits until the instance is in state `running`.
+function wait-until-running {
+    local instanceId="$1"
+
+    progress-msg 'Waiting for instance to be `running`...'
+
+    local state
+    while true; do
+        local infoJson
+        infoJson="$(
+            lib find-instance --loc="${zone}" --output=json "${instanceId}"
+        )" \
+        || return "$?"
+
+        if [[ ${infoJson} == '' ]]; then
+            error-msg "Cannot wait for ${name}; no such instance."
+            return 1
+        fi
+
+        state="$(jget --output=raw "${infoJson}" '.state')"
+        if [[ ${state} != 'pending' ]]; then
+            break
+        fi
+
+        sleep 1
+    done
+
+    if [[ ${state} != 'running' ]]; then
+        error-msg "Instance ${name} in state ${state}; cannot become running."
+        return 1
+    fi
+
+    progress-msg 'Instance is now `running`.'
+}
 
 
 #
@@ -208,6 +316,17 @@ instanceId="$(ec2-json run-instances \
 || exit "$?"
 
 progress-msg 'Launched!'
+progress-msg "Instance ID: ${instanceId}"
+
+if (( waitUntilRunning || extractHostKeys )); then
+    wait-until-running "${instanceId}" \
+    || exit "$?"
+fi
+
+if (( extractHostKey )); then
+    extract-host-key "${instanceId}" \
+    || exit "$?"
+fi
 
 case "${outputStyle}" in
     id)
