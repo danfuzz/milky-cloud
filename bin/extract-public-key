@@ -17,9 +17,9 @@ function usage {
     Usage:
 
     ${name} [<opt> ...] [<file-path>]
-      Extracts the public key from a private key PEM file or converts a public
-      key PEM file to different formats. If no path is given, this command will
-      read from stdin.
+      Extracts the public key from a private key PEM or SSH file, or converts a
+      public key PEM file to different formats. If no path is given, this command
+      will read from stdin.
 
     --output=<style>
       What to output.
@@ -63,9 +63,15 @@ function do-aws-fingerprint {
     local keyFile="$2"
 
     local opts=()
-    if [[ ${keyType} == 'public' ]]; then
-        opts=(-pubin)
-    fi
+    case "${keyType}" in
+        public)
+            opts=(-pubin)
+            ;;
+        private-ssh)
+            error-msg 'Cannot fingerprint an SSH key.'
+            return 1
+            ;;
+    esac
 
     openssl pkey <<<"${keyFile}" -pubout -outform DER "${opts[@]}" \
     | openssl md5 -c
@@ -76,8 +82,9 @@ function do-aws-generated-fingerprint {
     local keyType="$1"
     local keyFile="$2"
 
-    if [[ ${keyType} == 'public' ]]; then
-        error-msg 'Internally-generated AWS form requires a private (not public) key.'
+    if [[ ${keyType} != 'private' ]]; then
+        error-msg 'Internally-generated AWS form requires a private SSL key.'
+        error-msg 'Does not work for public or SSH keys.'
         return 1
     fi
 
@@ -90,12 +97,18 @@ function do-public-key {
     local keyType="$1"
     local keyFile="$2"
 
-    local opts=()
-    if [[ ${keyType} == 'public' ]]; then
-        opts=(-pubin)
-    fi
-
-    openssl pkey <<<"${keyFile}" -pubout "${opts[@]}"
+    case "${keyType}" in
+        public)
+            openssl pkey <<<"${keyFile}" -pubin -pubout
+            ;;
+        private)
+            openssl pkey <<<"${keyFile}" -pubout
+            ;;
+        private-ssh)
+            error-msg 'Cannot extract public PEM key from an SSH key.'
+            return 1
+            ;;
+    esac
 }
 
 # Extracts an SSH-style public key.
@@ -103,16 +116,36 @@ function do-ssh-auth {
     local keyType="$1"
     local keyFile="$2"
 
-    # Convert it to a PEM public key first (which will be a no-op if it's
-    # already a public key). We do this because `ssh-keygen` will complain if
-    # you pass a private key via a file that has `g+r` or `o+r` permissions
-    # (including stdin); this is well-intentioned but highly misguided. We
-    # sidestep the problem by doing the private-to-public conversion first
-    # (right here), and _then_ calling on `ssh-keygen` just to switch the
-    # format.
-    keyFile="$(do-public-key "${keyType}" "${keyFile}")"
-
-    ssh-keygen <<<"${keyFile}" -i -mPKCS8 -f /dev/stdin
+    # Note: When given an SSH private key, we have to force it to be in a file
+    # that is user-readable-only, because `ssh-keygen` will otherwise refuse to
+    # read the file (even from stdin); this is well-intentioned but highly
+    # misguided.
+    case "${keyType}" in
+        public)
+            ssh-keygen <<<"${keyFile}" -i -mPKCS8 -f /dev/stdin
+            ;;
+        private)
+            # Extract the public key, to avoid `ssh-keygen` complaints (see
+            # above).
+            keyFile="$(do-public-key "${keyType}" "${keyFile}")"
+            ssh-keygen <<<"${keyFile}" -i -mPKCS8 -f /dev/stdin
+            ;;
+        private-ssh)
+            # Need to use a temporary file to avoid `ssh-keygen` complaints (see
+            # above).
+            local tmpFile="./$(this-cmd-name)-$$"
+            cat <<<"${keyFile}" >"${tmpFile}"
+            chmod 600 "${tmpFile}"
+            local result error
+            result="$(ssh-keygen -y -f "${tmpFile}")"
+            error="$?"
+            rm -f "${tmpFile}"
+            if (( error == 0 )); then
+                echo "${result}"
+            fi
+            return "${error}"
+            ;;
+    esac
 }
 
 
@@ -136,6 +169,8 @@ keyFile="$(awk <"${path}" '
 keyType='private'
 if [[ ${keyFile} =~ ^$'-----BEGIN PUBLIC KEY-----\n' ]]; then
     keyType='public'
+elif [[ ${keyFile} =~ ^$'-----BEGIN OPENSSH PRIVATE KEY-----\n' ]]; then
+    keyType='private-ssh'
 fi
 
 "do-${outputStyle}" "${keyType}" "${keyFile}"
