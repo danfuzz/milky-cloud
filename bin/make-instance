@@ -230,12 +230,8 @@ function extract-host-key {
     local tag="host-public-key-${keyAlgorithm}"
     ec2-json create-tags --loc="${zone}" \
         id="${instanceId}" \
-        key="${key}" \
-        tag="${tag}" \
-        '{
-            Resources: [$id],
-            Tags: [{ Key: $tag, Value: $key}]
-        }' \
+        tagSpec:json="$(lib tag-spec "${tag}=${key}")" \
+        '{ Resources: [$id] } + $tagSpec' \
     || return "$?"
 
     progress-msg "Key stored as instance tag ${tag}."
