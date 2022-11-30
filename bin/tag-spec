@@ -5,7 +5,7 @@
 # Details: <http://www.apache.org/licenses/LICENSE-2.0>
 
 # Load the helper libraries.
-. "$(dirname "$(readlink -f "$0")")/init.sh" || exit "$?"
+. "$(dirname "$(readlink -f "$0")")/lib/init.sh" || exit "$?"
 
 
 #
@@ -26,6 +26,10 @@ function usage {
         <name>=<value> -- Use <value> as a the binding for <name>. It is invalid
           for a given name to be used more than once.
 
+      --name=<value>
+        Adds a spec to bind `Name` (capitalized) to the given value. This is
+        available as a convenience because it is such a common need in that it is
+        AWS\'s standard way to tag things with names.
       --output=<style> :: `compact` `json`
         Output style, as with `json-val`. Defaults to `json`.
       --resource-type=<type>
@@ -39,14 +43,17 @@ function usage {
     exit "$@"
 }
 
+# Want help?
+opt-action --call='{ usage }' help/h
+
+# `Name` binding.
+opt-value --var=name --filter='/./' name
+
 # Output style.
 opt-value --var=outputStyle --init=json --enum='compact json' output
 
 # Resource type.
 opt-value --var=resourceType --filter='/^[-a-z0-9]+$/' resource-type
-
-# Want help?
-opt-action --call='{ usage }' help/h
 
 # List of tag specifications, as parallel arrays of name and value.
 tagNames=()
@@ -79,6 +86,12 @@ process-args "$@" || usage "$?"
 #
 # Main script
 #
+
+# Add the binding from `--name`, if used.
+if [[ ${name} != '' ]]; then
+    tagNames+=('Name')
+    tagValues+=("${name}")
+fi
 
 # Check for duplicate names.
 duplicates=($(
