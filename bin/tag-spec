@@ -34,7 +34,7 @@ function usage {
         Output style, as with `json-val`. Defaults to `json`.
       --type=<type>
         Resource type, if `TagSpecifications` output is wanted. If not specified,
-        the output is _just_ the tags in a form suitable for `ec2 create-tags`.
+        the output is the `Tags` form suitable for `ec2 create-tags`.
 
     ${name} [--help | -h]
       Displays this message.
@@ -117,14 +117,9 @@ jval --output="${outputStyle}" \
         $binding as [$key, $value] | . + [{ Key: $key, Value: $value }]
     )
     |
+    { Tags: . }
+    |
     if $resourceType == "" then .
-    else {
-        TagSpecifications: [
-            {
-                ResourceType: $resourceType,
-                Tags: .
-            }
-        ]
-    }
+    else { TagSpecifications: [{ ResourceType: $resourceType } + .] }
     end
 '
