@@ -55,22 +55,20 @@ case "${type}" in
         # writing to stdout (or any non-file) works, so we fake it out. What's
         # going on here:
         #
-        # FD #3 gets wired back to _our_ stdout, to get the actual output we
+        # FD #3 gets wired back to _our_ stdout to get the actual output we
         # want, and then `ssh-keygen`'s stdout gets squelched. We make a couple
         # symbolic links for the command to write to, including `/dev/null` for
         # the public key (which we don't care about here). We pipe `y` into the
-        # command to answer the question, "Overwrite <output-file>?" And then,
-        # after running the command, we remove the links and exit with whatever
-        # status was originally reported. Source of inspiration:
+        # command to answer the question, "Overwrite <output-file>?" And then
+        # after running the command, we remove the links (via `trap` so that the
+        # exit status is trivially preserved). Source of inspiration:
         #   <https://gist.github.com/kraftb/9918106>
         outName="./$(this-cmd-name)-$$"
+        trap "rm -f \"${outName}\" \"${outName}.pub\"" EXIT
         ln -s /dev/fd/3 "${outName}" || exit "$?"
         ln -s /dev/null "${outName}.pub" || exit "$?"
         ssh-keygen <<<'y' 3>&1 >/dev/null \
             -q -t ed25519 -N '' -C '' -f "${outName}"
-        result="$?"
-        rm -f "${outName}" "${outName}.pub"
-        exit "${result}"
         ;;
     user)
         # Squelch stderr to avoid the progress spew.
