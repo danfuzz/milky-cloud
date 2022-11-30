@@ -82,13 +82,19 @@ function authorize-host {
     local publicKey="$2"
 
     local hostsFile="${HOME}/.ssh/known_hosts"
+    local hostLine="${address} ${publicKey}"
 
-    # No way to suppress "host not found" message except by squelching stderr.
-    ssh-keygen 2>/dev/null -f "${hostsFile}" -R "${address}" \
+    local already
+    already="$(ssh-keygen -f "${hostsFile}" -F "${address}" | tail -1)" \
     || return "$?"
 
-    echo "${address} ${publicKey}" >>"${hostsFile}" \
-    || return "$?"
+    if [[ ${already} != ${hostLine} ]]; then
+        if [[ ${already} != '' ]]; then
+            ssh-keygen >/dev/null 2>&1 -f "${hostsFile}" -R "${address}" \
+            || return "$?"
+        fi
+        echo "${hostLine}" >>"${hostsFile}"
+    fi
 }
 
 # Finds an instance. Outputs an `eval`able snippet to set things up.
