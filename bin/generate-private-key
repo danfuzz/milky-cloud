@@ -1,0 +1,67 @@
+#!/bin/bash
+#
+# Copyright 2022 Dan Bornstein.
+# Licensed AS IS and WITHOUT WARRANTY under the Apache License, Version 2.0.
+# Details: <http://www.apache.org/licenses/LICENSE-2.0>
+
+# Load the helper libraries.
+. "$(dirname "$(readlink -f "$0")")/lib/init.sh" || exit "$?"
+
+#
+# Argument parsing
+#
+
+function usage {
+    print-usage $'
+    Usage:
+
+    ${name} [<opt> ...]
+      Creates a new private key, with a couple different options for type.
+
+      --out=<file>
+        File to write to. Defaults to stdout.
+      --type=<type>
+        What type of key to create. Must be specified
+        `host` -- SSH host key, ED25519 algorithm.
+        `user` -- User key, 2048 bits, RSA algorithm.
+
+    ${name} [--help | -h]
+      Displays this message.
+    '
+
+    exit "$@"
+}
+
+# Want help?
+opt-action --call='{ usage }' help/h
+
+# Key type.
+opt-value --required --var=type --enum='host user' type
+
+# Where to output.
+opt-value --var=out --init='/dev/stdout' out
+
+process-args "$@" || usage "$?"
+
+
+#
+# Main script
+#
+
+case "${type}" in
+    host)
+        # Boy howdy `ssh-keygen` is a pain in the butt to script. This tells
+        # it to write the file to fd 3, which we have redirected to stdout,
+        # while _also_ squelching its chatty stdout and stderr messaging, and
+        # _also_ passing it `y` to answer the question "Overwrite /dev/fd/3?"
+        # Cribbed from here: <https://gist.github.com/kraftb/9918106>
+        (
+            exec 3>&1
+            ssh-keygen -qt ed25519 -N '' -f /dev/fd/3 <<<'y' >/dev/null 2>&1
+        )
+        ;;
+    user)
+        # Squelch stderr to avoid the progress spew.
+        openssl genrsa -out "${out}" 2048 2>/dev/null
+        ;;
+esac
