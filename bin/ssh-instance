@@ -83,8 +83,8 @@ function authorize-host {
 
     local hostsFile="${HOME}/.ssh/known_hosts"
 
-    # No way to suppress "host not found" message except by squelching stdout.
-    ssh-keygen >/dev/null -f "${hostsFile}" -R "${address}" \
+    # No way to suppress "host not found" message except by squelching stderr.
+    ssh-keygen 2>/dev/null -f "${hostsFile}" -R "${address}" \
     || return "$?"
 
     echo "${address} ${publicKey}" >>"${hostsFile}" \
