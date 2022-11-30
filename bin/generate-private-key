@@ -66,10 +66,8 @@ case "${type}" in
         outName="./$(this-cmd-name)-$$"
         ln -s /dev/fd/3 "${outName}" || exit "$?"
         ln -s /dev/null "${outName}.pub" || exit "$?"
-        (
-            exec 3>&1
-            ssh-keygen -q -t ed25519 -N '' -C '' -f "${outName}" <<<'y' >/dev/null
-        )
+        ssh-keygen <<<'y' 3>&1 >/dev/null \
+            -q -t ed25519 -N '' -C '' -f "${outName}"
         result="$?"
         rm -f "${outName}" "${outName}.pub"
         exit "${result}"
