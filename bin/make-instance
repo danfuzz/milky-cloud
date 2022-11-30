@@ -157,17 +157,14 @@ function build-user-data {
 
     # Build the code to do host key setup, if requested.
     if [[ ${hostKey} != '' ]]; then
-        local sshAuth
-        sshAuth="$(lib extract-public-key <<<"${hostKey}" --output=ssh-auth)" \
-        || return "$?"
-        [[ "${sshAuth}" =~ ^ssh-([^ ]+)' ' ]] \
+        [[ "${hostPublicKey}" =~ ^ssh-([^ ]+)' ' ]] \
         || return "$?"
         local algorithm="${BASH_REMATCH[1]}"
         local lines=(
             'rm -f /etc/ssh/ssh_host_*key*'
             "keyFile=/etc/ssh/ssh_host_${algorithm}_key"
             "cat <<<'${hostKey}' >\${keyFile}"
-            "cat <<<'${sshAuth}' >\${keyFile}.pub"
+            "cat <<<'${hostPublicKey}' >\${keyFile}.pub"
             'chmod 600 ${keyFile}'
             'chown root:ssh_keys ${keyFile}'
         )
@@ -277,6 +274,11 @@ function wait-until-running {
 # Main script
 #
 
+# Extract the SSH-auth version of the public key from the host private key, if
+# a host key is in fact being passed to the instance.
+hostPublicKey="$(lib extract-public-key <<<"${hostKey}" --output=ssh-auth)" \
+|| exit "$?"
+
 # Build the user data string.
 userData="$(build-user-data)" \
 || exit "$?"
@@ -317,6 +319,12 @@ if [[ ${vpcId} != '' ]]; then
     || exit 1
 fi
 
+progress-msg 'Where:'
+progress-msg "  zone:   ${zone}"
+progress-msg "  vpc:    ${vpcId}"
+progress-msg "  subnet: ${subnetId}"
+progress-msg "  group:  ${groupId}"
+
 # Make up a name if one wasn't provided.
 if [[ ${name} == '' ]]; then
     name="$(lib now-stamp via-script)"
@@ -324,7 +332,15 @@ fi
 
 # Form the main command, and do it!
 
-progress-msg 'Launching...'
+progress-msg "Launching instance: ${name}"
+
+tagExtras=()
+if [[ ${hostPublicKey} != '' ]]; then
+    [[ ${hostPublicKey} =~ ^ssh-([^ ]+)' '(.*)$ ]] \
+    || exit "$?"
+    tagExtras=("host-public-key-${BASH_REMATCH[1]}=${BASH_REMATCH[2]}")
+fi
+tagSpec="$(lib tag-spec --type='instance' --name="${name}" "${tagExtras[@]}")"
 
 # Note: If a subnet ID is known, then it implies the availability zone, in which
 # case one doesn't also need to specify the availability zone explicitly.
@@ -345,7 +361,7 @@ instanceId="$(ec2-json run-instances \
     keyName="${keyName}" \
     groupId="${groupId}" \
     subnetId="${subnetId}" \
-    tagSpec:json="$(lib tag-spec --type='instance' --name="${name}")" \
+    tagSpec:json="${tagSpec}" \
     userData="${userData}" \
     '
         {
