@@ -32,7 +32,7 @@ function usage {
         AWS\'s standard way to tag things with names.
       --output=<style> :: `compact` `json`
         Output style, as with `json-val`. Defaults to `json`.
-      --resource-type=<type>
+      --type=<type>
         Resource type, if `TagSpecifications` output is wanted. If not specified,
         the output is _just_ the tags in a form suitable for `ec2 create-tags`.
 
@@ -53,7 +53,7 @@ opt-value --var=name --filter='/./' name
 opt-value --var=outputStyle --init=json --enum='compact json' output
 
 # Resource type.
-opt-value --var=resourceType --filter='/^[-a-z0-9]+$/' resource-type
+opt-value --var=resourceType --filter='/^[-a-z0-9]+$/' type
 
 # List of tag specifications, as parallel arrays of name and value.
 tagNames=()
