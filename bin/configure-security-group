@@ -118,7 +118,7 @@ fi
 if (( !error )); then
     tagSpec='{}'
     if [[ ${name} != '' ]]; then
-        tagSpec="$(lib name-tag-spec 'security-group-rule' "${name}")"
+        tagSpec="$(lib tag-spec --type='security-group-rule' --name="${name}")"
     fi
 
     ec2-json authorize-security-group-ingress \

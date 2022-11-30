@@ -119,7 +119,7 @@ if [[ ${name} == '' ]]; then
     name="$(lib now-stamp via-script)"
 fi
 
-tagSpec="$(lib name-tag-spec 'subnet' "${name}")"
+tagSpec="$(lib tag-spec --type='subnet' --name="${name}")"
 
 progressArg="--progress=$(progress-msg --status)"
 
