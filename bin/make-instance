@@ -27,6 +27,10 @@ function usage {
         Using the EC2 console, extract the host public key for the ED25519
         algorithm (which has gloriously short keys). This implies
         `--wait-until-running`.
+      --host-key=<key>
+        Specify a host key to use, overriding the one(s) created during the
+        instance\'s first boot. This can be used to avoid a potential MITM attack
+        which relies on trusting the host key on first-connect.
       --instance-type=<type>
         What type of instance to install. Defaults to `t3.nano`, for convenience.
       --key-name=<name>
@@ -82,6 +86,9 @@ opt-value --required --var=zone --call=parse-zone loc
 # Extract host public key for ED25519?
 opt-toggle --var=extractHostKey extract-host-key
 
+# Host key to use.
+opt-value --var=hostKey host-key
+
 # Instance type.
 opt-value --var=instanceType --init='t3.nano' instance-type
 
@@ -128,6 +135,55 @@ fi
 #
 # Helper functions
 #
+
+# Builds the user data from all the possible sources.
+function build-user-data {
+    local hashBang='#!/bin/bash'
+    local passedIn="${userData}"
+    local keySetup=''
+
+    # Slurp the user data, if there is user data to be slurped.
+    if [[ ${userDataFile} != '' ]]; then
+        # We know `userData` is empty when the file name is specified, so it's
+        # a-okay to just set `passedIn` without concatenating.
+        passedIn="$(cat "${userDataFile}")" \
+        || return "$?"
+    fi
+
+    if [[ ${passedIn} =~ ^(#![^$'\n']+)$'\n'(.*)$ ]]; then
+        hashBang="${BASH_REMATCH[1]}"
+        passedIn="${BASH_REMATCH[2]}"
+    fi
+
+    # Build the code to do host key setup, if requested.
+    if [[ ${hostKey} != '' ]]; then
+        local sshAuth
+        sshAuth="$(lib extract-public-key <<<"${hostKey}" --output=ssh-auth)" \
+        || return "$?"
+        [[ "${sshAuth}" =~ ^ssh-([^ ]+)' ' ]] \
+        || return "$?"
+        local algorithm="${BASH_REMATCH[1]}"
+        local lines=(
+            'rm -f /etc/ssh/ssh_host_*key*'
+            "keyFile=/etc/ssh/ssh_host_${algorithm}_key"
+            "cat <<<'${hostKey}' >\${keyFile}"
+            "cat <<<'${sshAuth}' >\${keyFile}.pub"
+            'chmod 600 ${keyFile}'
+            'chown root:ssh_keys ${keyFile}'
+        )
+        keySetup="$(printf '%s\n' "${lines[@]}")"
+    fi
+
+    if [[ (${passedIn} != '') || (${keySetup} != '') ]]; then
+        cat <<<"${hashBang}"
+        if [[ ${keySetup} != '' ]]; then
+            cat <<<"${keySetup}"
+        fi
+        if [[ ${passedIn} != '' ]]; then
+            cat <<<"${passedIn}"
+        fi
+    fi
+}
 
 # Extracts the host public key for ED25519 from the console logs.
 function extract-host-key {
@@ -225,14 +281,11 @@ function wait-until-running {
 # Main script
 #
 
-# Slurp the user data, if there is user data to be slurped.
-if [[ ${userDataFile} != '' ]]; then
-    userData="$(cat "${userDataFile}")" \
-    || exit 1
-fi
+# Build the user data string.
+userData="$(build-user-data)" \
+|| exit "$?"
 
 # Figure out the correct AMI.
-
 amiInfo="$(lib find-ami --loc="${zone}" --instance-type="${instanceType}")" \
 || exit "$?"
 
