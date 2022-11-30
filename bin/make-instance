@@ -224,10 +224,10 @@ function extract-host-key {
     progress-msg "Got ${keyAlgorithm} key:"
     progress-msg "  ${key}"
 
-    local tag="host-public-key-${keyAlgorithm}"
+    local sshAuth="ssh-${keyAlgorithm} ${key}"
     ec2-json create-tags --loc="${zone}" \
         id="${instanceId}" \
-        tagSpec:json="$(lib tag-spec "${tag}=${key}")" \
+        tagSpec:json="$(lib tag-spec host-public-key="${sshAuth}")" \
         '{ Resources: [$id] } + $tagSpec' \
     || return "$?"
 
@@ -276,8 +276,10 @@ function wait-until-running {
 
 # Extract the SSH-auth version of the public key from the host private key, if
 # a host key is in fact being passed to the instance.
-hostPublicKey="$(lib extract-public-key <<<"${hostKey}" --output=ssh-auth)" \
-|| exit "$?"
+if [[ ${hostKey} != '' ]]; then
+    hostPublicKey="$(lib extract-public-key <<<"${hostKey}" --output=ssh-auth)" \
+    || exit "$?"
+fi
 
 # Build the user data string.
 userData="$(build-user-data)" \
@@ -336,9 +338,7 @@ progress-msg "Launching instance: ${name}"
 
 tagExtras=()
 if [[ ${hostPublicKey} != '' ]]; then
-    [[ ${hostPublicKey} =~ ^ssh-([^ ]+)' '(.*)$ ]] \
-    || exit "$?"
-    tagExtras=("host-public-key-${BASH_REMATCH[1]}=${BASH_REMATCH[2]}")
+    tagExtras=(host-public-key="${hostPublicKey}")
 fi
 tagSpec="$(lib tag-spec --type='instance' --name="${name}" "${tagExtras[@]}")"
 
