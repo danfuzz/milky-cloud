@@ -88,7 +88,7 @@ groupId="$(lib find-security-group --loc="${region}" "${groupNameOrId}")" \
 
 tagSpec='{}'
 if [[ ${name} != '' ]]; then
-    tagSpec="$(lib name-tag-spec 'security-group-rule' "${name}")"
+    tagSpec="$(lib tag-spec --type='security-group-rule' --name="${name}")"
 fi
 
 command="authorize-security-group-${direction}"

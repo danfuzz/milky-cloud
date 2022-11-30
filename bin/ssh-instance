@@ -76,7 +76,22 @@ fi
 # Helper functions
 #
 
-# Finds an instance.
+# Adds a host public key to the user's `known_hosts` file.
+function authorize-host {
+    local address="$1"
+    local publicKey="$2"
+
+    local hostsFile="${HOME}/.ssh/known_hosts"
+
+    # No way to suppress "host not found" message except by squelching stdout.
+    ssh-keygen >/dev/null -f "${hostsFile}" -R "${address}" \
+    || return "$?"
+
+    echo "${address} ${publicKey}" >>"${hostsFile}" \
+    || return "$?"
+}
+
+# Finds an instance. Outputs an `eval`able snippet to set things up.
 function find-instance {
     local instanceLoc="$1"
     local instanceName="$2"
@@ -87,7 +102,15 @@ function find-instance {
     )" \
     || return "$?"
 
-    jget --output=raw "${infoJson}" '.publicAddress'
+    local hostPublicKey address
+    hostPublicKey="$(jget --output=raw "${infoJson}" '.hostPublicKey // ""')"
+    address="$(jget --output=raw "${infoJson}" '.publicAddress')"
+
+    echo "instance='${address}'"
+
+    if [[ ${hostPublicKey} != '' ]]; then
+        echo "authorize-host '${address}' '${hostPublicKey}'"
+    fi
 }
 
 # Finds the indicated secret via `secret-access`, which is presumed to be a
@@ -127,7 +150,9 @@ fi
 
 if [[ ${instance} =~ ^([^:]+):([^:]+)$ ]]; then
     # The instance is in the AWS-lookup form.
-    instance="$(find-instance "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}")" \
+    instanceEval="$(find-instance "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}")" \
+    || exit "$?"
+    eval "${instanceEval}" \
     || exit "$?"
 fi
 

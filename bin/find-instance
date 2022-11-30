@@ -114,6 +114,7 @@ resultArray="$(ec2-json describe-instances --loc="${location}" \
     :: '[.Reservations[].Instances[] | {
         id:             .InstanceId,
         name:           (.Tags | map(select(.Key == "Name") | .Value)[0]),
+        hostPublicKey:  (.Tags | map(select(.Key == "host-public-key") | .Value)[0]),
         privateAddress: .PrivateIpAddress,
         publicAddress:  .PublicIpAddress,
         ipv6Address:    (.NetworkInterfaces[].Ipv6Addresses[0].Ipv6Address),
