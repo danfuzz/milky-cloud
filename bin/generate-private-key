@@ -50,15 +50,29 @@ process-args "$@" || usage "$?"
 
 case "${type}" in
     host)
-        # Boy howdy `ssh-keygen` is a pain in the butt to script. This tells
-        # it to write the file to fd 3, which we have redirected to stdout,
-        # while _also_ squelching its chatty stdout and stderr messaging, and
-        # _also_ passing it `y` to answer the question "Overwrite /dev/fd/3?"
-        # Cribbed from here: <https://gist.github.com/kraftb/9918106>
+        # Boy howdy `ssh-keygen` is a pain in the butt to script. That is, it
+        # _really_ wants to be used interactively, and it doesn't "get" how
+        # writing to stdout (or any non-file) works, so we fake it out. What's
+        # going on here:
+        #
+        # FD #3 gets wired back to _our_ stdout, to get the actual output we
+        # want, and then `ssh-keygen`'s stdout gets squelched. We make a couple
+        # symbolic links for the command to write to, including `/dev/null` for
+        # the public key (which we don't care about here). We pipe `y` into the
+        # command to answer the question, "Overwrite <output-file>?" And then,
+        # after running the command, we remove the links and exit with whatever
+        # status was originally reported. Source of inspiration:
+        #   <https://gist.github.com/kraftb/9918106>
+        outName="./$(this-cmd-name)-$$"
+        ln -s /dev/fd/3 "${outName}" || exit "$?"
+        ln -s /dev/null "${outName}.pub" || exit "$?"
         (
             exec 3>&1
-            ssh-keygen -qt ed25519 -N '' -f /dev/fd/3 <<<'y' >/dev/null 2>&1
+            ssh-keygen -q -t ed25519 -N '' -f "${outName}" <<<'y' >/dev/null
         )
+        result="$?"
+        rm -f "${outName}" "${outName}.pub"
+        exit "${result}"
         ;;
     user)
         # Squelch stderr to avoid the progress spew.
