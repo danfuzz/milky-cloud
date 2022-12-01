@@ -30,7 +30,8 @@ function usage {
       If a <command> and <arg>s are specified, these are passed through to the
       instance such that they are unparsed by any intermediate shell (e.g., spaces
       in arguments don\'t cause arguments to be split), _unlike_ the usual (and
-      often annoying and surprising) baseline SSH behavior.
+      often annoying and surprising) baseline SSH behavior. In case the usual
+      behavior is needed, the `--script` option does that.
 
       If neither `--key` nor `--secret` is specified, this command will fall back
       to the default SSH behavior (of using `~/.ssh/config` and defaulting to
@@ -38,6 +39,8 @@ function usage {
 
     --key=<path>
       Filesystem path to the private key (identity file).
+    --script
+      Treat <command> and <args> as a script, per default `ssh` behavior.
     --secret=\'<source> <path>\'
       Secret source and path for the private key. it is expected to be in the
       space-separated form used by `secret-access` (see which).
@@ -54,6 +57,9 @@ opt-action --call='{ usage }' help/h
 
 # Path to the key file.
 opt-value --var=keyPath --filter='/./' key
+
+# Treat positional arguments as a script?
+opt-toggle --var=script script
 
 # Secret vault path to the key file.
 opt-value --var=secretSourcePath --filter='/./' secret
@@ -186,8 +192,13 @@ else
 fi
 
 if (( ${#command[@]} != 0 )); then
-    # Apply "armor" to the command name and all arguments.
-    sshCommand+=($(printf '%q ' "${command[@]}"))
+    if (( script )); then
+        # Append command and arguments as-is.
+        sshCommand+=("${command[@]}")
+    else
+        # Apply "armor" to the command and all arguments.
+        sshCommand+=($(printf '%q ' "${command[@]}"))
+    fi
 fi
 
 exec "${sshCommand[@]}"
