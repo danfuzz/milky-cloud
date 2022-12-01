@@ -42,7 +42,7 @@ function usage {
     --script
       Treat <command> and <args> as a script, per default `ssh` behavior.
     --secret=\'<source> <path>\'
-      Secret source and path for the private key. it is expected to be in the
+      Secret source and path for the private key. It is expected to be in the
       space-separated form used by `secret-access` (see which).
 
     ${name} [--help | -h]
