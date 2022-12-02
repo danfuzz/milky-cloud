@@ -135,11 +135,14 @@ function address-info {
 
     # If we have a location, then try to look up the instance.
     if [[ ${instanceLoc} != '' ]]; then
-        local result
-        result="$(find-instance "${instanceLoc}" "${instanceName}")" \
+        local infoJson
+        infoJson="$(
+            lib find-instance --output=json --loc="${instanceLoc}" "${instanceName}"
+        )" \
         || return "$?"
-        address="$(jget --output=raw "${result}" '.address')"
-        hostPublicKey="$(jget --output=raw "${result}" '.hostPublicKey')"
+
+        address="$(jget --output=raw "${infoJson}" '.publicAddress')"
+        hostPublicKey="$(jget --output=raw "${infoJson}" '.hostPublicKey // ""')"
     fi
 
     jval \
@@ -172,23 +175,6 @@ function authorize-host {
         fi
         echo "${hostLine}" >>"${hostsFile}"
     fi
-}
-
-# Finds an instance. Outputs an `eval`able snippet to set things up.
-function find-instance {
-    local instanceLoc="$1"
-    local instanceName="$2"
-
-    local infoJson
-    infoJson="$(
-        lib find-instance --output=json --loc="${instanceLoc}" "${instanceName}"
-    )" \
-    || return "$?"
-
-    jget "${infoJson}" '{
-        address:       .publicAddress,
-        hostPublicKey: (.hostPublicKey // "")
-    }'
 }
 
 # Finds the indicated secret via `secret-access`, which is presumed to be a
