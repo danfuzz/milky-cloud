@@ -43,6 +43,8 @@ function usage {
         Availability zone to launch the instance in. Must be specified.
       --name=<name>
         Name tag for the resulting instance.
+      --os=<name>
+        Which OS to install. See `find-ami` for details about default and options.
       --output=<style> :: `id` `json` `none`
         What to print on successful output. `id` is just the plain ID (no quotes).
         `json` is the same as what is printed by `find-instance`. Defaults to
@@ -97,6 +99,9 @@ opt-value --var=keyName --filter='/./' key-name
 
 # Name for the instance.
 opt-value --var=name --filter='/./' name
+
+# Which OS to install.
+opt-value --var=osName --filter='/./' os
 
 # Output style.
 opt-value --var=outputStyle --init='id' --enum='id json none' output
@@ -286,7 +291,13 @@ userData="$(build-user-data)" \
 || exit "$?"
 
 # Figure out the correct AMI.
-amiInfo="$(lib find-ami --loc="${zone}" --instance-type="${instanceType}")" \
+amiInfo="$(
+    amiOpts=(--loc="${zone}" --instance-type="${instanceType}")
+    if [[ ${osName} != '' ]]; then
+        amiOpts+=(--os="${osName}")
+    fi
+    lib find-ami "${amiOpts[@]}"
+)" \
 || exit "$?"
 
 progress-msg --exec \
