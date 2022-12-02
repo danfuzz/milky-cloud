@@ -21,7 +21,7 @@ function usage {
       `ssh-instance` to make the connection (see which for details).
 
     Options passed through to `rsync`: --archive --delete
-    Options passed through to `ssh-instance`: --key --secret
+    Options passed through to `ssh-instance`: --default-loc --key --secret
 
     ${name} [--help | -h]
       Displays this message.
@@ -43,6 +43,7 @@ opt-toggle --call='{ rsyncOpts+=(--delete) }' delete
 
 # Passed through to `ssh-instance`.
 sshOpts=()
+opt-value --call='{ sshOpts+=(--default-loc="$1") }' default-loc
 opt-value --call='{ sshOpts+=(--key="$1") }' key
 opt-value --call='{ sshOpts+=(--secret="$1") }' secret
 
@@ -68,19 +69,7 @@ function call-rsync {
 
     local rsyncCmd=(rsync --rsh="${rshCmd[*]}" "${rsyncOpts[@]}" --)
 
-    # `ssh-instance` lets you use `:` for the location/name form, but `rsync`
-    # also uses `:`. We recognize `<loc>:<name>:<path>` here and convert the
-    # first `:` into an `=` to avoid confusing `rsync`. It gets converted back
-    # to `:` in the inner argument decoder (in `rsync-callback`).
-    local arg
-    for arg in "${args[@]}"; do
-        if [[ ${arg} =~ ^([^/:]+):([^:]+):(.*)$ ]]; then
-            arg="${BASH_REMATCH[1]}=${BASH_REMATCH[2]}:${BASH_REMATCH[3]}"
-        fi
-        rsyncCmd+=("${arg}")
-    done
-
-    exec "${rsyncCmd[@]}"
+    exec "${rsyncCmd[@]}" "$@"
 }
 
 # Handles the inner callback from `rsync` to this script.
@@ -108,15 +97,11 @@ function rsync-callback {
 
     local sshHost="$1"
     shift
-    if [[ ${sshHost} =~ ^([^=]+)=(.*)$ ]]; then
-        # Convert the `=` back into the original `:` that `ssh-instance` wants.
-        sshHost="${BASH_REMATCH[1]}:${BASH_REMATCH[2]}"
-    fi
     sshTarget+="${sshHost}"
 
-    sshCmd+=(--script -- "${sshTarget}")
+    sshCmd+=(--script -- "${sshTarget}" "$@")
 
-    exec "${sshCmd[@]}" "$@"
+    exec "${sshCmd[@]}"
 }
 
 
@@ -136,5 +121,5 @@ if (( fromRsync )); then
     rsync-callback "${args[@]}"
 else
     # We need to build up an "rsh" command and call `rsync` with it.
-    call-rsync
+    call-rsync "${args[@]}"
 fi
