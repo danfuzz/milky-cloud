@@ -25,8 +25,9 @@ function usage {
       `--default-domain` is provided. The last two forms are used to look up the
       instance by its AWS `Name` tag.
 
-      If a <user> is not specified, this command will fall back to the default SSH
-      behavior (of using `~/.ssh/config` and defaulting to the local userid).
+      If a <user> is not specified (and `--default-userid` is not used), then this
+      command will fall back to the default SSH behavior (of using `~/.ssh/config`
+      and defaulting to the local userid).
 
       If a <command> and <arg>s are specified, these are passed through to the
       instance such that they are unparsed by any intermediate shell (e.g., spaces
@@ -41,6 +42,8 @@ function usage {
     --default-domain=[<subdomain>. ...]<zone-or-region>
       "Domain" to use for instance name lookups, if not present in the instance
       name. Can be just a zone/region, or a "subdomain"-qualified version of same.
+    --default-userid=<userid>
+      Userid to log in as, if not present in the first (non-option) argument.
     --key=<path>
       Filesystem path to the private key (identity file).
     --script
@@ -61,6 +64,9 @@ opt-action --call='{ usage }' help/h
 
 # Default domain.
 opt-value --var=defaultDomain --filter='/./' default-domain
+
+# Default userid.
+opt-value --var=defaultUserid --filter='/./' default-userid
 
 # Path to the key file.
 opt-value --var=keyPath --filter='/./' key
@@ -145,6 +151,12 @@ function address-info {
 
         address="$(jget --output=raw "${infoJson}" '.publicAddress')"
         hostPublicKey="$(jget --output=raw "${infoJson}" '.hostPublicKey // ""')"
+    fi
+
+    # If a userid wasn't part of the original address, and there is a default,
+    # use it.
+    if [[ (${userid} == '') && (${defaultUserid} != '') ]]; then
+        userid="${defaultUserid}"
     fi
 
     jval \
