@@ -19,8 +19,8 @@ function usage {
       Configures a security group in a standard way. This involves removing all
       pre-existing rules from the group and then adding exactly what is needed.
 
-      On success, the security group allows incoming TCP traffic to the SSH and
-      HTTPS ports, and allows outgoing traffic to anywhere. It also allows
+      On success, the security group allows incoming TCP traffic to the SSH, HTTP,
+      and HTTPS ports, and allows outgoing traffic to anywhere. It also allows
       incoming traffic on all ports, from sources that are within the same
       security group.
 
@@ -143,8 +143,8 @@ fi
 
 if (( !error )); then
     lib add-ip-security-group-rules "${commonArgs[@]}" \
-        --ingress --protocol=tcp --port=22 \
-    && progress-msg "Added SSH ingress rules." \
+        --ingress --protocol=tcp --port=80 \
+    && progress-msg "Added HTTP ingress rules." \
     || error="$?"
 fi
 
@@ -152,6 +152,13 @@ if (( !error )); then
     lib add-ip-security-group-rules "${commonArgs[@]}" \
         --ingress --protocol=tcp --port=443 \
     && progress-msg "Added HTTPS ingress rules." \
+    || error="$?"
+fi
+
+if (( !error )); then
+    lib add-ip-security-group-rules "${commonArgs[@]}" \
+        --ingress --protocol=tcp --port=22 \
+    && progress-msg "Added SSH ingress rules." \
     || error="$?"
 fi
 
