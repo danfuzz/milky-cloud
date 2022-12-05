@@ -22,7 +22,7 @@ function usage {
 
       The <instance> can be specified as a DNS name, an IP address, instance name
       suffixed with `.<region-or-zone>`, or a plain instance name if
-      `--default-loc` is provided. The last two forms are used to look up the
+      `--default-domain` is provided. The last two forms are used to look up the
       instance by its AWS `Name` tag.
 
       If a <user> is not specified, this command will fall back to the default SSH
@@ -38,9 +38,9 @@ function usage {
       to the default SSH behavior (of using `~/.ssh/config` and defaulting to
       `~/.ssh/id_*`).
 
-    --default-loc=<zone-or-region>
-      Location to use for instance name lookups, if not present in the instance
-      name.
+    --default-domain=[<subdomain>. ...]<zone-or-region>
+      "Domain" to use for instance name lookups, if not present in the instance
+      name. Can be just a zone/region, or a "subdomain"-qualified version of same.
     --key=<path>
       Filesystem path to the private key (identity file).
     --script
@@ -59,8 +59,8 @@ function usage {
 # Want help?
 opt-action --call='{ usage }' help/h
 
-# Default location.
-opt-value --var=defaultLoc --filter='/./' default-loc
+# Default domain.
+opt-value --var=defaultDomain --filter='/./' default-domain
 
 # Path to the key file.
 opt-value --var=keyPath --filter='/./' key
@@ -93,14 +93,13 @@ fi
 # instances by name. Prints JSON info of the results, for ultimate
 # recombination.
 function address-info {
-    local orig="$1"
+    local address="$1"
 
     local userid=''
-    local address="${orig}"
     local hostPublicKey=''
 
     # Split off the userid, if present.
-    if [[ ${orig} =~ ^([^@]+)@(.+)$ ]]; then
+    if [[ ${address} =~ ^([^@]+)@(.+)$ ]]; then
         userid="${BASH_REMATCH[1]}"
         address="${BASH_REMATCH[2]}"
     fi
@@ -120,14 +119,17 @@ function address-info {
         fi
     fi
 
-    # Check to see if `instance` is an actual hostname. If not, set the location
-    # to the default if provided or error out.
+    # Check to see if `address` is an actual hostname. If not, combine it with
+    # the default "domain" if provided and then reparse, or error out.
     if [[ ${instanceLoc} == '' ]]; then
         if ! host >/dev/null 2>&1 "${address}"; then
-            if [[ ${defaultLoc} != '' ]]; then
-                instanceLoc="${defaultLoc}"
+            if [[ ${defaultDomain} != '' ]]; then
+                address+=".${defaultDomain}"
+                [[ ${address} =~ ^(.*)[.]([^.]+)$ ]] || return "$?"
+                instanceName="${BASH_REMATCH[1]}"
+                instanceLoc="${BASH_REMATCH[2]}"
             else
-                error-msg "Host not found (and no default location provided): ${address}"
+                error-msg "Host not found (and no default domain provided): ${address}"
                 exit 1
             fi
         fi

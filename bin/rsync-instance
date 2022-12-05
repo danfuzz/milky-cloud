@@ -21,7 +21,7 @@ function usage {
       `ssh-instance` to make the connection (see which for details).
 
     Options passed through to `rsync`: --archive --delete
-    Options passed through to `ssh-instance`: --default-loc --key --secret
+    Options passed through to `ssh-instance`: --default-domain --key --secret
 
     ${name} [--help | -h]
       Displays this message.
@@ -43,7 +43,7 @@ opt-toggle --call='{ rsyncOpts+=(--delete) }' delete
 
 # Passed through to `ssh-instance`.
 sshOpts=()
-opt-value --call='{ sshOpts+=(--default-loc="$1") }' default-loc
+opt-value --call='{ sshOpts+=(--default-domain="$1") }' default-domain
 opt-value --call='{ sshOpts+=(--key="$1") }' key
 opt-value --call='{ sshOpts+=(--secret="$1") }' secret
 
