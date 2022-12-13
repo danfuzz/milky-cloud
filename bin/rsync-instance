@@ -20,7 +20,7 @@ function usage {
       Uses `rsync` to copy files to or from the indicated instance, using
       `ssh-instance` to make the connection (see which for details).
 
-    Options passed through to `rsync`: --archive --delete
+    Options passed through to `rsync`: --archive --delete --verbose
     Options passed through to `ssh-instance`: --default-domain --default-userid
       --key --secret
 
@@ -41,6 +41,7 @@ opt-toggle --var=fromRsync from-rsync
 rsyncOpts=()
 opt-toggle --call='{ rsyncOpts+=(--archive) }' archive
 opt-toggle --call='{ rsyncOpts+=(--delete) }' delete
+opt-toggle --call='{ rsyncOpts+=(--verbose) }' verbose
 
 # Passed through to `ssh-instance`.
 sshOpts=()
