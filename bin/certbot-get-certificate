@@ -250,6 +250,55 @@ function find-zone-id {
     || return "$?"
 }
 
+# Does a certificate lifetime check. Prints `keep` or `renew`.
+function lifetime-check {
+    local minLifetimeDays="$1"
+    local fullChainFile="$2"
+
+    local SECS_PER_DAY=$(( 24 * 60 * 60 ))
+
+    local expireDateStr="$(
+        openssl x509 -in "${fullChainOut}" -noout -enddate
+    )" \
+    || return "$?"
+
+    if ! [[ ${expireDateStr} =~ ^[^=]+=(.*)$ ]]; then
+        error-msg "Strange date in certificate: ${expireDateStr}"
+        return 1
+    fi
+
+    local expireSecs="$(date -j -f '%b %d %T %Y %Z' "${BASH_REMATCH[1]}" '+%s')"
+    local nowSecs="$(date '+%s')"
+    local remainingDays=$(( (expireSecs - nowSecs) / SECS_PER_DAY ))
+
+    info-msg 'Existing certificate expires:'
+    info-msg "  $(date -r "${expireSecs}")"
+
+    case "${remainingDays}" in
+        -*)
+            info-msg $'  That\'s in the past! Eek!'
+            ;;
+        0)
+            info-msg $'  That\'s today! Eek!'
+            ;;
+        1)
+            info-msg $'  That\'s tomorrow! Eek!'
+            ;;
+        *)
+            info-msg "  ${remainingDays} days from now"
+            ;;
+    esac
+
+    info-msg "Required: at least ${minLifetimeDays} days."
+    if (( remainingDays >= minLifetimeDays )); then
+        info-msg 'Not renewing existing certificate.'
+        echo 'keep'
+    else
+        info-msg 'Renewing existing certificate.'
+        echo 'renew'
+    fi
+}
+
 # Makes a payload for a DNS change request.
 function make-change-payload {
     local action="$1"
@@ -308,14 +357,10 @@ fullChainOut="${certOutDir}/fullchain.pem"
 
 # Check for expiration, if so requested.
 if [[ (${minLifetimeDays} != '') && -r "${fullChainOut}" ]]; then
-    minLifetimeSecs=$(( minLifetimeDays * 24 * 60 * 60 ))
-    openssl >/dev/null 2>&1 \
-        x509 -in "${fullChainOut}" -checkend "${minLifetimeSecs}"
-    if (( $? == 0 )); then
-        info-msg "Not renewing existing certificate; it has at least ${minLifetimeDays} days left."
+    renewDecision="$(lifetime-check "${minLifetimeDays}" "${fullChainOut}")" \
+    || exit "$?"
+    if [[ ${renewDecision} == 'keep' ]]; then
         exit
-    else
-        info-msg "Renewing existing certificate; it has no more than ${minLifetimeDays} days left."
     fi
 fi
 
