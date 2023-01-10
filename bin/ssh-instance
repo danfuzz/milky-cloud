@@ -192,26 +192,16 @@ function authorize-host {
 }
 
 # Finds the indicated secret via `secret-access`, which is presumed to be a
-# private key file, if not already cached. Caches it into `~/.ssh/` in a
-# hopefully-not-objectionably-named file, and prints the name of the file.
+# private key file. Adds it to the set of IDs known to `ssh-agent`.
 function find-secret {
     local sourcePath="$1"
 
-    local secretCacheDir="${HOME}/.ssh/secret-cache"
-    local secretFileName="$(tr <<<"${sourcePath}" ' /:' '___')"
-    local secretPath="${secretCacheDir}/${secretFileName}"
+    local secretValue
+    secretValue="$(lib secret-access --output=text x="${sourcePath}")" \
+    || return "$?"
 
-    if [[ ! -r "${secretPath}" ]]; then
-        local secretValue
-        secretValue="$(lib secret-access --output=text x="${sourcePath}")" \
-        || return "$?"
-
-        mkdir -p "${secretCacheDir}"
-        cat <<<"${secretValue}" >"${secretPath}"
-        chmod 600 "${secretPath}"
-    fi
-
-    readlink -f "${secretPath}"
+    ssh-add -q /dev/stdin <<<"${secretValue}" \
+    || return "$?"
 }
 
 
@@ -220,7 +210,7 @@ function find-secret {
 #
 
 if [[ ${secretSourcePath} != '' ]]; then
-    keyPath="$(find-secret "${secretSourcePath}")" \
+    find-secret "${secretSourcePath}" \
     || exit "$?"
 fi
 
