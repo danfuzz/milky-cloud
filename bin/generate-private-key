@@ -22,8 +22,12 @@ function usage {
         File to write to. Defaults to stdout.
       --type=<type>
         What type of key to create. Must be specified
-        `host` -- SSH host key, ED25519 algorithm.
-        `user` -- User key, 2048 bits, RSA algorithm.
+        `host` -- Same as `host-ec`.
+        `host-ec` -- SSH host key, elliptic curve (ED25519 algorithm).
+        `user` -- Same as `user-2048`.
+        `user-2048` -- OpenSSL user key, 2048-bit RSA.
+        `user-4096` -- OpenSSL user key, 4096-bit RSA.
+        `user-ec` -- SSH-format user key, elliptic curve (ED25519 algorithm).
 
     ${name} [--help | -h]
       Displays this message.
@@ -36,7 +40,9 @@ function usage {
 opt-action --call='{ usage }' help/h
 
 # Key type.
-opt-value --required --var=type --enum='host user' type
+opt-value --required --var=type \
+    --enum='host host-ec user user-2048 user-4096 user-ec' \
+    type
 
 # Where to output.
 opt-value --var=out --init='/dev/stdout' out
@@ -49,7 +55,7 @@ process-args "$@" || usage "$?"
 #
 
 case "${type}" in
-    host)
+    host|host-ec|user-ec)
         # Boy howdy `ssh-keygen` is a pain in the butt to script. That is, it
         # _really_ wants to be used interactively, and it doesn't "get" how
         # writing to stdout (or any non-file) works, so we fake it out. What's
@@ -70,8 +76,12 @@ case "${type}" in
         ssh-keygen <<<'y' 3>&1 >/dev/null \
             -q -t ed25519 -N '' -C '' -f "${outName}"
         ;;
-    user)
+    user|user-2048)
         # Squelch stderr to avoid the progress spew.
         openssl genrsa -out "${out}" 2048 2>/dev/null
+        ;;
+    user-4096)
+        # Squelch stderr to avoid the progress spew.
+        openssl genrsa -out "${out}" 4096 2>/dev/null
         ;;
 esac
