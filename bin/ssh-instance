@@ -200,7 +200,7 @@ function find-secret {
     secretValue="$(lib secret-access --output=text x="${sourcePath}")" \
     || return "$?"
 
-    ssh-add -q /dev/stdin <<<"${secretValue}" \
+    ssh-add -q - <<<"${secretValue}" \
     || return "$?"
 }
 
