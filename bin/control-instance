@@ -16,9 +16,9 @@ function usage {
     Usage:
 
     ${name} [<opt> ...]
-      Controls one or more instances.
+      Controls major aspects of one or more instances.
 
-      --do=<action> :: `reboot` `start` `stop` `terminate`
+      --do=<action> :: protect-off protect-on reboot start stop terminate
         What action to perform. Must be specified.
       --loc=<region-or-zone>
         Where to look for instances. Must be specified.
@@ -45,7 +45,8 @@ function usage {
 opt-action --call='{ usage }' help/h
 
 # What to do to the instance(s).
-opt-value --required --var=action --enum='reboot start stop terminate' do
+opt-value --required --var=action \
+    --enum='protect-off protect-on reboot start stop terminate' do
 
 # Name or ID to look up.
 opt-value --var=nameOrId --init='*' id
@@ -63,6 +64,54 @@ opt-toggle --var=notFoundOk not-found-ok
 opt-value --var=vpcNameOrId --filter='/./' vpc
 
 process-args "$@" || usage "$?"
+
+
+#
+# Helper functions
+#
+
+# Performs protection or unprotection.
+function change-protection {
+    local action="$1"
+    local ids="$2"
+
+    # Convert `action` to an attribute value.
+    local value='error'
+    case "${action}" in
+        protect-off) value=false ;;
+        protect-on)  value=true  ;;
+    esac
+
+    # Convert `ids` to a regular array.
+    ids=($(jget --output=raw "${ids}" '.[]'))
+
+    local id attrib
+    for id in "${ids[@]}"; do
+        for attrib in 'DisableApiStop' 'DisableApiTermination'; do
+            ec2-json modify-instance-attribute --loc="${location}" \
+                id="${id}" \
+                attrib="${attrib}" \
+                value:json="${value}" \
+                '{
+                    InstanceId: $id,
+                    ($attrib):  { Value: $value }
+                }' \
+            || return "$?"
+        done
+    done
+}
+
+# Performs major control (rebooting, etc.).
+function major-control {
+    local action="$1"
+    local ids="$2"
+
+    ec2-json "${action}-instances" --loc="${location}" \
+        ids:json="${ids}" \
+        '{ InstanceIds: $ids }' \
+        :: --output=none \
+    || return "$?"
+}
 
 
 #
@@ -87,21 +136,20 @@ ids=($(lib find-instance "${findArgs[@]}")) \
 || exit "$?"
 
 case "${action}" in
-    reboot)    gerund='Rebooting'   ;;
-    start)     gerund='Starting'    ;;
-    stop)      gerund='Stopping'    ;;
-    terminate) gerund='Terminating' ;;
+    protect-off) gerund='Unprotecting'; func=change-protection ;;
+    protect-on)  gerund='Protecting';   func=change-protection ;;
+    reboot)      gerund='Rebooting';    func=major-control     ;;
+    start)       gerund='Starting';     func=major-control     ;;
+    stop)        gerund='Stopping';     func=major-control     ;;
+    terminate)   gerund='Terminating';  func=major-control     ;;
 esac
 
 progress-msg "${gerund} instance(s):"
 progress-msg --exec printf '  %s\n' "${ids[@]}"
 
-ids="$(jval ids:json="$(jarray --input=strings "${ids[@]}")" \
-    '{ InstanceIds: $ids }'
-)"
+ids="$(jarray --input=strings "${ids[@]}")"
 
-ec2-json "${action}-instances" --loc="${location}" "${ids}" \
-    :: --output=none \
+"${func}" "${action}" "${ids}" \
 || exit "$?"
 
-progress-msg 'Done!'
+progress-msg "${gerund}: Done."
