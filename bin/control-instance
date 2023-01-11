@@ -49,7 +49,7 @@ opt-value --required --var=action \
     --enum='protect-off protect-on reboot start stop terminate' do
 
 # Name or ID to look up.
-opt-value --var=nameOrId --init='*' id
+opt-value --var=nameOrId --init='*' --filter='/./' id
 
 # Location (region or availability zone).
 opt-value --required --var=location --filter='/[-a-z0-9]+/' loc
