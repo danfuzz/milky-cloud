@@ -121,6 +121,11 @@ function authentication-hook {
     zoneId="$(find-zone-id "${domain}")" \
     || return "$?"
 
+    # TODO: In the case of asking for a cert which covers both `example.com`
+    # _and_ `*.example.com`, there will be two active ACME challenges which use
+    # the same record name. To handle this, we need to read the record first if
+    # it exists and concatenate the existing and new challenges (that is, add a
+    # second text element instead of replacing the original).
     local payload
     payload="$(make-change-payload UPSERT "${domain}" "${validationData}")" \
     || return "$?"
