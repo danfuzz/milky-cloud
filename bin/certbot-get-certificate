@@ -258,14 +258,21 @@ function get-existing-record {
     local zoneId="$1"
     local domain="$2"
 
+    local name="_acme-challenge.${domain}"
+
     lib aws-json route53 list-resource-record-sets --global \
         zoneId="${zoneId}" \
-        name="_acme-challenge.${domain}" '{
+        name="${name}" '{
             HostedZoneId:    $zoneId,
             MaxItems:        "1", # Yes, it is supposed to be a string.
             StartRecordName: $name,
             StartRecordType: "TXT"
-        }' :: '.ResourceRecordSets[0].ResourceRecords // []' \
+        }' :: \
+        name="${name}" '[
+            .ResourceRecordSets[]
+            | select((.Name == "_acme-challenge.murtbo.com.") and (.Type == "TXT"))
+            | .ResourceRecords[]
+        ]' \
     || return "$?"
 }
 
