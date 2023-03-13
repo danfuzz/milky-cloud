@@ -121,13 +121,24 @@ function authentication-hook {
     zoneId="$(find-zone-id "${domain}")" \
     || return "$?"
 
-    # TODO: In the case of asking for a cert which covers both `example.com`
-    # _and_ `*.example.com`, there will be two active ACME challenges which use
-    # the same record name. To handle this, we need to read the record first if
-    # it exists and concatenate the existing and new challenges (that is, add a
-    # second text element instead of replacing the original).
+    # Note: When asking for a cert which covers both a domain name (with any
+    # number of subdomains including zero) and a wildcard of that exact same
+    # domain name, there might be two active ACME challenges which both want to
+    # use the same record name. So, before `UPSERT`ing, we need to get any
+    # existing `TXT` record, and then combine it with the new request.
+    local dataArray
+    dataArray="$(get-existing-record "${zoneId}" "${domain}")" \
+    || return "$?"
+
+    dataArray="$(jval \
+        existing:json="${dataArray}" \
+        data="${validationData}" \
+        '$existing + [{ Value: ($data | @json) }]'
+    )" \
+    || return "$?"
+
     local payload
-    payload="$(make-change-payload UPSERT "${domain}" "${validationData}")" \
+    payload="$(make-change-payload UPSERT "${domain}" "${dataArray}")" \
     || return "$?"
 
     local changeId
@@ -166,29 +177,14 @@ function cleanup-hook {
     local remainingChallenges="${CERTBOT_REMAINING_CHALLENGES}"
     local validationData="${CERTBOT_VALIDATION}"
 
-    local zoneId
-    zoneId="$(find-zone-id "${domain}")" \
-    || return "$?"
-
-    local payload="$(make-change-payload DELETE "${domain}" "${validationData}")"
-
-    local error
-    lib aws-json route53 change-resource-record-sets --global \
-        zoneId="${zoneId}" \
-        payload:json="${payload}" \
-        '{
-            HostedZoneId: $zoneId,
-            ChangeBatch: $payload
-        }' \
-        :: --output=none
-    error="$?"
+    # Note: Instead of paying attention to the given validation data, we treat
+    # each cleanup but the last as a no-op, and then at the end just delete all
+    # records that look like ACME challenges.
 
     if [[ ${remainingChallenges} == 0 ]]; then
         # No more challenges. Do the "extra cleanup" work.
         extra-cleanup || return "$?"
     fi
-
-    return "${error}"
 }
 
 # "Extra clean" cleanup hook: Remove any stray records leftover from old
@@ -233,7 +229,7 @@ function extra-cleanup {
         || return "$?"
 
         if [[ ${payload} != 'null' ]]; then
-            echo "Cleaning up leftover challenges for domain: ${domain}"
+            echo "Cleaning up challenges for domain: ${domain}"
             lib aws-json route53 change-resource-record-sets --global \
                 zoneId="${zoneId}" \
                 payload:json="${payload}" \
@@ -252,6 +248,24 @@ function find-zone-id {
     local domain="$1"
 
     lib find-dns-zone --output=id "${domain}" \
+    || return "$?"
+}
+
+# Gets the existing record value for a given zone and domain name. Outputs a
+# JSON array suitable for concatenating into a `ResourceRecords` value. The
+# result is `[]` (the empty array) if there is no existing record.
+function get-existing-record {
+    local zoneId="$1"
+    local domain="$2"
+
+    lib aws-json route53 list-resource-record-sets --global \
+        zoneId="${zoneId}" \
+        name="_acme-challenge.${domain}" '{
+            HostedZoneId:    $zoneId,
+            MaxItems:        "1", # Yes, it is supposed to be a string.
+            StartRecordName: $name,
+            StartRecordType: "TXT"
+        }' :: '.ResourceRecordSets[0].ResourceRecords // []' \
     || return "$?"
 }
 
@@ -304,11 +318,12 @@ function lifetime-check {
     fi
 }
 
-# Makes a payload for a DNS change request.
+# Makes a payload for a DNS change request. `data` should be a a JSON array of
+# `{ Value: "..." }` objects.
 function make-change-payload {
     local action="$1"
     local domain="$2"
-    local data="$3"
+    local dataArray="$3"
 
     # Note: The Route53 API requires the `Value` passed in for a `TXT` record to
     # be surrounded by double quotes (for an at least _somewhat_ okay reason),
@@ -316,7 +331,7 @@ function make-change-payload {
     jval \
         action="${action}" \
         name="_acme-challenge.${domain}." \
-        data="${data}" \
+        dataArray:json="${dataArray}" \
     '{
         Comment: "Via Certbot wrapper script",
         Changes: [
@@ -326,7 +341,7 @@ function make-change-payload {
                     Name: $name,
                     Type: "TXT",
                     TTL: 60,
-                    ResourceRecords: [{ Value: ($data | @json) }]
+                    ResourceRecords: $dataArray
                 }
             }
         ]
