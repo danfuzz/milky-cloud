@@ -187,8 +187,8 @@ function cleanup-hook {
     fi
 }
 
-# "Extra clean" cleanup hook: Remove any stray records leftover from old
-# Certbot requests.
+# "Extra clean" cleanup hook: Remove all the records from ACME (Certbot)
+# requests on all the domains used in this run.
 function extra-cleanup {
     local allDomains="${CERTBOT_ALL_DOMAINS}"
     allDomains=($(
