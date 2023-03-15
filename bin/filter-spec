@@ -5,7 +5,7 @@
 # Details: <http://www.apache.org/licenses/LICENSE-2.0>
 
 # Load the helper libraries.
-. "$(dirname "$(readlink -f "$0")")/init.sh" || exit "$?"
+. "$(dirname "$(readlink -f "$0")")/lib/init.sh" || exit "$?"
 
 
 #
