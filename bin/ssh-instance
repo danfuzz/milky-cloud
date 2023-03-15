@@ -232,9 +232,9 @@ if [[ ${keyPath} != '' ]]; then
     sshCommand+=('-i' "${keyPath}")
 fi
 
-if [[ -t 0 ]]; then
-    # Stdin is a TTY, so tell that to SSH. (This should only make a difference
-    # if running a command, not just logging in.)
+if [[ -t 1 ]]; then
+    # `stdout` is a TTY, so tell that to SSH. (This should only make a
+    # difference if running a command, not just logging in.)
     sshCommand+=('-t')
 fi
 
