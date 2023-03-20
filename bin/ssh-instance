@@ -178,9 +178,11 @@ function authorize-host {
     local hostsFile="${HOME}/.ssh/known_hosts"
     local hostLine="${address} ${publicKey}"
 
-    local already
-    already="$(ssh-keygen -f "${hostsFile}" -F "${address}" | tail -1)" \
-    || return "$?"
+    local already=''
+    if [[ -e "${hostsFile}" ]]; then
+        already="$(ssh-keygen -f "${hostsFile}" -F "${address}" | tail -1)" \
+        || return "$?"
+    fi
 
     if [[ ${already} != ${hostLine} ]]; then
         if [[ ${already} != '' ]]; then
