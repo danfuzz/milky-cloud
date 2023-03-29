@@ -134,7 +134,7 @@ filterSpec="$(lib filter-spec \
     root-device-type=ebs \
 )"
 
-ec2-json describe-images \
+result="$(ec2-json describe-images \
     --loc="${zone}" \
     filterSpec:json="${filterSpec}" \
     '$filterSpec +
@@ -143,10 +143,26 @@ ec2-json describe-images \
         Owners: ["amazon"]
     }' \
     :: '
-    .Images | max_by(.CreationDate)
-    |
-    {
-        Description: .Description,
-        ImageId:     .ImageId,
-        Name:        .Name
-    }'
+    if .Images == []
+    then
+        null
+    else
+        .Images
+        |
+        max_by(.CreationDate)
+        |
+        {
+            Description: .Description,
+            ImageId:     .ImageId,
+            Name:        .Name
+        }
+    end'
+)" \
+|| exit "$?"
+
+if [[ ${result} == 'null' ]]; then
+    error-msg 'Eek! No matching image found!'
+    exit 1
+fi
+
+jget "${result}"
