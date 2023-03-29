@@ -161,7 +161,8 @@ result="$(ec2-json describe-images \
 || exit "$?"
 
 if [[ ${result} == 'null' ]]; then
-    error-msg 'Eek! No matching image found!'
+    error-msg 'Eek! Did not find a matching AMI!'
+    error-msg '(Did Amazon just do something weird?)'
     exit 1
 fi
 
