@@ -15,7 +15,7 @@
 # for example, the version of the kernel we want to find.
 amiNamePatterns='{
     "amazon-2":    "amzn2-ami-kernel-5.10-hvm-*-gp2",
-    "amazon-2022": "al2022-ami-2022*-kernel-5.15-*"
+    "amazon-2023": "al2023-ami-2023.*-kernel-6.*"
 }'
 
 
@@ -38,8 +38,11 @@ function usage {
       --os=<name>
         Which OS to install.
         `amazon-2` -- Amazon Linux 2, which is stable but end-of-lifed.
-        `amazon-2022` -- Amazon Linux 2022, which is in preview but (as of this
+        `amazon-2023` -- Amazon Linux 2023, which is in preview but (as of this
           writing) apparently _nearly_ stable. This is the default.
+      --show-all
+        (For debugging) Show all matches for the AMI name pattern, not just the
+        most recent one.
 
     ${name} [--help | -h]
       Displays this message.
@@ -59,7 +62,12 @@ opt-value --required --var=instanceType \
     --filter='/^[a-z0-9]+\.[a-z0-9]+$/' instance-type
 
 # Which OS.
-opt-value --var=osName --init='amazon-2022' --enum='amazon-2 amazon-2022' os
+opt-value --var=osName --init='amazon-2023' \
+    --enum='amazon-2 amazon-2023' \
+    os
+
+# Show all matches?
+opt-toggle --var=showAll show-all
 
 process-args "$@" || usage "$?"
 
@@ -142,14 +150,20 @@ result="$(ec2-json describe-images \
         ExecutableUsers: ["all"],
         Owners: ["amazon"]
     }' \
-    :: '
+    :: \
+    showAll:json="${showAll}" '
     if .Images == []
     then
         null
     else
         .Images
         |
-        max_by(.CreationDate)
+        if $showAll == 1
+        then
+            sort_by(.CreationDate)[]
+        else
+            max_by(.CreationDate)
+        end
         |
         {
             Description: .Description,
