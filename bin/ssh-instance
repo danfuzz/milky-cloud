@@ -95,7 +95,7 @@ fi
 # Helper functions
 #
 
-# Interprets a `user@host` string, interpreting zone/name lookups by finding
+# Interprets a `user@host` string, interpreting loc/name lookups by finding
 # instances by name. Prints JSON info of the results, for ultimate
 # recombination.
 function address-info {
