@@ -187,6 +187,45 @@ function cleanup-hook {
     fi
 }
 
+# Date utilities that work with both BSD and GNU `date`.
+function date-util {
+    local cmd="$1"
+    shift
+
+    # Gross hack: If `date` has the `--version` option then it's GNU, otherwise
+    # it's BSD.
+    if date --version 1>&/dev/null; then
+        local impl=gnu
+    else
+        local impl=bsd
+    fi
+
+    case "${cmd}" in
+        now-secs)
+            date '+%s'
+            ;;
+        print)
+            local secs="$1"
+            if [[ ${impl} == gnu ]]; then
+                date --date="@${secs}"
+            else
+                date -r "${secs}"
+            fi
+            ;;
+        rfc822-secs)
+            local time="$1"
+            if [[ ${impl} == gnu ]]; then
+                date --date="${time}" '+%s'
+            else
+                date -j -f '%b %d %T %Y %Z' "${time}" '+%s'
+            fi
+            ;;
+        *)
+            error-msg "Unknown date command: ${cmd}"
+            return 1
+    esac
+}
+
 # "Extra clean" cleanup hook: Remove all the records from ACME (Certbot)
 # requests on all the domains used in this run.
 function extra-cleanup {
@@ -293,12 +332,12 @@ function lifetime-check {
         return 1
     fi
 
-    local expireSecs="$(date -j -f '%b %d %T %Y %Z' "${BASH_REMATCH[1]}" '+%s')"
-    local nowSecs="$(date '+%s')"
+    local expireSecs="$(date-util rfc822-secs "${BASH_REMATCH[1]}")"
+    local nowSecs="$(date-util now-secs)"
     local remainingDays=$(( (expireSecs - nowSecs) / SECS_PER_DAY ))
 
     info-msg 'Existing certificate expires:'
-    info-msg "  $(date -r "${expireSecs}")"
+    info-msg "  $(date-util print "${expireSecs}")"
 
     case "${remainingDays}" in
         -*)
