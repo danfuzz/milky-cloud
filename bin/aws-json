@@ -260,6 +260,17 @@ if [[ (${AWS_ACCESS_KEY_ID} =~ ^SECRET) || (${AWS_SECRET_ACCESS_KEY} =~ ^SECRET)
     eval "${secretEval}"
 fi
 
+if [[ ${loc} == '' ]]; then
+    # Work around a bug in the underlying `aws` command: If there is no region
+    # passed in, it will try to automatically derive it via EC2 metadata (on the
+    # assumption that the command is running on an EC2 instance). Sometimes it
+    # fails (because that's not where the command is running); that's not the
+    # bug. The bug is that many commands don't need a region, so there's no
+    # point in trying to derive it in those cases. The following suppresses the
+    # attempt.
+    export AWS_EC2_METADATA_DISABLED=true
+fi
+
 result="$("${fullCommand[@]}")" \
 || {
     error-msg 'Trouble running AWS command.'
