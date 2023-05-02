@@ -63,5 +63,5 @@ if (( doCopy )); then
     destDir="$(base-dir)/scripts/lib"
     rm -rf "${destDir}/bashy-*"
     cd "$(this-cmd-dir)/bashy-lib/scripts"
-    cp -r "./bashy-*" "${destDir}"
+    cp -r ./bashy-* "${destDir}"
 fi
