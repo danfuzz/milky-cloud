@@ -60,8 +60,8 @@ fi
 
 if (( doCopy )); then
     # Copy upstream bashy-lib files into place.
-    destDir="$(base-dir)/bin/lib"
-    cd "$(this-cmd-dir)/bashy-lib/lib"
-    find . -type f '!' -name 'init-product.sh' \
-        -exec cp '{}' "${destDir}" ';'
+    destDir="$(base-dir)/scripts/lib"
+    rm -rf "${destDir}/bashy-*"
+    cd "$(this-cmd-dir)/bashy-lib/scripts"
+    cp -r "./bashy-*" "${destDir}"
 fi
