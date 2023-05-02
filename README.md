@@ -15,3 +15,14 @@ On top of that, the dependencies are:
 * Certbot -- EFF's tool for getting site certificates.
 * op -- the (poorly-named) 1Password CLI tool, only needed if secrets (e.g.
   access keys) are stored in 1Password.
+
+## Instructions (OLD)
+
+Copy the `bin` directory wherever you want.
+
+## Instructions (NEW)
+
+Copy the `scripts` directory wherever you want. It is itself a copy of
+[`bashy-lib`](https://github.com/danfuzz/bashy-lib), with an additional
+sub-library for this project. If you have your own verion of `bashy-lib`, you
+can instead just copy the directory `scripts/lib/milky-cloud`.
