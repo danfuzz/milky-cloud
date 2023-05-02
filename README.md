@@ -16,11 +16,7 @@ On top of that, the dependencies are:
 * op -- the (poorly-named) 1Password CLI tool, only needed if secrets (e.g.
   access keys) are stored in 1Password.
 
-## Instructions (OLD)
-
-Copy the `bin` directory wherever you want.
-
-## Instructions (NEW)
+## Instructions
 
 Copy the `scripts` directory wherever you want. It is itself a copy of
 [`bashy-lib`](https://github.com/danfuzz/bashy-lib), with an additional
