@@ -9,7 +9,7 @@
 # as an example of how the special handler mechanism works, just in case it's
 # needed for some other reason.
 
-. "$(dirname "$(readlink -f "$0")")/init.sh" || exit "$?"
+. "$(dirname "$(readlink -f "$0")")/_init.sh" || exit "$?"
 
 
 #
