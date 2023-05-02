@@ -1,0 +1,207 @@
+#!/bin/bash
+#
+# Copyright 2022-2023 the Milky-cloud Authors (Dan Bornstein et alia).
+# SPDX-License-Identifier: Apache-2.0
+
+. "$(dirname "$(readlink -f "$0")")/init.sh" || exit "$?"
+
+
+#
+# Argument parsing
+#
+
+define-usage $'
+    ${name} [<opt> ...] [--] <assignment> ...
+
+    Sets one or more attributes on a thing-that-has-attributes. Supported
+    "things" are subnets and VPCs.
+
+    <assignment>
+      <name>=<value> Assign attribute `name` to be the indicated value.
+
+    --id=<id>
+      ID of the thing to operate on. Must be specified.
+    --loc=<region-or-zone>
+      What region to operate in. Must be specified. If specified as an
+      availability zone, only the region portion matters.
+    --progress (--no-progress to disable)
+      Print progress messages to stderr.
+
+    ${name} [--help | -h]
+
+    Displays this message.
+'
+
+# Want help?
+opt-action --call='{ usage; exit }' help/h
+
+# Region, passed as either region per se or availability zone.
+opt-value --required --var=region --filter=region-from-location loc
+
+# ID of the thing to operate on.
+opt-value --required --var=id --filter='/^[-a-z0-9]+$/' id
+
+# Progress messages?
+opt-toggle --call='{ progress-msg --set="$1" }' progress
+
+# Names and values of assignments, as parallel arrays.
+assignNames=()
+assignValues=()
+rest-arg --call=parse-rest assignments
+function parse-rest {
+    local arg
+
+    while (( $# > 0)); do
+        arg="$1"
+
+        if ! [[ ${arg} =~ ^([-_:.a-zA-Z0-9]+)=(.*)$ ]]; then
+            error-msg "Invalid assignment: ${arg}"
+            return 1
+        fi
+
+        assignNames+=("${BASH_REMATCH[1]}")
+        assignValues+=("${BASH_REMATCH[2]}")
+
+        shift
+    done
+
+    if (( ${#assignNames[@]} == 0 )); then
+        error-msg 'Missing assignment(s).'
+        return 1
+    fi
+}
+
+process-args "$@" || usage --short
+
+
+#
+# Main script
+#
+
+if ! [[ ${id} =~ ^([a-z]+)-([a-f0-9]+)$ ]]; then
+    error-msg "Unparseable ID: ${id}"
+    exit 1
+fi
+
+# The type portion of the ID.
+idType="${BASH_REMATCH[1]}"
+
+# Figure out the appropriate command and ID argument to use.
+command=''
+idArg=''
+case "${idType}" in
+    subnet)
+        command='modify-subnet-attribute'
+        idArg='SubnetId'
+        ;;
+    vpc)
+        command='modify-vpc-attribute'
+        idArg='VpcId'
+        ;;
+    *)
+        error-msg "Cannot work with type: ${idType}"
+        exit 1
+        ;;
+esac
+
+# Grab and interpret the "skeleton" of the attribute command as a way to figure
+# out the types of all the attributes. Kinda icky, but it means we don't have to
+# maintain parallel AWS metadata here.
+skeleton="$(
+    ec2-json "${command}" --skeleton \
+        :: idArg="${idArg}" 'del(.[$idArg])'
+)" \
+|| exit "$?"
+
+# Reform `idArg` so it can be used to pass the actual ID into the AWS commands.
+idArg="$(jval idArg="${idArg}" id="${id}" '{ ($idArg): $id }')" \
+|| exit "$?"
+
+error=0
+
+# Preflight all the attribute names, so we don't try to do any modification
+# unless all names seem to be usable. This loop also converts all the values
+# into the correct JSON form for performing the actual commands.
+for (( n = 0; n < ${#assignNames[@]}; n++ )); do
+    name="${assignNames[${n}]}"
+    value="${assignValues[${n}]}"
+    valueType="$(jget --output=raw "${skeleton}" \
+        name="${name}" '
+        if (has($name) | not)
+        then
+            "missing"
+        else
+            { skel: .[$name], type: (.[$name] | type) }
+            |
+            if (.type != "object")
+                then .type
+            elif (.skel | keys) == ["Value"]
+                then "value-" + (.skel.Value | type)
+            else "unhandled"
+            end
+        end
+        ')"
+
+    jsonError=0
+    case "${valueType}" in
+        boolean|null|number)
+            # These are okay without alteration, just need to validate JSON
+            # form.
+            value="$(jget 2>/dev/null --output=compact "${value}" '.')" \
+            || jsonError=1
+            ;;
+        string)
+            # Quote the string.
+            value="$(jval 2>/dev/null value="${value}" '$value')" \
+            || jsonError=1
+            ;;
+        value-boolean)
+            # Wrap the value.
+            value="$(
+                jget 2>/dev/null --output=compact "${value}" '{ Value: . }'
+            )" \
+            || jsonError=1
+            ;;
+        missing)
+            error-msg "No such attribute: ${name}"
+            error=1
+            ;;
+        *)
+            error-msg "Unhandled attribute: ${name}"
+            error=1
+            ;;
+    esac
+
+    if (( jsonError )); then
+        error-msg "Unparseable value for attribute: ${name}"
+        error=1
+    else
+        assignValues[${n}]="${value}"
+    fi
+done
+
+if (( error )); then
+    exit 1
+fi
+
+# Do all the commands.
+for (( n = 0; n < ${#assignNames[@]} && !error; n++ )); do
+    name="${assignNames[${n}]}"
+    value="${assignValues[${n}]}"
+
+    progress-msg "Setting ${name}..."
+    ec2-json "${command}" \
+        --loc="${region}" \
+        idArg:json="${idArg}" \
+        name="${name}" \
+        value:json="${value}" \
+        '$idArg | .[$name] = $value' \
+    || error=1
+done
+
+if (( error )); then
+    error-msg 'Could not set all attributes.'
+    exit 1
+fi
+
+progress-msg 'Done setting attributes.'

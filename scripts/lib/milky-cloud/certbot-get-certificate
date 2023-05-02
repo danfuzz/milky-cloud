@@ -1,0 +1,475 @@
+#!/bin/bash
+#
+# Copyright 2022-2023 the Milky-cloud Authors (Dan Bornstein et alia).
+# SPDX-License-Identifier: Apache-2.0
+
+. "$(dirname "$(readlink -f "$0")")/init.sh" || exit "$?"
+
+
+#
+# Argument parsing
+#
+
+define-usage $'
+    ${name} [<opt> ...]
+
+    Runs Certbot to get a certificate, saving it to a local directory. This
+    uses the DNS challenge, implemented "manually" here to call out to other
+    scripts in this project which use Route53. (Why not use Certbot\'s Route53
+    plugin? Because as of this writing, it is easier to reimplement it than to
+    get the plugins, because reasons.)
+
+    After a successful run of this command, it is safe to delete the specified
+    work directory. All certificates and Cerbot account information will have
+    been stored in the output directory. (The Certbot account information will
+    get re-used on subsequent invocations.)
+
+    --domain=<domain-name>
+      Domain name to get a certificate for. This is required, and can be
+      specified more than once to get a certificate with alternate subjects.
+      (The first domain listed is the primary.) Wildcards are allowed, in the
+      form `*.domain.name`.
+    --email=<email-address>
+      Email address to use when making API requests. This is required. Per
+      Certbot / LetsEncrypt docs, this is just used for urgent communication.
+    --min-lifetime-days=<count>
+      Cause this command to _not_ actually get a new certificate if there are
+      at least <count> days left before an existing certificate expires. If
+      this option is not used, then the command will always get a new
+      certificate.
+    --out=<path>
+      Directory to use to store certs and Certbot account information. Defaults
+      to `out/certs` under the current directory. The directory will be created
+      if it doesn\'t exist.
+    --staging
+      Use the staging server.
+    --work-dir=<path>
+      Directory to use for Certbot intermediate file storage, including logs.
+      Defaults to `out/certbot` under the current directory. The directory
+      will be created if it doesn\'t exist.
+
+    ${name} [--help | -h]
+
+    Displays this message.
+'
+
+# Special logic for callbacks from `certbot` to skip the usual argument parsing
+# and just call the right hook.
+runHook=''
+if [[ ${RUN_CERTBOT_HOOK} == 1 ]]; then
+    # Certbot sets `CERTBOT_AUTH_OUTPUT` only when calling the cleanup script.
+    if [[ ${CERTBOT_AUTH_OUTPUT-unset} == 'unset' ]]; then
+        runHook=authentication
+    else
+        runHook=cleanup
+    fi
+fi
+
+if [[ ${runHook} == '' ]]; then
+    # Want help?
+    opt-action --call='{ usage }' help/h
+
+    # Directory to use for final output.
+    opt-value --var=outDir --init='out/certs' out
+
+    # Domain(s) to get a certificate for.
+    certName='' # Primary name (minus wildcard, if any).
+    domainArgs=()
+    opt-value --required --call=add-domain --filter='/^([*][.])?[-.a-z0-9]+$/' domain
+    function add-domain {
+        domainArgs+=(--domain="$1")
+        if [[ ${certName} == '' ]]; then
+            # Drop the wildcard off of the domain, if any, to produce the main
+            # certificate name.
+            [[ $1 =~ ^([*][.])?(.*)$ ]]
+            certName="${BASH_REMATCH[2]}"
+        fi
+    }
+
+    # Email address.
+    opt-value --required --var=email --filter='/^[-_.+@a-z0-9]+$/' email
+
+    # Minimum days of validity for an existing certificate.
+    opt-value --var=minLifetimeDays --filter='/^[0-9]{1,4}$/' min-lifetime-days
+
+    # Use the staging server?
+    opt-toggle --var=useStaging staging
+
+    # Directory to use for Certbot intermediate files.
+    opt-value --var=workDir --init='out/certbot' work-dir
+
+    process-args "$@" || usage "$?"
+fi
+
+
+#
+# Helper functions
+#
+
+# The "authentication" hook. This is (in effect) a callback from `certbot`.
+function authentication-hook {
+    local validationData="${CERTBOT_VALIDATION}"
+    local domain="${CERTBOT_DOMAIN}"
+
+    local zoneId
+    zoneId="$(find-zone-id "${domain}")" \
+    || return "$?"
+
+    # Note: When asking for a cert which covers both a domain name (with any
+    # number of subdomains including zero) and a wildcard of that exact same
+    # domain name, there might be two active ACME challenges which both want to
+    # use the same record name. So, before `UPSERT`ing, we need to get any
+    # existing `TXT` record, and then combine it with the new request.
+    local dataArray
+    dataArray="$(get-existing-record "${zoneId}" "${domain}")" \
+    || return "$?"
+
+    dataArray="$(jval \
+        existing:json="${dataArray}" \
+        data="${validationData}" \
+        '$existing + [{ Value: ($data | @json) }]'
+    )" \
+    || return "$?"
+
+    local payload
+    payload="$(make-change-payload UPSERT "${domain}" "${dataArray}")" \
+    || return "$?"
+
+    local changeId
+    changeId="$(lib aws-json route53 change-resource-record-sets --global \
+        zoneId="${zoneId}" \
+        payload:json="${payload}" \
+        '{
+            HostedZoneId: $zoneId,
+            ChangeBatch: $payload
+        }' \
+        :: --output=raw '.ChangeInfo.Id')" \
+    || return "$?"
+
+    local i status
+    for (( i = 0; i < 30; i++ )); do
+        status="$(lib aws-json route53 get-change --global \
+            id="${changeId}" \
+            '{ Id: $id }' \
+            :: --output=raw '.ChangeInfo.Status'
+        )" \
+        || return "$?"
+        if [[ ${status} == 'INSYNC' ]]; then
+            break
+        fi
+        sleep 1
+    done
+
+    if [[ ${status} != 'INSYNC' ]]; then
+        info-msg 'DNS change failed to propagate. There may be trouble!'
+    fi
+}
+
+# The "cleanup" hook. This is (in effect) a callback from `certbot`.
+function cleanup-hook {
+    local domain="${CERTBOT_DOMAIN}"
+    local remainingChallenges="${CERTBOT_REMAINING_CHALLENGES}"
+    local validationData="${CERTBOT_VALIDATION}"
+
+    # Note: Instead of paying attention to the given validation data, we treat
+    # each cleanup but the last as a no-op, and then at the end just delete all
+    # records that look like ACME challenges.
+
+    if [[ ${remainingChallenges} == 0 ]]; then
+        # No more challenges. Do the "extra cleanup" work.
+        extra-cleanup || return "$?"
+    fi
+}
+
+# Date utilities that work with both BSD and GNU `date`.
+function date-util {
+    local cmd="$1"
+    shift
+
+    # Gross hack: If `date` has the `--version` option then it's GNU, otherwise
+    # it's BSD.
+    if date --version 1>&/dev/null; then
+        local impl=gnu
+    else
+        local impl=bsd
+    fi
+
+    case "${cmd}" in
+        now-secs)
+            date '+%s'
+            ;;
+        print)
+            local secs="$1"
+            if [[ ${impl} == gnu ]]; then
+                date --date="@${secs}"
+            else
+                date -r "${secs}"
+            fi
+            ;;
+        rfc822-secs)
+            local time="$1"
+            if [[ ${impl} == gnu ]]; then
+                date --date="${time}" '+%s'
+            else
+                date -j -f '%b %d %T %Y %Z' "${time}" '+%s'
+            fi
+            ;;
+        *)
+            error-msg "Unknown date command: ${cmd}"
+            return 1
+    esac
+}
+
+# "Extra clean" cleanup hook: Remove all the records from ACME (Certbot)
+# requests on all the domains used in this run.
+function extra-cleanup {
+    local allDomains="${CERTBOT_ALL_DOMAINS}"
+    allDomains=($(
+        tr <<<"${allDomains}" ',' '\n' \
+        | awk '
+            /[.].*[.]/ { $0 = substr($0, match($0, /[^.]*[.][^.]*$/)) }
+            { print }
+        ' \
+        | sort -u
+    ))
+
+    local domain zoneId
+    for domain in "${allDomains[@]}"; do
+        zoneId="$(find-zone-id "${domain}")" \
+        || return "$?"
+
+        local payload
+        payload="$(lib aws-json route53 list-resource-record-sets --global \
+            zoneId="${zoneId}" \
+            '{ HostedZoneId: $zoneId }' \
+            :: '
+              .ResourceRecordSets
+            | map(select(.Type == "TXT"))
+            | map(select(.Name | test("^_acme-challenge[.]")))
+            |
+            if length > 0
+            then {
+              Comment: "Via Cerbot wrapper extra-cleanup script",
+              Changes: map({
+                Action: "DELETE",
+                ResourceRecordSet: .
+              })
+            }
+            else null
+            end
+            '
+        )" \
+        || return "$?"
+
+        if [[ ${payload} != 'null' ]]; then
+            echo "Cleaning up challenges for domain: ${domain}"
+            lib aws-json route53 change-resource-record-sets --global \
+                zoneId="${zoneId}" \
+                payload:json="${payload}" \
+                '{
+                    HostedZoneId: $zoneId,
+                    ChangeBatch: $payload
+                }' \
+                :: --output=none \
+            || return "$?"
+        fi
+    done
+}
+
+# Finds the zone ID for a given domain name.
+function find-zone-id {
+    local domain="$1"
+
+    lib find-dns-zone --output=id "${domain}" \
+    || return "$?"
+}
+
+# Gets the existing record value for a given zone and domain name. Outputs a
+# JSON array suitable for concatenating into a `ResourceRecords` value. The
+# result is `[]` (the empty array) if there is no existing record.
+function get-existing-record {
+    local zoneId="$1"
+    local domain="$2"
+
+    local name="_acme-challenge.${domain}."
+
+    lib aws-json route53 list-resource-record-sets --global \
+        zoneId="${zoneId}" \
+        name="${name}" '{
+            HostedZoneId:    $zoneId,
+            MaxItems:        "1", # Yes, it is supposed to be a string.
+            StartRecordName: $name,
+            StartRecordType: "TXT"
+        }' :: \
+        name="${name}" '[
+            .ResourceRecordSets[]
+            | select((.Name == $name) and (.Type == "TXT"))
+            | .ResourceRecords[]
+        ]' \
+    || return "$?"
+}
+
+# Does a certificate lifetime check. Prints `keep` or `renew`.
+function lifetime-check {
+    local minLifetimeDays="$1"
+    local fullChainFile="$2"
+
+    local SECS_PER_DAY=$(( 24 * 60 * 60 ))
+
+    local expireDateStr="$(
+        openssl x509 -in "${fullChainOut}" -noout -enddate
+    )" \
+    || return "$?"
+
+    if ! [[ ${expireDateStr} =~ ^[^=]+=(.*)$ ]]; then
+        error-msg "Strange date in certificate: ${expireDateStr}"
+        return 1
+    fi
+
+    local expireSecs="$(date-util rfc822-secs "${BASH_REMATCH[1]}")"
+    local nowSecs="$(date-util now-secs)"
+    local remainingDays=$(( (expireSecs - nowSecs) / SECS_PER_DAY ))
+
+    info-msg 'Existing certificate expires:'
+    info-msg "  $(date-util print "${expireSecs}")"
+
+    case "${remainingDays}" in
+        -*)
+            info-msg $'  That\'s in the past! Eek!'
+            ;;
+        0)
+            info-msg $'  That\'s today! Eek!'
+            ;;
+        1)
+            info-msg $'  That\'s tomorrow! Eek!'
+            ;;
+        *)
+            info-msg "  ${remainingDays} days from now"
+            ;;
+    esac
+
+    info-msg "Required: at least ${minLifetimeDays} days."
+    if (( remainingDays >= minLifetimeDays )); then
+        info-msg 'Not renewing existing certificate.'
+        echo 'keep'
+    else
+        info-msg 'Renewing existing certificate.'
+        echo 'renew'
+    fi
+}
+
+# Makes a payload for a DNS change request. `data` should be a a JSON array of
+# `{ Value: "..." }` objects.
+function make-change-payload {
+    local action="$1"
+    local domain="$2"
+    local dataArray="$3"
+
+    # Note: The Route53 API requires the `Value` passed in for a `TXT` record to
+    # be surrounded by double quotes (for an at least _somewhat_ okay reason),
+    # hence the `| @json` below.
+    jval \
+        action="${action}" \
+        name="_acme-challenge.${domain}." \
+        dataArray:json="${dataArray}" \
+    '{
+        Comment: "Via Certbot wrapper script",
+        Changes: [
+            {
+                Action: $action,
+                ResourceRecordSet: {
+                    Name: $name,
+                    Type: "TXT",
+                    TTL: 60,
+                    ResourceRecords: $dataArray
+                }
+            }
+        ]
+    }'
+}
+
+
+#
+# Main script
+#
+
+# Just run the requested callback hook, if it looks like we were called from
+# Certbot.
+if [[ ${runHook} != '' ]]; then
+    "${runHook}-hook"
+    exit "$?"
+fi
+
+# Not a callback. Do the main call.
+
+if [[ ! -d ${workDir} ]]; then
+    mkdir -p "${workDir}" || exit "$?"
+fi
+
+if [[ ! -d ${outDir} ]]; then
+    mkdir -p "${outDir}" || exit "$?"
+fi
+outDir="$(readlink -f "${outDir}")"
+
+accountOutDir="${outDir}/certbot-accounts"
+certOutDir="${outDir}/${certName}"
+fullChainOut="${certOutDir}/fullchain.pem"
+
+# Check for expiration, if so requested.
+if [[ (${minLifetimeDays} != '') && -r "${fullChainOut}" ]]; then
+    renewDecision="$(lifetime-check "${minLifetimeDays}" "${fullChainOut}")" \
+    || exit "$?"
+    if [[ ${renewDecision} == 'keep' ]]; then
+        exit
+    fi
+fi
+
+# Clean out any pre-existing bits about the to-be-produced certificate from the
+# Certbot work directory.
+rm -rf "${workDir}/archive/${certName}"
+rm -rf "${workDir}/live/${certName}"
+rm -rf "${workDir}/renewal/${certName}.conf"
+
+# Copy the pre-existing Certbot account info (if any) into the work directory.
+if [[ -d "${accountOutDir}" ]]; then
+    mkdir -p "${workDir}/accounts"
+    lib rsync-local "${accountOutDir}/" "${workDir}/accounts" \
+    || exit "$?"
+fi
+
+extraOpts=()
+if (( useStaging )); then
+    extraOpts+=(--staging)
+fi
+
+# Note: We use `--force-renewal`, because by the time we're here this script has
+# already decided that the certificate needs renewing. (It probably doesn't
+# matter, though, because we clean the salient bits out of the work directory,
+# above.)
+thisCmd="$(this-cmd-path)"
+RUN_CERTBOT_HOOK=1 \
+certbot certonly \
+    --config-dir="${workDir}" --logs-dir="${workDir}" --work-dir="${workDir}" \
+    --manual --noninteractive --agree-tos --email="${email}" \
+    --preferred-challenges=dns --force-renewal \
+    --manual-auth-hook="${thisCmd}" --manual-cleanup-hook="${thisCmd}" \
+    --cert-name="${certName}" \
+    "${extraOpts[@]}" "${domainArgs[@]}" \
+|| exit "$?"
+
+# Copy the result files into place.
+mkdir -p "${certOutDir}"
+(
+    cd "${workDir}/live/${certName}"
+    find . '(' -type f -o -type l ')' -name '*.pem' \
+        -exec cp '{}' "${certOutDir}" ';'
+)
+
+# Copy Certbot account info back into the output area.
+mkdir -p "${accountOutDir}"
+lib rsync-local "${workDir}/accounts/" "${accountOutDir}" \
+|| exit "$?"
+
+info-msg
+info-msg 'Certificate files stored to:'
+info-msg "  ${certOutDir}"

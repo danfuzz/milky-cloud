@@ -1,0 +1,79 @@
+#!/bin/bash
+#
+# Copyright 2022-2023 the Milky-cloud Authors (Dan Bornstein et alia).
+# SPDX-License-Identifier: Apache-2.0
+
+. "$(dirname "$(readlink -f "$0")")/init.sh" || exit "$?"
+
+
+#
+# Argument parsing
+#
+
+define-usage $'
+    ${name} [<opt> ...]
+
+    Finds a VPC subnet that meets the indicated criteria. On success, prints
+    the subnet ID.
+
+    --loc=<availability-zone>
+      What availibility zone to look in. Must be specified.
+    --vpc=<name-or-id>
+      Name or ID of the VPC to look in. Must be specified.
+
+    ${name} [--help | -h]
+
+    Displays this message.
+'
+
+# Want help?
+opt-action --call='{ usage; exit }' help/h
+
+# Availability zone.
+opt-value --required --var=zone --call=parse-zone loc
+
+# Name or ID of VPC to look up.
+opt-value --required --var=nameOrId --filter='/./' vpc
+
+process-args "$@" || usage --short
+
+
+#
+# Main script
+#
+
+vpcId="$(lib find-vpc --loc="${zone}" "${nameOrId}")" \
+|| exit "$?"
+
+filterSpec="$(lib filter-spec \
+    availability-zone="${zone}" \
+    vpc-id="${vpcId}"
+)"
+
+result="$(ec2-json describe-subnets \
+    --loc="${zone}" \
+    "${filterSpec}" \
+    :: '.Subnets | map(.SubnetId)' \
+)" \
+|| exit "$?"
+
+subnetId="$(jget --output=raw "${result}" '
+    if length == 0 then "none"
+    elif length == 1 then .[0]
+    else "ambiguous"
+    end
+')"
+
+case "${subnetId}" in
+    ambiguous)
+        error-msg 'Ambiguous specification matches all of:'
+        error-msg --exec jget --output=raw "${result}" '.[] | "  " + .'
+        exit 1
+        ;;
+    none)
+        error-msg 'No such subnet.'
+        exit 1
+        ;;
+esac
+
+echo "${subnetId}"

@@ -1,0 +1,110 @@
+#!/bin/bash
+#
+# Copyright 2022-2023 the Milky-cloud Authors (Dan Bornstein et alia).
+# SPDX-License-Identifier: Apache-2.0
+
+. "$(dirname "$(readlink -f "$0")")/init.sh" || exit "$?"
+
+
+#
+# Argument parsing
+#
+
+define-usage $'
+    ${name} [<opt> ...] [<assignment> ...] <filter-expr> ...
+
+    Removes rules from an existing subnet, based on given filter criteria.
+    Simple filters can be specified via options, or if no such option is used,
+    a general filter can be specified via assignment and expression arguments,
+    similar to `aws-json`. This filter is expected to accept `Subnet` objects
+    and then re-output the ones to be removed.
+
+    On success, prints a JSON array of the IDs of all removed subnets.
+
+    --all
+      Remove all subnets.
+    --loc=<region-or-zone>
+      What region to make the security group in. Must be specified. If
+      specified as an availability zone, only the region portion matters.
+    --quiet
+      Suppress non-error output to stdout.
+    --vpc=<name-or-id>
+      Name or ID of the VPC to operate on.
+
+    ${name} [--help | -h]
+
+    Displays this message.
+'
+
+# Want help?
+opt-action --call='{ usage; exit }' help/h
+
+# Region, passed as either region per se or availability zone.
+opt-value --required --var=region --filter=region-from-location loc
+
+# Name or ID of the VPC.
+opt-value --required --var=vpcNameOrId --filter='/./' vpc
+
+# Simple filter for `--all` (degenerate choice option).
+opt-choice --var=simpleFilter \
+    all='.'
+
+# Quiet?
+opt-toggle --var=quiet quiet
+
+# Filter arguments.
+rest-arg --var=filterArgs filter-exprs
+
+process-args "$@" || usage --short
+
+if (( ${#filterArgs[@]} == 0 )); then
+    if [[ ${simpleFilter} == '' ]]; then
+        error-msg 'Missing filter option or arguments.'
+        exit 1
+    fi
+    filterArgs=("${simpleFilter}")
+elif [[ ${simpleFilter} != '' ]]; then
+    error-msg 'Cannot specify both filter option and arguments.'
+    exit 1
+fi
+
+
+#
+# Main script
+#
+
+# Validate or find the ID of the VPC.
+vpcId="$(lib find-vpc --loc="${region}" "${vpcNameOrId}")" \
+|| exit "$?"
+
+allSubnets="$(ec2-json describe-subnets \
+    --loc="${region}" \
+    "$(lib filter-spec vpc-id="${vpcId}")" \
+    :: '.Subnets[]'
+)" \
+|| exit "$?"
+
+selectedSubnets="$(
+    jval <<<"${allSubnets}" --input=read -- "${filterArgs[@]}"
+)" \
+|| exit "$?"
+
+subnetIds=($(
+    jval <<<"${selectedSubnets}" --output=words --input=slurp \
+        'map(.SubnetId) | sort | .[]'
+)) \
+|| exit "$?"
+
+for id in "${subnetIds[@]}"; do
+    ec2-json delete-subnet \
+        --loc="${region}" \
+        id="${id}" \
+        '{
+            SubnetId: $id
+        }' \
+    || exit "$?"
+done
+
+if (( !quiet )); then
+    jarray --input=strings "${subnetIds[@]}"
+fi

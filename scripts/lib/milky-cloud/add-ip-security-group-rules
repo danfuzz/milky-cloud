@@ -1,0 +1,110 @@
+#!/bin/bash
+#
+# Copyright 2022-2023 the Milky-cloud Authors (Dan Bornstein et alia).
+# SPDX-License-Identifier: Apache-2.0
+
+. "$(dirname "$(readlink -f "$0")")/init.sh" || exit "$?"
+
+
+#
+# Argument parsing
+#
+
+define-usage $'
+    ${name} [<opt> ...]
+
+    Adds one or more rules to a given security group to specify IP-based
+    restrictions. Upon success, prints out a JSON array of all added rules.
+
+    Note: Even though this command only nominally lets you specify one rule,
+    AWS splits out multiple rules when the specified rule applies to multiple
+    IP address ranges (including notably treating "any IPv4" and "any IPv6" as
+    different ranges).
+
+    --egress
+      The rule is to be an egress rule.
+    --ingress
+      The rule is to be an ingress rule.
+    --loc=<region-or-zone>
+      What region to make the security group in. Must be specified. If
+      specified as an availability zone, only the region portion matters.
+    --name=<name>
+      Name to attach to the rule, if any.
+    --port=<number> or --port=all
+      Port for the rule, or an indicator to apply to all ports. Must be
+      specified.
+    --protocol=<spec> :: `all` `tcp` `udp`
+      Protocol(s) the rule applies to. Must be specified.
+    --quiet (--no-quiet to disable)
+      Suppress non-error output to stdout.
+    --security-group=<name-or-id>
+      Name or ID of the security group to add to. Can also be a VPC ID,
+      to indicate the default security group for that VPC.
+
+    ${name} [--help | -h]
+
+    Displays this message.
+'
+
+# Want help?
+opt-action --call='{ usage; exit }' help/h
+
+# Rule direction (`ingress` or `egress`).
+opt-choice --required --var=direction egress ingress
+
+# Name or ID of the security group.
+opt-value --required --var=groupNameOrId --filter='/./' security-group
+
+# Region, passed as either region per se or availability zone.
+opt-value --required --var=region --filter=region-from-location loc
+
+# Name of the rule.
+opt-value --var=name --filter='/./' name
+
+# Port of the rule.
+opt-value --required --var=port --filter='/^([0-9]+|all)$/' port
+
+# Protocol of the rule.
+opt-value --required --var=protocol --enum='all tcp udp' protocol
+
+# Quiet?
+opt-toggle --var=quiet quiet
+
+process-args "$@" || usage --short
+
+
+#
+# Main script
+#
+
+# Validate or find the ID of the security group.
+groupId="$(lib find-security-group --loc="${region}" "${groupNameOrId}")" \
+|| exit "$?"
+
+tagSpec='{}'
+if [[ ${name} != '' ]]; then
+    tagSpec="$(lib tag-spec --type='security-group-rule' --name="${name}")"
+fi
+
+command="authorize-security-group-${direction}"
+
+ipSpec="$(lib ip-permission-spec "${protocol}" "${port}")" \
+|| exit "$?"
+
+filterArg='.SecurityGroupRules | map(.SecurityGroupRuleId)'
+if (( quiet )); then
+    filterArg='--output=none'
+fi
+
+ec2-json "${command}" \
+    --loc="${region}" \
+    groupId="${groupId}" \
+    ipPermissions:json="[${ipSpec}]" \
+    tagSpec:json="${tagSpec}" \
+    '
+    $tagSpec +
+    {
+        GroupId: $groupId,
+        IpPermissions: $ipPermissions
+    }' \
+    :: "${filterArg}"

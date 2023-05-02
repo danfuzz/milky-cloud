@@ -1,0 +1,32 @@
+#!/bin/bash
+#
+# Copyright 2022-2023 the Milky-cloud Authors (Dan Bornstein et alia).
+# SPDX-License-Identifier: Apache-2.0
+
+# Special case handler to rewrite the arguments to `ec2 create-security-group`,
+# so as to work around this issue: <https://github.com/aws/aws-cli/issues/7058>
+# This issue is also worked around in the main `aws-json`, but this file remains
+# as an example of how the special handler mechanism works, just in case it's
+# needed for some other reason.
+
+. "$(dirname "$(readlink -f "$0")")/init.sh" || exit "$?"
+
+
+#
+# Main script
+#
+
+parts="$1"
+
+jget "${parts}" '
+      .jsonArg.Description as $description
+    | del(.jsonArg.Description)
+    | if $description then
+        .dashArgs += ["--description=" + $description]
+      else . end
+    | .jsonArg.GroupName as $groupName
+    | del(.jsonArg.GroupName)
+    | if $groupName then
+        .dashArgs += ["--group-name=" + $groupName]
+      else . end
+'

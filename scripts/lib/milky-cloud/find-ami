@@ -1,0 +1,178 @@
+#!/bin/bash
+#
+# Copyright 2022-2023 the Milky-cloud Authors (Dan Bornstein et alia).
+# SPDX-License-Identifier: Apache-2.0
+
+. "$(dirname "$(readlink -f "$0")")/init.sh" || exit "$?"
+
+
+#
+# Parameters for occasional update.
+#
+
+# Patterns for the AMI name to select, given the OS name. The pattern includes,
+# for example, the version of the kernel we want to find.
+amiNamePatterns='{
+    "amazon-2":    "amzn2-ami-kernel-5.10-hvm-*-gp2",
+    "amazon-2023": "al2023-ami-2023.*-kernel-6.*"
+}'
+
+
+#
+# Argument parsing
+#
+
+define-usage $'
+    ${name} [<opt> ...]
+
+    Finds an AMI to use when launching an instance. On success, prints a JSON
+    object of the salient info.
+
+    --instance-type=<type>
+      What type of instance is to be launched. Must be specified.
+    --loc=<availability-zone>
+      Where the AMI is to be launched. Must be specified.
+    --os=<name>
+      Which OS to install.
+      `amazon-2` -- Amazon Linux 2, which is stable but end-of-lifed.
+      `amazon-2023` -- Amazon Linux 2023, which is in preview but (as of this
+        writing) apparently _nearly_ stable. This is the default.
+    --show-all
+      (For debugging) Show all matches for the AMI name pattern, not just the
+      most recent one.
+
+    ${name} [--help | -h]
+
+    Displays this message.
+'
+
+# Want help?
+opt-action --call='{ usage; exit }' help/h
+
+# Availability zone.
+opt-value --required --var=zone --call=parse-zone loc
+
+# Instance type.
+opt-value --required --var=instanceType \
+    --filter='/^[a-z0-9]+\.[a-z0-9]+$/' instance-type
+
+# Which OS.
+opt-value --var=osName --init='amazon-2023' \
+    --enum='amazon-2 amazon-2023' \
+    os
+
+# Show all matches?
+opt-toggle --var=showAll show-all
+
+process-args "$@" || usage --short
+
+
+#
+# Main script
+#
+
+# Grab the AMI name pattern (defined at the top of this file).
+amiNamePattern="$(
+    jget --output=raw "${amiNamePatterns}" os="${osName}" '.[$os] // ""'
+)"
+
+if [[ ${amiNamePattern} == '' ]]; then
+    # Shouldn't happen; should have been caught by the argument check.
+    error-msg "Unknown OS: ${osName}"
+    exit 1
+fi
+
+# Check to see if the indicated instance type is available in the availability
+# zone.
+
+filterSpec="$(lib filter-spec \
+    location="${zone}" \
+    instance-type="${instanceType}"
+)"
+
+foundInstanceType="$(
+ec2-json describe-instance-type-offerings \
+    --loc="${zone}" \
+    filterSpec:json="${filterSpec}" \
+    '$filterSpec + { LocationType: "availability-zone" }' \
+    :: '.InstanceTypeOfferings | length'
+)" \
+|| exit "$?"
+
+if (( !foundInstanceType )); then
+    error-msg "No such instance type: ${instanceType} in ${zone}"
+    exit 1
+fi
+
+# `describe-instance-types` to extract the supported architecture, ignoring
+# `i386` which we don't care about (`x86_64` is the modern choice).
+
+architecture="$(
+ec2-json describe-instance-types \
+    --loc="${zone}" \
+    instanceType="${instanceType}" \
+    '{ InstanceTypes: [$instanceType] }' \
+    :: --output=raw '
+        .InstanceTypes[0].ProcessorInfo.SupportedArchitectures
+        | map(select(. != "i386"))
+        | .[0] // "error"
+    '
+)" \
+|| exit "$?"
+
+if [[ ${architecture} == 'error' ]]; then
+    error-msg "Unsupported instance type: ${instanceType} in ${zone}"
+    exit 1
+fi
+
+# `describe-images` to find the most recent salient AMI.
+
+thisYear="$(date "+%Y")"
+filterSpec="$(lib filter-spec \
+    architecture="${architecture}" \
+    name="${amiNamePattern}" \
+    creation-date="${thisYear}*" \
+    creation-date="$(( thisYear - 1 ))*" \
+    image-type=machine \
+    root-device-type=ebs \
+)"
+
+result="$(ec2-json describe-images \
+    --loc="${zone}" \
+    filterSpec:json="${filterSpec}" \
+    '$filterSpec +
+    {
+        ExecutableUsers: ["all"],
+        Owners: ["amazon"]
+    }' \
+    :: \
+    showAll:json="${showAll}" '
+    if .Images == []
+    then
+        null
+    else
+        .Images
+        |
+        if $showAll == 1
+        then
+            sort_by(.CreationDate)[]
+        else
+            max_by(.CreationDate)
+        end
+        |
+        {
+            Description: .Description,
+            ImageId:     .ImageId,
+            Name:        .Name
+        }
+    end'
+)" \
+|| exit "$?"
+
+if [[ ${result} == 'null' ]]; then
+    error-msg 'Eek! Did not find a matching AMI!'
+    error-msg '(Did Amazon just do something weird?)'
+    exit 1
+fi
+
+jget "${result}"

@@ -1,0 +1,151 @@
+#!/bin/bash
+#
+# Copyright 2022-2023 the Milky-cloud Authors (Dan Bornstein et alia).
+# SPDX-License-Identifier: Apache-2.0
+
+. "$(dirname "$(readlink -f "$0")")/init.sh" || exit "$?"
+
+
+#
+# Argument parsing
+#
+
+define-usage $'
+    ${name} [<opt> ...]
+
+    Detaches and removes an internet gateway, including removing routing rules
+    from the default routing table of the formerly-associated VPC.
+
+    --gateway=<id>
+      ID of the gateway to remove. Must be specified.
+    --loc=<region-or-zone>
+      What region to operate in. Must be specified. If specified as an
+      availability zone, only the region portion matters.
+    --progress (--no-progress to disable)
+      Print progress messages to stderr.
+
+    ${name} [--help | -h]
+
+    Displays this message.
+'
+
+# Want help?
+opt-action --call='{ usage; exit }' help/h
+
+# Region, passed as either region per se or availability zone.
+opt-value --required --var=region --filter=region-from-location loc
+
+# ID of the gateway.
+opt-value --required --var=gatewayId --filter='/./' gateway
+
+# Progress messages?
+opt-toggle --call='{ progress-msg --set="$1" }' progress
+
+process-args "$@" || usage --short
+
+
+#
+# Main script
+#
+
+# Get info on the gateway (which also validates the ID).
+gatewayInfo="$(ec2-json describe-internet-gateways \
+    --loc="${region}" \
+    gatewayId="${gatewayId}" \
+    '{
+        InternetGatewayIds: [$gatewayId]
+    }' \
+    :: '.InternetGateways[0]'
+)" \
+|| exit "$?"
+
+# Find the attached VPC ID if any. And if there is a VPC, figure out what needs
+# to be done to detach it.
+vpcId="$(jget --output=raw "${gatewayInfo}" '.Attachments[0].VpcId')"
+rtId=
+attached=0
+hasIpv4Route=0
+hasIpv6Route=0
+if [[ ${vpcId} != 'null' ]]; then
+    attached=1
+
+    # Find the default route table for the VPC.
+    rtInfo="$(ec2-json describe-route-tables \
+        --loc="${region}" \
+        filters:json="$(lib filter-spec vpc-id="${vpcId}" association.main=true)" \
+        '$filters' \
+        :: --output=raw '.RouteTables[0]'
+    )" \
+    || exit "$?"
+
+    rtId="$(jget --output=raw "${rtInfo}" '.RouteTableId')"
+
+    hasIpv4Route="$(jget "${rtInfo}" '
+          .Routes
+        | map(select(.DestinationCidrBlock == "0.0.0.0/0"))
+        | if . == [] then 0 else 1 end
+    ')"
+
+    hasIpv6Route="$(jget "${rtInfo}" '
+          .Routes
+        | map(select(.DestinationIpv6CidrBlock == "::/0"))
+        | if . == [] then 0 else 1 end
+    ')"
+fi
+
+# At this point, attempt all the needed detachment / deletion bits, and just
+# keep track of whether to report an error at the end.
+
+error=0
+
+if (( hasIpv4Route )); then
+    progress-msg 'Deleting IPv4 route...'
+    ec2-json delete-route \
+        --loc="${region}" \
+        rtId="${rtId}" \
+        '{
+            RouteTableId: $rtId,
+            DestinationCidrBlock: "0.0.0.0/0"
+        }' \
+    || error=1
+fi
+
+if (( hasIpv6Route )); then
+    progress-msg 'Deleting IPv6 route...'
+    ec2-json delete-route \
+        --loc="${region}" \
+        rtId="${rtId}" \
+        '{
+            RouteTableId: $rtId,
+            DestinationIpv6CidrBlock: "::/0"
+        }' \
+    || error=1
+fi
+
+if (( attached )); then
+    progress-msg 'Detaching gateway...'
+    ec2-json detach-internet-gateway \
+        --loc="${region}" \
+        gatewayId="${gatewayId}" \
+        vpcId="${vpcId}" \
+        '{
+            InternetGatewayId: $gatewayId,
+            VpcId: $vpcId
+        }' \
+    || error=1
+fi
+
+progress-msg 'Deleting gateway...'
+ec2-json delete-internet-gateway \
+    --loc="${region}" \
+    gatewayId="${gatewayId}" \
+    '{ InternetGatewayId: $gatewayId }' \
+|| error=1
+
+if (( error )); then
+    error-msg 'Trouble with gateway deletion. May not be fully deleted. Alas!'
+else
+    progress-msg 'Done with gateway deletion.'
+fi
+
+exit "${error}"
