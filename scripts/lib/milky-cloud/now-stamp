@@ -4,8 +4,8 @@
 # Licensed AS IS and WITHOUT WARRANTY under the Apache License, Version 2.0.
 # Details: <http://www.apache.org/licenses/LICENSE-2.0>
 
-# Load the helper libraries.
 . "$(dirname "$(readlink -f "$0")")/init.sh" || exit "$?"
+
 
 #
 # Argument parsing
