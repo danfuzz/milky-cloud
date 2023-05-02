@@ -55,7 +55,9 @@ define-usage $'
 # AWS command and subcommand. These are expected before any dashed options.
 if ! ( (( $# >= 2 )) && [[ $1 =~ ^[a-z] ]] && [[ $2 =~ ^[a-z] ]] ); then
     error-msg 'Missing AWS command and/or subcommand.'
-    usage 1
+    error-msg
+    usage --short
+    exit 1
 else
     command="$1"
     subcommand="$2"

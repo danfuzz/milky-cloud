@@ -67,7 +67,7 @@ fi
 
 if [[ ${runHook} == '' ]]; then
     # Want help?
-    opt-action --call='{ usage }' help/h
+    opt-action --call='{ usage; exit }' help/h
 
     # Directory to use for final output.
     opt-value --var=outDir --init='out/certs' out
@@ -98,7 +98,7 @@ if [[ ${runHook} == '' ]]; then
     # Directory to use for Certbot intermediate files.
     opt-value --var=workDir --init='out/certbot' work-dir
 
-    process-args "$@" || usage "$?"
+    process-args "$@" || usage --short "$?"
 fi
 
 
