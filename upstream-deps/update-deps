@@ -57,8 +57,8 @@ if (( doCopy )); then
     # Copy upstream bashy-lib files into place.
     destDir="$(base-dir)/scripts"
     rm -rf "${destDir}/bashy-*"
-    cd "$(this-cmd-dir)/bashy-lib/scripts/lib"
+    cd "$(this-cmd-dir)/bashy-lib/scripts"
     cp ./ubik "${destDir}"
-    cd "lib"
-    cp -r init.sh ./bashy-* "${destDir}/lib"
+    cd lib
+    cp -r ./init.sh ./bashy-* "${destDir}/lib"
 fi
