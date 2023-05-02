@@ -24,5 +24,6 @@ Copy the `bin` directory wherever you want.
 
 Copy the `scripts` directory wherever you want. It is itself a copy of
 [`bashy-lib`](https://github.com/danfuzz/bashy-lib), with an additional
-sub-library for this project. If you have your own verion of `bashy-lib`, you
-can instead just copy the directory `scripts/lib/milky-cloud`.
+sub-library for this project and a top-level dispatch script. If you have your
+own verion of `bashy-lib`, you can instead just copy the directory
+`scripts/lib/milky-cloud` and (optionally) the top-level script.
