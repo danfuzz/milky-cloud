@@ -10,7 +10,7 @@
 # Argument parsing
 #
 
-defineusage $'
+define-usage $'
     ${name} <subcommand> ... [<opt> ...] [--] [<arg> ...]
       Runs a subcommand. <opt>s and <arg>s depend on the specific subcommand.
 
@@ -35,6 +35,11 @@ process-args "$@" || usage --short "$?"
 #
 
 libsOpt='--libs=milky-cloud'
+
+if [[ ${cmdName} == '' ]]; then
+    lib helpy print-all-commands "${libsOpt}" --prefix="$(this-cmd-name) "
+    exit 1
+fi
 
 lib "${libsOpt}" --quiet "${cmdName}" "${args[@]}"
 exitCode="$?"
