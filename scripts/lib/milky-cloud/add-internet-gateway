@@ -1,0 +1,192 @@
+#!/bin/bash
+#
+# Copyright 2022 the Milky-cloud Authors (Dan Bornstein et alia).
+# Licensed AS IS and WITHOUT WARRANTY under the Apache License, Version 2.0.
+# Details: <http://www.apache.org/licenses/LICENSE-2.0>
+
+# Load the helper libraries.
+. "$(dirname "$(readlink -f "$0")")/lib/init.sh" || exit "$?"
+
+#
+# Argument parsing
+#
+
+function usage {
+    print-usage $'
+    Usage:
+
+    ${name} [<opt> ...]
+      Creates an internet gateway and attaches it to a VPC, including adding all
+      necessary routing rules to the default route table for the VPC. On success,
+      prints the ID of the created gateway.
+
+      --loc=<region-or-zone>
+        What region to make the gateway in. Must be specified. If specified as an
+        availability zone, only the region portion matters.
+      --name=<name>
+        Name to assign to the constructed gateway. If not specified, a name is
+        derived from the associated VPC.
+      --progress (--no-progress to disable)
+        Print progress messages to stderr.
+      --vpc=<name-or-id>
+        Name or ID of the VPC to be associated with. Must be specified.
+
+    ${name} [--help | -h]
+      Displays this message.
+    '
+
+    exit "$@"
+}
+
+# Want help?
+opt-action --call='{ usage }' help/h
+
+# Region, passed as either region per se or availability zone.
+opt-value --required --var=region --filter=region-from-location loc
+
+# Name of the resulting gateway.
+opt-value --var=name --filter='/./' name
+
+# Progress messages?
+opt-toggle --call='{ progress-msg --set="$1" }' progress
+
+# Name or ID of the VPC.
+opt-value --required --var=vpcNameOrId --filter='/./' vpc
+
+process-args "$@" || usage "$?"
+
+
+#
+# Helper functions
+#
+
+# Figures out a name for the result: If the VPC has a name, use that as a basis.
+# Or, if the VPC doesn't have a name, then just use the VPC ID as the basis.
+function figure-out-name {
+    local name
+    name=$(ec2-json describe-vpcs \
+        --loc="${region}" \
+        "$(lib filter-spec vpc-id="${vpcId}")" \
+        :: --output=raw \
+        '.Vpcs[0].Tags[] | select(.Key == "Name") | .Value'
+    ) \
+    || return "$?"
+
+    if [[ ${name} == '' ]]; then
+        name="for-${vpcId}"
+    fi
+
+    echo "$(lib now-stamp)-${name}"
+}
+
+
+#
+# Main script
+#
+
+# Validate the VPC name/id and get its info, extracting a couple useful bits.
+vpcInfo="$(lib find-vpc --output=json --loc="${region}" "${vpcNameOrId}")" \
+|| exit "$?"
+
+vpcId="$(jget --output=raw "${vpcInfo}" '.VpcId')"
+usesIpv4="$(jget "${vpcInfo}" \
+    'if .CidrBlockAssociationSet == null then 0 else 1 end')"
+usesIpv6="$(jget "${vpcInfo}" \
+    'if .Ipv6CidrBlockAssociationSet == null then 0 else 1 end')"
+
+# Figure out the name to use if not passed as an option.
+if [[ ${name} == '' ]]; then
+    name="$(figure-out-name)" \
+    || exit "$?"
+fi
+
+# Make the actual gateway.
+gatewayId="$(ec2-json create-internet-gateway \
+    --loc="${region}" \
+    "$(lib tag-spec --type='internet-gateway' --name="${name}")" \
+    :: --output=raw '.InternetGateway.InternetGatewayId'
+)" \
+|| exit "$?"
+
+progress-msg "Made internet gateway: ${gatewayId}"
+
+# Note: Past this point, if there are errors, we attempt to clean up the mess by
+# deleting anything that got successfully added.
+
+error=0
+
+# Find the default route table.
+rtId="$(ec2-json describe-route-tables \
+    --loc="${region}" \
+    filters:json="$(lib filter-spec vpc-id="${vpcId}" association.main=true)" \
+    '$filters' \
+    :: --output=raw '.RouteTables[0].RouteTableId'
+)" \
+&& progress-msg "Default VPC route table: ${rtId}" \
+|| error=1
+
+# Attach the internet gateway to the VPC.
+attached=0
+if (( !error )); then
+    ec2-json attach-internet-gateway \
+        --loc="${region}" \
+        gatewayId="${gatewayId}" \
+        vpcId="${vpcId}" \
+        '{
+            InternetGatewayId: $gatewayId,
+            VpcId: $vpcId
+        }' \
+    && progress-msg "Attached gateway: ${gatewayId}" \
+    && attached=1 \
+    || error=1
+fi
+
+# Add an IPv4 route if appropriate.
+v4RouteAdded=0
+if (( !error && usesIpv4 )); then
+    ec2-json create-route \
+        --loc="${region}" \
+        gatewayId="${gatewayId}" \
+        rtId="${rtId}" \
+        '{
+            RouteTableId: $rtId,
+            DestinationCidrBlock: "0.0.0.0/0",
+            GatewayId: $gatewayId
+        }' \
+        :: --output=none \
+    && v4RouteAdded=1 \
+    && progress-msg 'Added IPv4 route.' \
+    || error=1
+fi
+
+# Add an IPv6 route if appropriate.
+v6RouteAdded=0
+if (( !error && usesIpv6 )); then
+    ec2-json create-route \
+        --loc="${region}" \
+        gatewayId="${gatewayId}" \
+        rtId="${rtId}" \
+        '{
+            RouteTableId: $rtId,
+            DestinationIpv6CidrBlock: "::/0",
+            GatewayId: $gatewayId
+        }' \
+        :: --output=none \
+    && v6RouteAdded=1 \
+    && progress-msg 'Added IPv6 route.' \
+    || error=1
+fi
+
+# Do cleanup if necessary.
+
+if (( error )); then
+    error-msg 'Error(s) after gateway creation. Attempting cleanup!'
+    lib delete-internet-gateway --progress="$(progress-msg --status)" \
+        --loc="${region}" --gateway="${gatewayId}"
+    progress-msg 'Done with post-error gateway cleanup.'
+    exit "${error}"
+fi
+
+progress-msg 'Done making and configuring internet gateway.'
+
+echo "${gatewayId}"

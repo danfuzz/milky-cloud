@@ -1,0 +1,211 @@
+#!/bin/bash
+#
+# Copyright 2022 the Milky-cloud Authors (Dan Bornstein et alia).
+# Licensed AS IS and WITHOUT WARRANTY under the Apache License, Version 2.0.
+# Details: <http://www.apache.org/licenses/LICENSE-2.0>
+
+# Load the helper libraries.
+. "$(dirname "$(readlink -f "$0")")/lib/init.sh" || exit "$?"
+
+#
+# Argument parsing
+#
+
+function usage {
+    print-usage $'
+    Usage:
+
+    ${name} [<opt> ...]
+      Adds a set of subnets to a VPC -- one per availability zone -- along with
+      an associated routing table. Upon success, prints a JSON array of all the
+      created subnets.
+
+      --loc=<region-or-zone>
+        What region to make the subnets in. Must be specified. If specified as an
+        availability zone, only the region portion matters.
+      --name=<name>
+        Name to use for the created subnets. If not specified, a name is
+        generated programatically.
+      --progress
+        Print progress messages to stderr.
+      --quiet (--no-quiet to disable)
+        Suppress non-error output to stdout.
+      --vpc=<name-or-id>
+        Name or ID of the VPC.
+
+    ${name} [--help | -h]
+      Displays this message.
+    '
+
+    exit "$@"
+}
+
+# Want help?
+opt-action --call='{ usage }' help/h
+
+# Region, passed as either region per se or availability zone.
+opt-value --required --var=region --filter=region-from-location loc
+
+# Name for the subnets.
+opt-value --var=name --filter='/./' name
+
+# Progress messages?
+opt-toggle --call='{ progress-msg --set="$1" }' progress
+
+# Quiet?
+opt-toggle --var=quiet quiet
+
+# Name or ID of the VPC.
+opt-value --required --var=vpcNameOrId --filter='/./' vpc
+
+process-args "$@" || usage "$?"
+
+
+#
+# Main script
+#
+
+azList=($(lib list-availability-zones --loc="${region}")) \
+|| exit "$?"
+
+# Get all the VPC info.
+vpcInfo="$(lib find-vpc --loc="${region}" --output=json "${vpcNameOrId}")" \
+|| exit "$?"
+
+vpcId="$(jget --output=raw "${vpcInfo}" '.VpcId')"
+
+cidr4="$(jget --output=raw "${vpcInfo}" '
+    .CidrBlockAssociationSet
+    |
+    if length == 0 then "none"
+    elif length == 1 then .[0].CidrBlock
+    else "many"
+    end
+')"
+
+if [[ ${cidr4} == 'many' ]]; then
+    error-msg 'Sorry, not set up to deal with multiple CIDRs (IPv4).'
+    exit 1
+fi
+
+cidr6="$(jget --output=raw "${vpcInfo}" '
+    .Ipv6CidrBlockAssociationSet
+    |
+    if length == 0 then "none"
+    elif length == 1 then .[0].Ipv6CidrBlock
+    else "many"
+    end
+')"
+
+if [[ ${cidr6} == 'many' ]]; then
+    error-msg 'Sorry, not set up to deal with multiple CIDRs (IPv6).'
+    exit 1
+fi
+
+azCount="${#azList[@]}"
+v4Subnets=()
+v6Subnets=()
+
+if [[ ${cidr4} != 'none' ]]; then
+    v4Subnets=($(lib cidr-calc make-subnets "${cidr4}" "${azCount}"))
+fi
+
+if [[ ${cidr6} != 'none' ]]; then
+    # `64` because AWS requires V6 subnet networks to be exactly 64 bits.
+    v6Subnets=($(lib cidr-calc make-subnets "${cidr6}" "${azCount}" 64))
+fi
+
+if [[ ${name} == '' ]]; then
+    name="$(lib now-stamp via-script)"
+fi
+
+tagSpec="$(lib tag-spec --type='subnet' --name="${name}")"
+
+progressArg="--progress=$(progress-msg --status)"
+
+results=()
+error=0
+
+for (( n = 0; n < azCount && !error; n++ )); do
+    az="${azList[${n}]}"
+    v4Subnet="${v4Subnets[${n}]}"
+    v6Subnet="${v6Subnets[${n}]}"
+    result="$(ec2-json create-subnet \
+        --loc="${region}" \
+        az="${azList[${n}]}" \
+        tagSpec:json="${tagSpec}" \
+        v4Subnet="${v4Subnets[${n}]}" \
+        v6Subnet="${v6Subnets[${n}]}" \
+        vpcId="${vpcId}" \
+        '
+        $tagSpec
+        +
+        {
+            AvailabilityZone: $az,
+            VpcId: $vpcId
+        }
+        +
+        if $v4Subnet == ""
+            then { Ipv6Native: true }
+            else { CidrBlock: $v4Subnet }
+        end
+        +
+        if $v6Subnet == ""
+            then { }
+            else { Ipv6CidrBlock: $v6Subnet }
+        end
+        ' \
+        :: --output=raw '.Subnet.SubnetId' \
+    )" \
+    || error=1
+
+    if (( error )); then
+        break
+    fi
+
+    results+=("${result}")
+
+    # Set attributes on the subnet:
+    # * AssignIpv6AddressOnCreation: Make instances have an IPv6 address.
+    # * EnableResourceNameDnsARecordOnLaunch: Make DNS report an IPv4 address.
+    # * EnableResourceNameDnsAAAARecordOnLaunch: Make DNS report an IPv6 address
+    #   (it can legitimately report both).
+    # * MapPublicIpOnLaunch: Make instances publicly accessible (by default).
+    # * PrivateDnsHostnameTypeOnLaunch: Private DNS name is based on the
+    #   instance ID (not private DNS address).
+    lib set-attributes \
+        --loc="${region}" --id="${result}" "${progressArg}" \
+        AssignIpv6AddressOnCreation=true \
+        EnableResourceNameDnsARecordOnLaunch=true \
+        EnableResourceNameDnsAAAARecordOnLaunch=true \
+        MapPublicIpOnLaunch=true \
+        PrivateDnsHostnameTypeOnLaunch=resource-name \
+    && progress-msg "Made subnet: ${result}" \
+    || error=1
+done
+
+if (( error )); then
+    # Attempt to delete any subnets that had been added.
+    error-msg 'Problem creating subnets; attempting cleanup...'
+
+    for id in "${results[@]}"; do
+        progress-msg "Removing subnet: ${id}"
+
+        ec2-json delete-subnet \
+            --loc="${region}" \
+            id="${id}" \
+            '{
+                SubnetId: $id
+            }'
+    done
+
+    progress-msg 'Done with post-error subnet cleanup.'
+
+    exit 1
+fi
+
+progress-msg "Done making and configuring ${#results[@]} subnets."
+
+if (( !quiet )); then
+    jarray --input=strings "${results[@]}"
+fi

@@ -1,0 +1,154 @@
+#!/bin/bash
+#
+# Copyright 2022 the Milky-cloud Authors (Dan Bornstein et alia).
+# Licensed AS IS and WITHOUT WARRANTY under the Apache License, Version 2.0.
+# Details: <http://www.apache.org/licenses/LICENSE-2.0>
+
+# Load the helper libraries.
+. "$(dirname "$(readlink -f "$0")")/lib/init.sh" || exit "$?"
+
+#
+# Argument parsing
+#
+
+function usage {
+    print-usage $'
+    Usage:
+
+    ${name} [<opt> ...]
+      Makes a new security group, configured in a standard way. On success, prints
+      the ID of the created security group. See `configure-security-group` for
+      details about the resulting configuration.
+
+      --description=<description>
+        Brief description of the security group. If not specified, fairly generic
+        and content-free text is used (because it does need to be defined on the
+        result).
+      --loc=<region-or-zone>
+        What region to make the security group in. Must be specified. If
+        specified as an availability zone, only the region portion matters.
+      --name=<name>
+        Name to assign to the constructed security group. If not specified, a
+        name is derived from the associated VPC.
+      --progress (--no-progress to disable)
+        Print progress messages to stderr.
+      --vpc=<name-or-id>
+        Name or ID of the VPC to be associated with. Must be specified.
+
+    ${name} [--help | -h]
+      Displays this message.
+    '
+
+    exit "$@"
+}
+
+# Want help?
+opt-action --call='{ usage }' help/h
+
+# Region, passed as either region per se or availability zone.
+opt-value --required --var=region --filter=region-from-location loc
+
+# Description of the resulting security group.
+opt-value --var=description --filter='/./' description
+
+# Name for the resulting security group.
+opt-value --var=name --filter='/^[-_a-zA-Z0-9]+$/' name
+
+# Progress messages?
+opt-toggle --call='{ progress-msg --set="$1" }' progress
+
+# Name or ID of VPC to look up.
+opt-value --required --var=vpcNameOrId --filter='/./' vpc
+
+process-args "$@" || usage "$?"
+
+
+#
+# Helper functions
+#
+
+# Figures out a name for the security group: If the VPC has a name, use that as
+# a basis. Or, if the VPC doesn't have a name, then just use the VPC ID as the
+# basis.
+function figure-out-name {
+    local filterSpec=
+
+    local name
+    name=$(ec2-json describe-vpcs \
+        --loc="${region}" \
+        "$(lib filter-spec vpc-id="${vpcId}")" \
+        :: --output=raw \
+        '.Vpcs[0].Tags[] | select(.Key == "Name") | .Value'
+    ) \
+    || return "$?"
+
+    if [[ ${name} == '' ]]; then
+        name="for-${vpcId}"
+    fi
+
+    echo "$(lib now-stamp)-${name}"
+}
+
+
+#
+# Main script
+#
+
+# Validate or find the ID of the VPC.
+vpcId="$(lib find-vpc --loc="${region}" "${vpcNameOrId}")" \
+|| exit "$?"
+
+# Figure out the name if not passed as an option.
+if [[ ${name} == '' ]]; then
+    name="$(figure-out-name)" \
+    || exit "$?"
+fi
+
+# Make up a description if not passed as an option.
+if [[ ${description} == '' ]]; then
+    description="$(lib now-stamp via-script)"
+fi
+
+groupId="$(ec2-json create-security-group \
+    --loc="${region}" \
+    description="${description}" \
+    name="${name}" \
+    tagSpec:json="$(lib tag-spec --type='security-group' --name="${name}")" \
+    vpcId="${vpcId}" \
+    '
+        $tagSpec +
+        {
+            Description: $description,
+            GroupName: $name,
+            VpcId: $vpcId
+        }
+    ' \
+    :: --output=raw '.GroupId'
+)" \
+|| exit "$?"
+
+progress-msg 'Made security group:'
+progress-msg "  id:   ${groupId}"
+progress-msg "  name: ${name}"
+
+# Note: Past this point, if there are errors, we attempt to clean up the
+# partial mess by deleting the security group.
+
+error=0
+
+lib configure-security-group \
+    --progress="$(progress-msg --status)" \
+    --loc="${region}" --security-group="${groupId}" \
+|| error="$?"
+
+if (( error )); then
+    error-msg 'Error(s) after group creation. Attempting cleanup!'
+    ec2-json delete-security-group \
+        --loc="${region}" \
+        groupId="${groupId}" \
+        '{ GroupId: $groupId }' \
+    || progress-msg 'Error while deleting group, alas!'
+    exit "${error}"
+fi
+
+echo "${groupId}"

@@ -1,0 +1,101 @@
+#!/bin/bash
+#
+# Copyright 2022 the Milky-cloud Authors (Dan Bornstein et alia).
+# Licensed AS IS and WITHOUT WARRANTY under the Apache License, Version 2.0.
+# Details: <http://www.apache.org/licenses/LICENSE-2.0>
+
+# Load the helper libraries.
+. "$(dirname "$(readlink -f "$0")")/lib/init.sh" || exit "$?"
+
+#
+# Argument parsing
+#
+
+function usage {
+    print-usage $'
+    Usage:
+
+    ${name} [<opt> ...] <name-or-id>
+      Finds a security group by name or validates the existence of one by ID, and
+      prints its information. If passed an ID, it can either be the ID of a
+      security group per se, or it can be an ID of a VPC which is taken to refer
+      to the default security group for the indicated VPC.
+
+      --loc=<region-or-zone>
+        Where to look. Must be specified. If specified as an availability zone,
+        only the region portion matters.
+      --output=<style> :: `compact` `id` `json`
+        What to output, as with `json-val`, except that `id` prints just the ID
+        of the security group as a plain string. `id` is the default.
+
+    ${name} [--help | -h]
+      Displays this message.
+    '
+
+    exit "$@"
+}
+
+# Want help?
+opt-action --call='{ usage }' help/h
+
+# Region, passed as either region per se or availability zone.
+opt-value --required --var=region --filter=region-from-location loc
+
+# Output style.
+opt-value --var=outputStyle --init=id --enum='compact id json' output
+
+# Name or ID to look up.
+positional-arg --required --var=nameOrId name-or-id
+
+process-args "$@" || usage "$?"
+
+
+#
+# Main script
+#
+
+filterSpec=''
+if [[ ${nameOrId} =~ ^sg- ]]; then
+    # It looks like a security group ID.
+    filterSpec="$(lib filter-spec group-id="${nameOrId}")"
+elif [[ ${nameOrId} =~ ^vpc- ]]; then
+    # It looks like a VPC ID.
+    filterSpec="$(lib filter-spec group-name=default vpc-id="${nameOrId}")"
+else
+    # It's expected to be the name of a security group.
+    filterSpec="$(lib filter-spec group-name="${nameOrId}")"
+fi
+
+result="$(
+ec2-json describe-security-groups \
+    --loc="${region}" \
+    "${filterSpec}" \
+    :: \
+    '
+        .SecurityGroups
+        |
+        {
+            count: (. | length),
+            group: .[0],
+            all:   map(.GroupId + " " + (.GroupName | tojson))
+        }
+    '
+)" \
+|| exit "$?"
+
+count="$(jget "${result}" '.count')"
+
+if (( count == 0 )); then
+    error-msg "No such security group: ${nameOrId}"
+    exit 1
+elif (( count != 1 )); then
+    error-msg 'Ambiguous name or ID matches all of:'
+    error-msg --exec jget --output=raw "${result}" '.all[] | "  " + .'
+    exit 1
+fi
+
+if [[ ${outputStyle} == 'id' ]]; then
+    jget --output=raw "${result}" '.group.GroupId'
+else
+    jget --output="${outputStyle}" "${result}" '.group'
+fi

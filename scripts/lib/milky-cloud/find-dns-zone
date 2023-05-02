@@ -1,0 +1,119 @@
+#!/bin/bash
+#
+# Copyright 2022 the Milky-cloud Authors (Dan Bornstein et alia).
+# Licensed AS IS and WITHOUT WARRANTY under the Apache License, Version 2.0.
+# Details: <http://www.apache.org/licenses/LICENSE-2.0>
+
+# Load the helper libraries.
+. "$(dirname "$(readlink -f "$0")")/lib/init.sh" || exit "$?"
+
+#
+# Argument parsing
+#
+
+function usage {
+    print-usage $'
+    Usage:
+
+    ${name} [<opt> ...] <name-or-id>
+      Finds a DNS zone (Route53 "hosted zone") by name, or validates the
+      existence of one by ID, and prints its information. If given a name, it
+      is allowed to be more than just the main two components; any additional
+      subdomains are ignored. The name is also accepted either with or without
+      a final dot (`.`). If given an ID, it can be the plain ID string or the
+      fully-qualified `/hostedzone/...` form.
+
+      --not-found-ok
+        Do not report an error -- just don\'t print any output -- if there is
+        no zone with the given name. This has no effect if given an ID.
+      --output=<style> :: `compact` `id` `json`
+        What to output, as with `json-val`, except that `id` prints just the ID
+        of the VPC as a plain string. `id` is the default.
+
+    ${name} [--help | -h]
+      Displays this message.
+    '
+
+    exit "$@"
+}
+
+# Want help?
+opt-action --call='{ usage }' help/h
+
+# Ok if no VPC found?
+opt-toggle --var=notFoundOk not-found-ok
+
+# What to print.
+opt-value --var=outputStyle --init=id --enum='compact id json' output
+
+# Name or ID to look up.
+positional-arg --required --var=nameOrId name-or-id
+
+process-args "$@" || usage "$?"
+
+
+#
+# Helper functions
+#
+
+# Finds the zone ID for a given domain name.
+function find-from-domain {
+    local domain="$1"
+
+    # Extract the main domain, and append `.` to make it officially "absolute."
+    [[ ${domain} =~ ([^.]+[.][^.]+)[.]?$ ]] || return "$1"
+    domain="${BASH_REMATCH[1]}."
+
+    lib aws-json route53 list-hosted-zones-by-name --global \
+        domain="${domain}" \
+        '{ DNSName: $domain }' \
+        :: \
+        domain="${domain}" \
+        '.HostedZones[] | select(.Name == $domain) | { id: .Id, name: .Name }'
+}
+
+# Finds the zone info for a given zone ID.
+function find-from-id {
+    local id="$1"
+    local fullId="${id}"
+
+    if [[ ! "${id}" =~ ^/hostedzone/ ]]; then
+        fullId="/hostedzone/${id}"
+    fi
+
+    lib aws-json route53 get-hosted-zone --global \
+        id="${fullId}" \
+        '{ Id: $id }' \
+        :: '.HostedZone | { id: .Id, name: .Name }'
+
+    echo "${zoneInfo}"
+}
+
+
+#
+# Main script
+#
+
+if [[ ${nameOrId} =~ [.] ]]; then
+    # It looks like a domain name.
+    zoneInfo="$(find-from-domain "${nameOrId}")" \
+    || exit "$?"
+else
+    # It's expected to be an ID.
+    zoneInfo="$(find-from-id "${nameOrId}")" \
+    || exit "$?"
+fi
+
+if [[ ${zoneInfo} == '' ]]; then
+    if (( notFoundOk )); then
+        exit
+    fi
+    error-msg "Could not find zone info for: ${nameOrId}"
+    exit 1
+fi
+
+if [[ ${outputStyle} == 'id' ]]; then
+    jget --output=raw "${zoneInfo}" '.id'
+else
+    jget --output="${outputStyle}" "${zoneInfo}"
+fi

@@ -1,0 +1,96 @@
+#!/bin/bash
+#
+# Copyright 2022 the Milky-cloud Authors (Dan Bornstein et alia).
+# Licensed AS IS and WITHOUT WARRANTY under the Apache License, Version 2.0.
+# Details: <http://www.apache.org/licenses/LICENSE-2.0>
+
+# Load the helper libraries.
+. "$(dirname "$(readlink -f "$0")")/lib/init.sh" || exit "$?"
+
+
+#
+# Argument parsing
+#
+
+function usage {
+    print-usage $'
+    Usage:
+
+    ${name} [<opt> ...] [--] [<spec> ...]
+      Constructs and prints a JSON object suitable for use as a `Filters`
+      specification argument to an AWS command. The result is an object that
+      binds `Filters`, so it can be used as-is (if that is the only argument) or
+      merged with other arguments.
+
+      <spec>
+        <name>=<value> -- Use <value> as a filter for <name>. If the same name
+          is used multiple times, then (per the usual AWS rules) the result is a
+          logical OR of the values.
+
+      --output=<style> :: `compact` `json`
+        Output style, as with `json-val`. Defaults to `json`.
+
+    ${name} [--help | -h]
+      Displays this message.
+    '
+
+    exit "$@"
+}
+
+# Output style.
+opt-value --var=outputStyle --init=json --enum='compact json' output
+
+# Want help?
+opt-action --call='{ usage }' help/h
+
+# List of filter specifications, as parallel arrays of name and value.
+filterNames=()
+filterValues=()
+
+rest-arg --call=parse-specs specs
+function parse-specs {
+    local arg
+    local error=0
+
+    while (( $# > 0 )); do
+        arg="$1"
+        if ! [[ ${arg} =~ ^([-_:.a-zA-Z0-9]+)=(.*)$ ]]; then
+            error-msg 'Could not parse filter specification:' "${arg}"
+            error=1
+        fi
+
+        filterNames+=("${BASH_REMATCH[1]}")
+        filterValues+=("${BASH_REMATCH[2]}")
+
+        shift
+    done
+
+    return "${error}"
+}
+
+process-args "$@" || usage "$?"
+
+
+#
+# Main script
+#
+
+jval --output="${outputStyle}" \
+    names:json="$(jarray --input=strings "${filterNames[@]}")" \
+    values:json="$(jarray --input=strings "${filterValues[@]}")" \
+'
+    [$names, $values]
+    |
+    transpose
+    |
+    reduce .[] as $binding ({};
+          $binding[0] as $key
+        | $binding[1] as $value
+        | (.[$key] // []) as $orig
+        | .[$key] = [$orig[], $value]
+    )
+    |
+    to_entries
+    |
+    { Filters: map({ Name: .key, Values: .value}) }
+'

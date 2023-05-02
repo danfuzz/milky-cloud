@@ -1,0 +1,414 @@
+#!/bin/bash
+#
+# Copyright 2022 the Milky-cloud Authors (Dan Bornstein et alia).
+# Licensed AS IS and WITHOUT WARRANTY under the Apache License, Version 2.0.
+# Details: <http://www.apache.org/licenses/LICENSE-2.0>
+
+# Load the helper libraries.
+. "$(dirname "$(readlink -f "$0")")/lib/init.sh" || exit "$?"
+
+#
+# Argument parsing
+#
+
+function usage {
+    print-usage $'
+    Usage:
+
+    ${name} [<opt> ...]
+      Launches a standard-configured instance. On success, prints a JSON object
+      with the most-salient values (including notably the instance ID). Note: If
+      neither `--security-group` nor `--vpc` is specified, then this command
+      will launch the instance into the default security group of the default VPC
+      for the specified availability zone (which, TBQH, is probably not what you
+      want).
+
+      --extract-host-key
+        Using the EC2 console, extract the host public key for the ED25519
+        algorithm (which has gloriously short keys). This implies
+        `--wait-until-running`.
+      --host-key=<key>
+        Specify a host key to use, overriding the one(s) created during the
+        instance\'s first boot. This can be used to avoid a potential MITM attack
+        which relies on trusting the host key on first-connect.
+      --instance-type=<type>
+        What type of instance to install. Defaults to `t3.nano`, for convenience.
+      --key-name=<name>
+        Name of the keypair to use for SSH access. If not specified, then
+        something else will have to have set up SSH access (e.g. the user data
+        script, or something baked into the AMI). Detail: This causes the public
+        key of the indicate keypair to be listed in `.ssh/authorized_keys` for
+        the default userid on the new instance.
+      --loc=<availability-zone>
+        Availability zone to launch the instance in. Must be specified.
+      --name=<name>
+        Name tag for the resulting instance.
+      --os=<name>
+        Which OS to install. See `find-ami` for details about default and options.
+      --output=<style> :: `id` `json` `none`
+        What to print on successful output. `id` is just the plain ID (no quotes).
+        `json` is the same as what is printed by `find-instance`. Defaults to
+        `id`.
+      --security-group=<name-or-id>
+        Name or ID of the security group to use for network access control. If
+        specified, this is used to derive the VPC to use, and in conjunction with
+        the specified availability zone, the specific subnet within the VPC. It
+        is not valid to specify both this option and `--vpc`.
+      --progress
+        Print progress messages to stderr.
+      --user-data=<data>
+        User data for the instance, which is taken to be a script to run on
+        first-boot of the instance. It is invalid to specify both this and the
+        `--user-data-file` option. Note: On the instance, the user data can be
+        found at `/var/lib/cloud/instance/user-data.txt`, and the log of running
+        it can be found at `/var/log/cloud-init-output.log`.
+      --user-data-file=<file>
+        Name of a file containing user data for the instance. It is invalid to
+        specify both this and the --user-data option.
+      --vpc=<name-or-id>
+        Name or ID of the VPC to launch into. If specified, then the instance
+        will be in the default security group of the indicated VPC. It is not
+        valid to specify both this option and `--security-group`.
+      --wait-until-running
+        After launching, wait until the instance is in state `running`.
+
+    ${name} [--help | -h]
+      Display this message.
+    '
+
+    exit "$@"
+}
+
+# Want help?
+opt-action --call='{ usage }' help/h
+
+# Availability zone.
+opt-value --required --var=zone --call=parse-zone loc
+
+# Extract host public key for ED25519?
+opt-toggle --var=extractHostKey extract-host-key
+
+# Host key to use.
+opt-value --var=hostKey host-key
+
+# Instance type.
+opt-value --var=instanceType --init='t3.nano' instance-type
+
+# Name for the SSH keypair that allows for login access.
+opt-value --var=keyName --filter='/./' key-name
+
+# Name for the instance.
+opt-value --var=name --filter='/./' name
+
+# Which OS to install.
+opt-value --var=osName --filter='/./' os
+
+# Output style.
+opt-value --var=outputStyle --init='id' --enum='id json none' output
+
+# Progress messages?
+opt-toggle --call='{ progress-msg --set="$1" }' progress
+
+# Name or ID of the security group to be in.
+opt-value --var=groupNameOrId --filter='/./' security-group
+
+# Actual user data (first-boot script).
+opt-value --var=userData --filter='/./' user-data
+
+# Name of file containing user data.
+opt-value --var=userDataFile --filter='/./' user-data-file
+
+# Name or ID of the VPC to be in.
+opt-value --var=vpcNameOrId --filter='/./' vpc
+
+# Wait until the instance is running?
+opt-toggle --var=waitUntilRunning wait-until-running
+
+process-args "$@" || usage "$?"
+
+if [[ (${userData} != '') && (${userDataFile} != '') ]]; then
+    error-msg 'Cannot specify both --user-data and --user-data-file.'
+    exit 1
+fi
+
+if [[ (${groupNameOrId} != '') && (${vpc} != '') ]]; then
+    error-msg 'Cannot specify both --security-group and --vpc.'
+    exit 1
+fi
+
+
+#
+# Helper functions
+#
+
+# Builds the user data from all the possible sources.
+function build-user-data {
+    local hashBang='#!/bin/bash'
+    local passedIn="${userData}"
+    local keySetup=''
+
+    # Slurp the user data, if there is user data to be slurped.
+    if [[ ${userDataFile} != '' ]]; then
+        # We know `userData` is empty when the file name is specified, so it's
+        # a-okay to just set `passedIn` without concatenating.
+        passedIn="$(cat "${userDataFile}")" \
+        || return "$?"
+    fi
+
+    if [[ ${passedIn} =~ ^(#![^$'\n']+)$'\n'(.*)$ ]]; then
+        hashBang="${BASH_REMATCH[1]}"
+        passedIn="${BASH_REMATCH[2]}"
+    fi
+
+    # Build the code to do host key setup, if requested.
+    if [[ ${hostKey} != '' ]]; then
+        [[ "${hostPublicKey}" =~ ^ssh-([^ ]+)' ' ]] \
+        || return "$?"
+        local algorithm="${BASH_REMATCH[1]}"
+        local lines=(
+            'rm -f /etc/ssh/ssh_host_*key*'
+            "keyFile=/etc/ssh/ssh_host_${algorithm}_key"
+            "cat <<<'${hostKey}' >\${keyFile}"
+            "cat <<<'${hostPublicKey}' >\${keyFile}.pub"
+            'chmod 600 ${keyFile}'
+            'chown root:ssh_keys ${keyFile}'
+        )
+        keySetup="$(printf '%s\n' "${lines[@]}")"
+    fi
+
+    if [[ (${passedIn} != '') || (${keySetup} != '') ]]; then
+        cat <<<"${hashBang}"
+        if [[ ${keySetup} != '' ]]; then
+            cat <<<"${keySetup}"
+        fi
+        if [[ ${passedIn} != '' ]]; then
+            cat <<<"${passedIn}"
+        fi
+    fi
+}
+
+# Extracts the host public key for ED25519 from the console logs.
+function extract-host-key {
+    local instanceId="$1"
+    local keyAlgorithm='ed25519'
+
+    progress-msg 'Extracting host public key...'
+
+    local attempt=0
+    local key=''
+    while [[ ${key} == '' ]]; do
+        (( attempt++ ))
+        if (( attempt != 1 )); then
+            if (( attempt == 2 )); then
+                progress-msg 'This can take a while...'
+            elif (( (attempt % 6) == 0 )); then
+                progress-msg 'Still waiting for console output...'
+            fi
+            sleep 10
+        fi
+        local key
+        key="$(
+            ec2-json get-console-output --loc="${zone}" \
+                id="${instanceId}" \
+                '{ InstanceId: $id }' \
+                :: --output=raw \
+                    alg="${keyAlgorithm}" \
+                '
+                  (.Output // "")
+                | split("\n")
+                | (index("-----BEGIN SSH HOST KEY KEYS-----") + 1) as $startIndex
+                | index("-----END SSH HOST KEY KEYS-----") as $endIndex
+                | .[$startIndex:$endIndex]
+                | map(split(" ") | select(.[0] == "ssh-" + $alg) | .[1])
+                | .[0] // ""
+                '
+        )" \
+        || return "$?"
+    done
+
+    progress-msg "Got ${keyAlgorithm} key:"
+    progress-msg "  ${key}"
+
+    local sshAuth="ssh-${keyAlgorithm} ${key}"
+    ec2-json create-tags --loc="${zone}" \
+        id="${instanceId}" \
+        tagSpec:json="$(lib tag-spec host-public-key="${sshAuth}")" \
+        '{ Resources: [$id] } + $tagSpec' \
+    || return "$?"
+
+    progress-msg "Key stored as instance tag ${tag}."
+}
+
+# Waits until the instance is in state `running`.
+function wait-until-running {
+    local instanceId="$1"
+
+    progress-msg 'Waiting for instance to be `running`...'
+
+    local state
+    while true; do
+        local infoJson
+        infoJson="$(
+            lib find-instance --loc="${zone}" --output=json "${instanceId}"
+        )" \
+        || return "$?"
+
+        if [[ ${infoJson} == '' ]]; then
+            error-msg "Cannot wait for ${name}; no such instance."
+            return 1
+        fi
+
+        state="$(jget --output=raw "${infoJson}" '.state')"
+        if [[ ${state} != 'pending' ]]; then
+            break
+        fi
+
+        sleep 1
+    done
+
+    if [[ ${state} != 'running' ]]; then
+        error-msg "Instance ${name} in state ${state}; cannot become running."
+        return 1
+    fi
+
+    progress-msg 'Instance is now `running`.'
+}
+
+
+#
+# Main script
+#
+
+# Extract the SSH-auth version of the public key from the host private key, if
+# a host key is in fact being passed to the instance.
+if [[ ${hostKey} != '' ]]; then
+    hostPublicKey="$(lib extract-public-key <<<"${hostKey}" --output=ssh-auth)" \
+    || exit "$?"
+fi
+
+# Build the user data string.
+userData="$(build-user-data)" \
+|| exit "$?"
+
+# Figure out the correct AMI.
+amiInfo="$(
+    amiOpts=(--loc="${zone}" --instance-type="${instanceType}")
+    if [[ ${osName} != '' ]]; then
+        amiOpts+=(--os="${osName}")
+    fi
+    lib find-ami "${amiOpts[@]}"
+)" \
+|| exit "$?"
+
+progress-msg --exec \
+jget --output=raw "${amiInfo}" '
+    "Using AMI:",
+    "  desc: " + .Description,
+    "  name: " + .Name,
+    "  id:   " + .ImageId
+'
+
+# Resolve the VPC, security group, and subnet IDs, if necessary.
+
+vpcId=''
+groupId=''
+subnetId=''
+if [[ ${groupNameOrId} != '' ]]; then
+    # Resolve the security group ID, and then use it to find the VPC ID.
+    groupId="$(lib find-security-group --loc="${zone}" "${groupNameOrId}")" \
+    || exit 1
+    vpcId="$(lib find-vpc --loc="${zone}" "${groupId}")" \
+    || exit 1
+elif [[ ${vpcNameOrId} != '' ]]; then
+    # Resolve the VPC ID, and then use it to find the security group ID.
+    vpcId="$(lib find-vpc --loc="${zone}" "${vpcNameOrId}")" \
+    || exit 1
+    groupId="$(lib find-security-group --loc="${zone}" "${vpcId}")" \
+    || exit 1
+fi
+
+if [[ ${vpcId} != '' ]]; then
+    subnetId="$(lib find-vpc-subnet --loc="${zone}" --vpc="${vpcId}")" \
+    || exit 1
+fi
+
+progress-msg 'Where:'
+progress-msg "  zone:   ${zone}"
+progress-msg "  vpc:    ${vpcId}"
+progress-msg "  subnet: ${subnetId}"
+progress-msg "  group:  ${groupId}"
+
+# Make up a name if one wasn't provided.
+if [[ ${name} == '' ]]; then
+    name="$(lib now-stamp via-script)"
+fi
+
+# Form the main command, and do it!
+
+progress-msg "Launching instance: ${name}"
+
+tagExtras=()
+if [[ ${hostPublicKey} != '' ]]; then
+    tagExtras=(host-public-key="${hostPublicKey}")
+fi
+tagSpec="$(lib tag-spec --type='instance' --name="${name}" "${tagExtras[@]}")"
+
+# Note: If a subnet ID is known, then it implies the availability zone, in which
+# case one doesn't also need to specify the availability zone explicitly.
+# However, it's easier just to include it because this script is also meant to
+# work when a subnet isn't known (which means we're just launching into the
+# default security group of the default VPC for the region).
+#
+# Note: Public IP and DNS are de facto (or at least usually) not set in the
+# output from `ec2 run-instances`, that is, they aren't known at the moment of
+# launch. However, they seem to become set very soon thereafter, which is why
+# JSON output makes a new EC2 call instead of trying to manipulate the results
+# of this call.
+instanceId="$(ec2-json run-instances \
+    --loc="${zone}" \
+    amiInfo:json="${amiInfo}" \
+    zone="${zone}" \
+    instanceType="${instanceType}" \
+    keyName="${keyName}" \
+    groupId="${groupId}" \
+    subnetId="${subnetId}" \
+    tagSpec:json="${tagSpec}" \
+    userData="${userData}" \
+    '
+        {
+            ImageId:      $amiInfo.ImageId,
+            InstanceType: $instanceType,
+            MaxCount:     1,
+            Placement:    { AvailabilityZone: $zone }
+        }
+        + $tagSpec
+        + if $keyName == "" then {} else { KeyName: $keyName } end
+        + if $groupId == "" then {} else { SecurityGroupIds: [$groupId] } end
+        + if $subnetId == "" then {} else { SubnetId: $subnetId } end
+        + if $userData == "" then {} else { UserData: $userData } end
+    ' \
+    :: --output=raw '.Instances[0].InstanceId'
+)" \
+|| exit "$?"
+
+progress-msg 'Launched!'
+progress-msg "Instance ID: ${instanceId}"
+
+if (( waitUntilRunning || extractHostKey )); then
+    wait-until-running "${instanceId}" \
+    || exit "$?"
+fi
+
+if (( extractHostKey )); then
+    extract-host-key "${instanceId}" \
+    || exit "$?"
+fi
+
+case "${outputStyle}" in
+    id)
+        echo "${instanceId}"
+        ;;
+    json)
+        lib find-instance --output=json --loc="${zone}" "${instanceId}"
+        ;;
+esac

@@ -1,0 +1,77 @@
+#!/bin/bash
+#
+# Copyright 2022 the Milky-cloud Authors (Dan Bornstein et alia).
+# Licensed AS IS and WITHOUT WARRANTY under the Apache License, Version 2.0.
+# Details: <http://www.apache.org/licenses/LICENSE-2.0>
+
+# Load the helper libraries.
+. "$(dirname "$(readlink -f "$0")")/init.sh" || exit "$?"
+
+#
+# Argument parsing
+#
+
+function usage {
+    print-usage $'
+    Usage:
+
+    ${name} [<opt> ...] <protocol> <port>
+
+    Constructs and prints a JSON object suitable for use as an `IpPermissions`
+    entry to one of the security group rule addition commands. <protocol> must be
+    one of `all`, `tcp`, or `udp`. The resulting specification contains both IPv4
+    and IPv6 entries. <port> must be a valid port number or `all`.
+
+    --output=<style> :: `compact` `json`
+      Output style, as with `json-val`. Defaults to `json`.
+
+    ${name} [--help | -h]
+      Displays this message.
+    '
+
+    exit "$@"
+}
+
+# Want help?
+opt-action --call='{ usage }' help/h
+
+# Output style.
+opt-value --var=outputStyle --init=json --enum='compact json' output
+
+# Protocol.
+positional-arg --required --var=protocol --enum='all tcp udp' protocol
+
+# Port.
+positional-arg --required --var=port --filter='/^([0-9]+|all)$/' port
+
+process-args "$@" || usage "$?"
+
+
+#
+# Main script
+#
+
+if [[ ${port} == 'all' ]]; then
+    port='-1'
+fi
+
+if [[ ${protocol} == 'all' ]]; then
+    # Note: Even though this is a "number," the AWS API wants this to be passed
+    # as a string.
+    protocol='-1'
+fi
+
+jval --output="${outputStyle}" \
+    port:json="${port}" \
+    protocol="${protocol}" \
+'{
+    FromPort:   $port,
+    ToPort:     $port,
+    IpProtocol: $protocol,
+    IpRanges: [
+        { CidrIp: "0.0.0.0/0" }
+    ],
+    Ipv6Ranges: [
+        { CidrIpv6: "::/0" }
+    ]
+}'

@@ -1,0 +1,185 @@
+#!/bin/bash
+#
+# Copyright 2022 the Milky-cloud Authors (Dan Bornstein et alia).
+# Licensed AS IS and WITHOUT WARRANTY under the Apache License, Version 2.0.
+# Details: <http://www.apache.org/licenses/LICENSE-2.0>
+
+# Load the helper libraries.
+. "$(dirname "$(readlink -f "$0")")/lib/init.sh" || exit "$?"
+
+#
+# Argument parsing
+#
+
+function usage {
+    print-usage $'
+    Usage:
+
+    ${name} [<opt> ...]
+      Configures a security group in a standard way. This involves removing all
+      pre-existing rules from the group and then adding exactly what is needed.
+
+      On success, the security group allows incoming TCP traffic to the SSH, HTTP,
+      and HTTPS ports, and allows outgoing traffic to anywhere. It also allows
+      incoming traffic on all ports, from sources that are within the same
+      security group.
+
+      --loc=<region-or-zone>
+        What region to make the security group in. Must be specified. If specified
+        as an availability zone, only the region portion matters.
+      --name=<name>
+        Name tag to add to the security group and to all the added rules. If not
+        specified, it defaults to the name of the security group. This option is
+        particularly useful when configuring a default security group, whose name
+        is always just `default`.
+      --security-group=<name-or-id>
+        Name or ID of the security group to modify. Can also be a VPC ID, to
+        indicate the default security group for that VPC.
+      --progress (--no-progress to disable)
+        Print progress messages to stderr.
+
+    ${name} [--help | -h]
+      Displays this message.
+    '
+
+    exit "$@"
+}
+
+# Want help?
+opt-action --call='{ usage }' help/h
+
+# Region, passed as either region per se or availability zone.
+opt-value --required --var=region --filter=region-from-location loc
+
+# Name for the security group.
+opt-value --var=name --filter='/./' name
+
+# Name or ID of the security group.
+opt-value --required --var=groupNameOrId --filter='/./' security-group
+
+# Progress messages?
+opt-toggle --call='{ progress-msg --set="$1" }' progress
+
+process-args "$@" || usage "$?"
+
+
+#
+# Main script
+#
+
+# Validate or find the ID of the security group.
+groupInfo="$(
+    lib find-security-group --output=json --loc="${region}" "${groupNameOrId}"
+)" \
+|| exit "$?"
+
+groupId="$(jget --output=raw "${groupInfo}" '.GroupId')"
+groupName="$(jget --output=raw "${groupInfo}" '.GroupName')"
+
+if [[ ${name} == '' ]]; then
+    name="${groupName}"
+fi
+
+progress-msg "Configuring security group ${groupId}..."
+
+# Note: Past this point, if there are errors, we attempt to clean up the
+# partial mess by deleting the security group.
+
+error=0
+
+# Start with a blank slate of rules by deleting any that are already associated
+# with the new security group.
+#
+# Context: Newly-created security groups (including the default security group
+# of a VPC) come with one or more rules, but relying on those details is
+# arguably not a wise idea.
+if (( !error )); then
+    lib delete-security-group-rules --quiet --loc="${region}" \
+        --security-group="${groupId}" --all \
+    && progress-msg 'Removed old rules (if any).' \
+    || error="$?"
+fi
+
+# Common args for all calls to `add-ip-security-group-rules`.
+commonArgs=(--quiet --loc="${region}" --security-group="${groupId}"
+    --name="${name}")
+
+# Add egress rules.
+
+if (( !error )); then
+    lib add-ip-security-group-rules "${commonArgs[@]}" \
+        --egress --protocol=all --port=all \
+    && progress-msg "Added all-access egress rules." \
+    || error="$?"
+fi
+
+# Add ingress rules.
+
+if (( !error )); then
+    tagSpec='{}'
+    if [[ ${name} != '' ]]; then
+        tagSpec="$(lib tag-spec --type='security-group-rule' --name="${name}")"
+    fi
+
+    ec2-json authorize-security-group-ingress \
+        --loc="${region}" \
+        groupId="${groupId}" \
+        tagSpec:json="${tagSpec}" \
+        '
+        $tagSpec +
+        {
+            GroupId: $groupId,
+            IpPermissions: [{
+                IpProtocol: "-1",
+                UserIdGroupPairs: [{
+                    GroupId: $groupId
+                }]
+            }]
+        }' \
+        :: --output=none \
+    && progress-msg "Added within-group rule." \
+    || error="$?"
+fi
+
+if (( !error )); then
+    lib add-ip-security-group-rules "${commonArgs[@]}" \
+        --ingress --protocol=tcp --port=80 \
+    && progress-msg "Added HTTP ingress rules." \
+    || error="$?"
+fi
+
+if (( !error )); then
+    lib add-ip-security-group-rules "${commonArgs[@]}" \
+        --ingress --protocol=tcp --port=443 \
+    && progress-msg "Added HTTPS ingress rules." \
+    || error="$?"
+fi
+
+if (( !error )); then
+    lib add-ip-security-group-rules "${commonArgs[@]}" \
+        --ingress --protocol=tcp --port=22 \
+    && progress-msg "Added SSH ingress rules." \
+    || error="$?"
+fi
+
+if (( !error )) && [[ ${name} != '' ]]; then
+    ec2-json create-tags --loc="${region}" \
+        groupId="${groupId}" \
+        value="${name}" \
+        '{
+            Resources: [$groupId],
+            Tags: [{
+                Key: "Name",
+                Value: $value
+            }]
+        }' \
+    && progress-msg "Added name tag." \
+    || error="$?"
+fi
+
+if (( error )); then
+    error-msg 'Error(s) during rule configuration. Alas!'
+    exit "${error}"
+fi
+
+progress-msg 'Done configuring security group.'

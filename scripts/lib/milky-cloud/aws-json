@@ -1,0 +1,295 @@
+#!/bin/bash
+#
+# Copyright 2022 the Milky-cloud Authors (Dan Bornstein et alia).
+# Licensed AS IS and WITHOUT WARRANTY under the Apache License, Version 2.0.
+# Details: <http://www.apache.org/licenses/LICENSE-2.0>
+
+# Load the helper libraries.
+. "$(dirname "$(readlink -f "$0")")/lib/init.sh" || exit "$?"
+
+#
+# Argument parsing
+#
+
+function usage {
+    print-usage $'
+    Usage:
+
+    ${name} <cmd> <subcommand> [<opt> ...] [--] [<jval-expr> ...]
+      [:: [<out-opt> ...] [<jval-expr> ...]
+
+    Makes an AWS call with a JSON value constructed with `json-val`, and with
+    successful result optionally post-processed through `json-val`. If no
+    argument expression is supplied, the value `{}` (an empty object) is passed
+    to the command. When post-processing, the original result becomes the sole
+    input from stdin.
+
+    Of the options, exactly one of `--global`, `--loc`, or `--skeleton` must be
+    used.
+
+    <cmd> <subcommand>
+      The AWS command and subcommand to call, e.g. `ec2 run-instances`.
+
+    --global
+      Indicate that this command is expected to work without specifying a
+      region or zone.
+    --loc=<region-or-zone>
+      What region to make the call in. If specified as an availability zone,
+      only the region portion matters. Either this option or `--skeleton` must
+      be specified.
+    --print-command-to=<file>
+      Name of a file to print the fully-constructed command to. It is emitted as
+      a JSON value including both split-out components and the actual commandline.
+    --skeleton
+      Instead of making a regular call, just print out a JSON "skeleton" of the
+      parameters to the command. This can be filtered just like any other result.
+
+    Output options:
+
+    --output=<style> :: `compact` `json` `lines` `none` `raw` `words`
+      How to process the final output. All options are as with `json-val`, with
+      the addition of `none` which means that nothing should be output. The
+      default is `json`.
+
+    ${name} [--help | -h]
+      Displays this message.
+    '
+
+    exit "$@"
+}
+
+# AWS command and subcommand. These are expected before any dashed options.
+if ! ( (( $# >= 2 )) && [[ $1 =~ ^[a-z] ]] && [[ $2 =~ ^[a-z] ]] ); then
+    error-msg 'Missing AWS command and/or subcommand.'
+    usage 1
+else
+    command="$1"
+    subcommand="$2"
+    shift 2
+fi
+
+# Want help?
+opt-action --call='{ usage }' help/h
+
+# Region, passed as either region per se or availability zone.
+opt-value --var=region --filter=region-from-location loc
+
+# File to print the constructed command to.
+opt-value --filter='/./' --var=printCommandTo print-command-to
+
+# Just print argument "skeleton" ?
+opt-action --var=skeleton skeleton
+
+# Indicate that this call should not pass a region argument.
+opt-action --var=global global
+
+require-exactly-one-arg-of global loc skeleton
+
+# Output style (result post-processor option).
+outputStyle=json
+
+# Assignments and expression arguments to use to construct the value to pass to
+# the AWS command.
+argConstructor=()
+
+# Assignments and expression arguments to use to perform the result
+# post-processing.
+resultConstructor=()
+
+rest-arg --call=parse-rest jval-exprs
+function parse-rest {
+    local error=0
+    local arg
+
+    # Collect constructor arguments.
+    while (( $# > 0 )); do
+        arg="$1"
+        if [[ ${arg} == '::' ]]; then
+            shift
+            break
+        fi
+
+        argConstructor+=("${arg}")
+        shift
+    done
+
+    # Process result post-processor arguments.
+    while (( $# > 0 )); do
+        case "$1" in
+            --output=*)
+                outputStyle="${1#*=}"
+                if ! [[ "${outputStyle}" =~ ^(compact|json|lines|none|raw|words)$ ]]; then
+                    error-msg "Invalid result output style: ${outputStyle}"
+                    return 1
+                fi
+                ;;
+            --)
+                # Explicit end of options.
+                shift
+                break
+                ;;
+            -?*)
+                error-msg "Unknown result option: $1"
+                return 1
+                ;;
+            *)
+                # Non-option argument.
+                break
+                ;;
+        esac
+
+        shift
+    done
+
+    resultConstructor=("$@")
+}
+
+process-args "$@" || usage "$?"
+
+
+#
+# Helper functions
+#
+
+# Constructs a JSON value to represent all the pieces of a command, based on the
+# globals set up by the main script.
+function make-command-parts-json {
+    local dashArgsJson="$(jarray --input=strings -- "${dashArgs[@]}")"
+
+    jval \
+        command="${command}" \
+        subcommand="${subcommand}" \
+        jsonArg:json="${jsonArg}" \
+        dashArgs:json="${dashArgsJson}" \
+        '{
+            command:    $command,
+            subcommand: $subcommand,
+            jsonArg:    $jsonArg,
+            dashArgs:   $dashArgs
+        }'
+}
+
+
+#
+# Main script
+#
+
+dashArgs=(--no-cli-pager --output=json)
+
+if (( skeleton )); then
+    dashArgs+=(--generate-cli-skeleton)
+elif (( !global )); then
+    dashArgs+=(--region="${region}")
+fi
+
+jsonArg='{}'
+if (( ${#argConstructor[@]} > 0 )); then
+    jsonArg="$(jval --output=compact -- "${argConstructor[@]}")" \
+    || {
+        error-msg 'Trouble parsing argument constructor.'
+        exit 1
+    }
+fi
+
+# Run the special case handler which manipulates the arguments to `aws`, if such
+# a handler is defined (in a sibling file to this script).
+specialCaseHandler="$(lib --path --quiet "$(this-cmd-name)_${command}_${subcommand}")"
+if [[ ${specialCaseHandler} != '' ]]; then
+    commandParts="$("${specialCaseHandler}" "$(make-command-parts-json)")" \
+    || exit 1
+
+    command="$(jget --output=raw "${commandParts}" '.command')"
+    subcommand="$(jget --output=raw "${commandParts}" '.subcommand')"
+    jsonArg="$(jget --output=compact "${commandParts}" '.jsonArg')"
+
+    dashArgsLength="$(jget "${commandParts}" '.dashArgs | length')"
+    dashArgs=()
+    for (( i = 0; i < dashArgsLength; i++ )); do
+        dashArgs+=("$(jval --output=raw p:json="${commandParts}" i:json="${i}" '$p.dashArgs[$i]')")
+    done
+fi
+
+# Split dash args that use `=` to bind values to instead be separate arguments.
+# This is done because, while the AWS CLI nominally recognizes `=` forms, it
+# seems to not actually be a well-tested code path. But, because we want the
+# special case handlers to have a more standardized setup, we use `=` all the
+# way up to this moment. See bug <https://github.com/aws/aws-cli/issues/7058>
+# for one way that `=` mis-handling affects things.
+origDashArgs=("${dashArgs[@]}")
+dashArgs=()
+for arg in "${origDashArgs[@]}"; do
+    if [[ ${arg} =~ ^--([_a-zA-Z0-9][-_a-zA-Z0-9]+)=([^-].*)?$ ]]; then
+        dashArgs+=("--${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}")
+    else
+        dashArgs+=("${arg}")
+    fi
+done
+
+# Note: Similarly to above, `--cli-input-json` and its argument are passed as
+# separate values, not combined in the usual way with `=`. See the section above
+# in re the bug which motivated this arrangement.
+fullCommand=(
+    aws "${command}" "${subcommand}" "${dashArgs[@]}"
+        --cli-input-json "${jsonArg}"
+)
+
+if [[ ${printCommandTo} != '' ]]; then
+    # Print a JSON value representing the command, hopefully covering pretty
+    # much every bit someone might care about.
+    jval >"${printCommandTo}" \
+        parts:json="$(make-command-parts-json)" \
+        full:json="$(jarray --input=strings "${fullCommand[@]}")" \
+        '
+        def quoteMaybe:
+            if test("^[-_/=a-zA-Z0-9]+$")
+            then .
+            else (. | @sh)
+            end
+        ;
+
+        $parts + {
+            commandWords: $full,
+            commandLine: ($full | map(quoteMaybe) | join(" "))
+        }
+        '
+fi
+
+if [[ (${AWS_ACCESS_KEY_ID} =~ ^SECRET) || (${AWS_SECRET_ACCESS_KEY} =~ ^SECRET) ]]; then
+    # AWS credentials are kept out of the environment. Grab them!
+    secretEval="$(lib secret-access --env --output=eval)" || exit "$?"
+    eval "${secretEval}"
+fi
+
+if [[ ${loc} == '' ]]; then
+    # Work around a bug in the underlying `aws` command: If there is no region
+    # passed in, it will try to automatically derive it via EC2 metadata (on the
+    # assumption that the command is running on an EC2 instance). Sometimes it
+    # fails (because that's not where the command is running); that's not the
+    # bug. The bug is that many commands don't need a region, so there's no
+    # point in trying to derive it in those cases. The following suppresses the
+    # attempt.
+    export AWS_EC2_METADATA_DISABLED=true
+fi
+
+result="$("${fullCommand[@]}")" \
+|| {
+    error-msg 'Trouble running AWS command.'
+    exit 1
+}
+
+# Note: Even if there's no result filter, we use `jget` to automatically get
+# color output when appropriate and to do "raw" output when requested.
+
+if (( ${#resultConstructor[@]} == 0 )); then
+    if [[ ${outputStyle} == 'none' ]]; then
+        # No need to run a nop-filter just to not produce output.
+        exit 0
+    fi
+    resultConstructor=('.')
+fi
+
+jget --output="${outputStyle}" -- "${result}" "${resultConstructor[@]}" \
+|| {
+    error-msg 'Trouble filtering result.'
+    exit 1
+}
