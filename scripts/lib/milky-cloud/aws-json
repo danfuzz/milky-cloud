@@ -10,12 +10,9 @@
 # Argument parsing
 #
 
-function usage {
-    print-usage $'
-    Usage:
-
+define-usage $'
     ${name} <cmd> <subcommand> [<opt> ...] [--] [<jval-expr> ...]
-      [:: [<out-opt> ...] [<jval-expr> ...]
+    [:: [<out-opt> ...] [<jval-expr> ...]
 
     Makes an AWS call with a JSON value constructed with `json-val`, and with
     successful result optionally post-processed through `json-val`. If no
@@ -51,11 +48,9 @@ function usage {
       default is `json`.
 
     ${name} [--help | -h]
-      Displays this message.
-    '
 
-    exit "$@"
-}
+    Displays this message.
+'
 
 # AWS command and subcommand. These are expected before any dashed options.
 if ! ( (( $# >= 2 )) && [[ $1 =~ ^[a-z] ]] && [[ $2 =~ ^[a-z] ]] ); then
@@ -68,7 +63,7 @@ else
 fi
 
 # Want help?
-opt-action --call='{ usage }' help/h
+opt-action --call='{ usage; exit }' help/h
 
 # Region, passed as either region per se or availability zone.
 opt-value --var=region --filter=region-from-location loc
@@ -143,7 +138,7 @@ function parse-rest {
     resultConstructor=("$@")
 }
 
-process-args "$@" || usage "$?"
+process-args "$@" || usage --short
 
 
 #

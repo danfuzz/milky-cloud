@@ -10,34 +10,30 @@
 # Argument parsing
 #
 
-function usage {
-    print-usage $'
-    Usage:
-
+define-usage $'
     ${name} [<opt> ...] <name-or-id>
-      Finds a DNS zone (Route53 "hosted zone") by name, or validates the
-      existence of one by ID, and prints its information. If given a name, it
-      is allowed to be more than just the main two components; any additional
-      subdomains are ignored. The name is also accepted either with or without
-      a final dot (`.`). If given an ID, it can be the plain ID string or the
-      fully-qualified `/hostedzone/...` form.
 
-      --not-found-ok
-        Do not report an error -- just don\'t print any output -- if there is
-        no zone with the given name. This has no effect if given an ID.
-      --output=<style> :: `compact` `id` `json`
-        What to output, as with `json-val`, except that `id` prints just the ID
-        of the VPC as a plain string. `id` is the default.
+    Finds a DNS zone (Route53 "hosted zone") by name, or validates the
+    existence of one by ID, and prints its information. If given a name, it
+    is allowed to be more than just the main two components; any additional
+    subdomains are ignored. The name is also accepted either with or without
+    a final dot (`.`). If given an ID, it can be the plain ID string or the
+    fully-qualified `/hostedzone/...` form.
+
+    --not-found-ok
+      Do not report an error -- just don\'t print any output -- if there is
+      no zone with the given name. This has no effect if given an ID.
+    --output=<style> :: `compact` `id` `json`
+      What to output, as with `json-val`, except that `id` prints just the ID
+      of the VPC as a plain string. `id` is the default.
 
     ${name} [--help | -h]
-      Displays this message.
-    '
 
-    exit "$@"
-}
+    Displays this message.
+'
 
 # Want help?
-opt-action --call='{ usage }' help/h
+opt-action --call='{ usage; exit }' help/h
 
 # Ok if no VPC found?
 opt-toggle --var=notFoundOk not-found-ok
@@ -48,7 +44,7 @@ opt-value --var=outputStyle --init=id --enum='compact id json' output
 # Name or ID to look up.
 positional-arg --required --var=nameOrId name-or-id
 
-process-args "$@" || usage "$?"
+process-args "$@" || usage --short
 
 
 #

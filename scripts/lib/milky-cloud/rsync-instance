@@ -10,27 +10,23 @@
 # Argument parsing
 #
 
-function usage {
-    print-usage $'
-    Usage:
-
+define-usage $'
     ${name} [<opt> ...] <rsync-arg> ...
-      Uses `rsync` to copy files to or from the indicated instance, using
-      `ssh-instance` to make the connection (see which for details).
+
+    Uses `rsync` to copy files to or from the indicated instance, using
+    `ssh-instance` to make the connection (see which for details).
 
     Options passed through to `rsync`: --archive --checksum --delete --verbose
     Options passed through to `ssh-instance`: --default-domain --default-userid
       --key --secret
 
     ${name} [--help | -h]
-      Displays this message.
-    '
 
-    exit "$@"
-}
+    Displays this message.
+'
 
 # Want help?
-opt-action --call='{ usage }' help/h
+opt-action --call='{ usage; exit }' help/h
 
 # Used when this script calls through to itself via `rsync`.
 opt-toggle --var=fromRsync from-rsync
@@ -52,7 +48,7 @@ opt-value --call='{ sshOpts+=(--secret="$1") }' secret
 # Main arguments.
 rest-arg --var=args arg
 
-process-args "$@" || usage "$?"
+process-args "$@" || usage --short
 
 
 #

@@ -10,36 +10,32 @@
 # Argument parsing
 #
 
-function usage {
-    print-usage $'
-    Usage:
-
+define-usage $'
     ${name} [<opt> ...] [--] [<spec> ...]
-      Constructs and prints a JSON object suitable for use as a `Filters`
-      specification argument to an AWS command. The result is an object that
-      binds `Filters`, so it can be used as-is (if that is the only argument) or
-      merged with other arguments.
 
-      <spec>
-        <name>=<value> -- Use <value> as a filter for <name>. If the same name
-          is used multiple times, then (per the usual AWS rules) the result is a
-          logical OR of the values.
+    Constructs and prints a JSON object suitable for use as a `Filters`
+    specification argument to an AWS command. The result is an object that
+    binds `Filters`, so it can be used as-is (if that is the only argument) or
+    merged with other arguments.
 
-      --output=<style> :: `compact` `json`
-        Output style, as with `json-val`. Defaults to `json`.
+    <spec>
+      <name>=<value> -- Use <value> as a filter for <name>. If the same name
+        is used multiple times, then (per the usual AWS rules) the result is a
+        logical OR of the values.
+
+    --output=<style> :: `compact` `json`
+      Output style, as with `json-val`. Defaults to `json`.
 
     ${name} [--help | -h]
-      Displays this message.
-    '
 
-    exit "$@"
-}
+    Displays this message.
+'
 
 # Output style.
 opt-value --var=outputStyle --init=json --enum='compact json' output
 
 # Want help?
-opt-action --call='{ usage }' help/h
+opt-action --call='{ usage; exit }' help/h
 
 # List of filter specifications, as parallel arrays of name and value.
 filterNames=()
@@ -66,7 +62,7 @@ function parse-specs {
     return "${error}"
 }
 
-process-args "$@" || usage "$?"
+process-args "$@" || usage --short
 
 
 #

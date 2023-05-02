@@ -10,48 +10,44 @@
 # Argument parsing
 #
 
-function usage {
-    print-usage $'
-    Usage:
-
+define-usage $'
     ${name} [<opt> ...]
-      Adds one or more rules to a given security group to specify IP-based
-      restrictions. Upon success, prints out a JSON array of all added rules.
 
-      Note: Even though this command only nominally lets you specify one rule,
-      AWS splits out multiple rules when the specified rule applies to multiple
-      IP address ranges (including notably treating "any IPv4" and "any IPv6" as
-      different ranges).
+    Adds one or more rules to a given security group to specify IP-based
+    restrictions. Upon success, prints out a JSON array of all added rules.
 
-      --egress
-        The rule is to be an egress rule.
-      --ingress
-        The rule is to be an ingress rule.
-      --loc=<region-or-zone>
-        What region to make the security group in. Must be specified. If
-        specified as an availability zone, only the region portion matters.
-      --name=<name>
-        Name to attach to the rule, if any.
-      --port=<number> or --port=all
-        Port for the rule, or an indicator to apply to all ports. Must be
-        specified.
-      --protocol=<spec> :: `all` `tcp` `udp`
-        Protocol(s) the rule applies to. Must be specified.
-      --quiet (--no-quiet to disable)
-        Suppress non-error output to stdout.
-      --security-group=<name-or-id>
-        Name or ID of the security group to add to. Can also be a VPC ID,
-        to indicate the default security group for that VPC.
+    Note: Even though this command only nominally lets you specify one rule,
+    AWS splits out multiple rules when the specified rule applies to multiple
+    IP address ranges (including notably treating "any IPv4" and "any IPv6" as
+    different ranges).
+
+    --egress
+      The rule is to be an egress rule.
+    --ingress
+      The rule is to be an ingress rule.
+    --loc=<region-or-zone>
+      What region to make the security group in. Must be specified. If
+      specified as an availability zone, only the region portion matters.
+    --name=<name>
+      Name to attach to the rule, if any.
+    --port=<number> or --port=all
+      Port for the rule, or an indicator to apply to all ports. Must be
+      specified.
+    --protocol=<spec> :: `all` `tcp` `udp`
+      Protocol(s) the rule applies to. Must be specified.
+    --quiet (--no-quiet to disable)
+      Suppress non-error output to stdout.
+    --security-group=<name-or-id>
+      Name or ID of the security group to add to. Can also be a VPC ID,
+      to indicate the default security group for that VPC.
 
     ${name} [--help | -h]
-      Displays this message.
-    '
 
-    exit "$@"
-}
+    Displays this message.
+'
 
 # Want help?
-opt-action --call='{ usage }' help/h
+opt-action --call='{ usage; exit }' help/h
 
 # Rule direction (`ingress` or `egress`).
 opt-choice --required --var=direction egress ingress
@@ -74,7 +70,7 @@ opt-value --required --var=protocol --enum='all tcp udp' protocol
 # Quiet?
 opt-toggle --var=quiet quiet
 
-process-args "$@" || usage "$?"
+process-args "$@" || usage --short
 
 
 #

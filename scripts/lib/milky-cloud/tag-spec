@@ -10,10 +10,7 @@
 # Argument parsing
 #
 
-function usage {
-    print-usage $'
-    Usage:
-
+define-usage $'
     ${name} [<opt> ...] [--] [<spec> ...]
     Constructs and prints a JSON object suitable for use as the `Tags` argument
     to `ec2 create-tags` or the `TagSpecifications` argument to various other
@@ -35,14 +32,12 @@ function usage {
         the output is the `Tags` form suitable for `ec2 create-tags`.
 
     ${name} [--help | -h]
-      Displays this message.
-    '
 
-    exit "$@"
-}
+    Displays this message.
+'
 
 # Want help?
-opt-action --call='{ usage }' help/h
+opt-action --call='{ usage; exit }' help/h
 
 # `Name` binding.
 opt-value --var=name --filter='/./' name
@@ -78,7 +73,7 @@ function parse-specs {
     return "${error}"
 }
 
-process-args "$@" || usage "$?"
+process-args "$@" || usage --short
 
 
 #

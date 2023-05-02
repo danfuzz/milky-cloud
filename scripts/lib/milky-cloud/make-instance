@@ -10,76 +10,72 @@
 # Argument parsing
 #
 
-function usage {
-    print-usage $'
-    Usage:
-
+define-usage $'
     ${name} [<opt> ...]
-      Launches a standard-configured instance. On success, prints a JSON object
-      with the most-salient values (including notably the instance ID). Note: If
-      neither `--security-group` nor `--vpc` is specified, then this command
-      will launch the instance into the default security group of the default VPC
-      for the specified availability zone (which, TBQH, is probably not what you
-      want).
 
-      --extract-host-key
-        Using the EC2 console, extract the host public key for the ED25519
-        algorithm (which has gloriously short keys). This implies
-        `--wait-until-running`.
-      --host-key=<key>
-        Specify a host key to use, overriding the one(s) created during the
-        instance\'s first boot. This can be used to avoid a potential MITM attack
-        which relies on trusting the host key on first-connect.
-      --instance-type=<type>
-        What type of instance to install. Defaults to `t3.nano`, for convenience.
-      --key-name=<name>
-        Name of the keypair to use for SSH access. If not specified, then
-        something else will have to have set up SSH access (e.g. the user data
-        script, or something baked into the AMI). Detail: This causes the public
-        key of the indicate keypair to be listed in `.ssh/authorized_keys` for
-        the default userid on the new instance.
-      --loc=<availability-zone>
-        Availability zone to launch the instance in. Must be specified.
-      --name=<name>
-        Name tag for the resulting instance.
-      --os=<name>
-        Which OS to install. See `find-ami` for details about default and options.
-      --output=<style> :: `id` `json` `none`
-        What to print on successful output. `id` is just the plain ID (no quotes).
-        `json` is the same as what is printed by `find-instance`. Defaults to
-        `id`.
-      --security-group=<name-or-id>
-        Name or ID of the security group to use for network access control. If
-        specified, this is used to derive the VPC to use, and in conjunction with
-        the specified availability zone, the specific subnet within the VPC. It
-        is not valid to specify both this option and `--vpc`.
-      --progress
-        Print progress messages to stderr.
-      --user-data=<data>
-        User data for the instance, which is taken to be a script to run on
-        first-boot of the instance. It is invalid to specify both this and the
-        `--user-data-file` option. Note: On the instance, the user data can be
-        found at `/var/lib/cloud/instance/user-data.txt`, and the log of running
-        it can be found at `/var/log/cloud-init-output.log`.
-      --user-data-file=<file>
-        Name of a file containing user data for the instance. It is invalid to
-        specify both this and the --user-data option.
-      --vpc=<name-or-id>
-        Name or ID of the VPC to launch into. If specified, then the instance
-        will be in the default security group of the indicated VPC. It is not
-        valid to specify both this option and `--security-group`.
-      --wait-until-running
-        After launching, wait until the instance is in state `running`.
+    Launches a standard-configured instance. On success, prints a JSON object
+    with the most-salient values (including notably the instance ID). Note: If
+    neither `--security-group` nor `--vpc` is specified, then this command
+    will launch the instance into the default security group of the default VPC
+    for the specified availability zone (which, TBQH, is probably not what you
+    want).
+
+    --extract-host-key
+      Using the EC2 console, extract the host public key for the ED25519
+      algorithm (which has gloriously short keys). This implies
+      `--wait-until-running`.
+    --host-key=<key>
+      Specify a host key to use, overriding the one(s) created during the
+      instance\'s first boot. This can be used to avoid a potential MITM attack
+      which relies on trusting the host key on first-connect.
+    --instance-type=<type>
+      What type of instance to install. Defaults to `t3.nano`, for convenience.
+    --key-name=<name>
+      Name of the keypair to use for SSH access. If not specified, then
+      something else will have to have set up SSH access (e.g. the user data
+      script, or something baked into the AMI). Detail: This causes the public
+      key of the indicate keypair to be listed in `.ssh/authorized_keys` for
+      the default userid on the new instance.
+    --loc=<availability-zone>
+      Availability zone to launch the instance in. Must be specified.
+    --name=<name>
+      Name tag for the resulting instance.
+    --os=<name>
+      Which OS to install. See `find-ami` for details about default and options.
+    --output=<style> :: `id` `json` `none`
+      What to print on successful output. `id` is just the plain ID (no quotes).
+      `json` is the same as what is printed by `find-instance`. Defaults to
+      `id`.
+    --security-group=<name-or-id>
+      Name or ID of the security group to use for network access control. If
+      specified, this is used to derive the VPC to use, and in conjunction with
+      the specified availability zone, the specific subnet within the VPC. It
+      is not valid to specify both this option and `--vpc`.
+    --progress
+      Print progress messages to stderr.
+    --user-data=<data>
+      User data for the instance, which is taken to be a script to run on
+      first-boot of the instance. It is invalid to specify both this and the
+      `--user-data-file` option. Note: On the instance, the user data can be
+      found at `/var/lib/cloud/instance/user-data.txt`, and the log of running
+      it can be found at `/var/log/cloud-init-output.log`.
+    --user-data-file=<file>
+      Name of a file containing user data for the instance. It is invalid to
+      specify both this and the --user-data option.
+    --vpc=<name-or-id>
+      Name or ID of the VPC to launch into. If specified, then the instance
+      will be in the default security group of the indicated VPC. It is not
+      valid to specify both this option and `--security-group`.
+    --wait-until-running
+      After launching, wait until the instance is in state `running`.
 
     ${name} [--help | -h]
-      Display this message.
-    '
 
-    exit "$@"
-}
+    Displays this message.
+'
 
 # Want help?
-opt-action --call='{ usage }' help/h
+opt-action --call='{ usage; exit }' help/h
 
 # Availability zone.
 opt-value --required --var=zone --call=parse-zone loc
@@ -123,7 +119,7 @@ opt-value --var=vpcNameOrId --filter='/./' vpc
 # Wait until the instance is running?
 opt-toggle --var=waitUntilRunning wait-until-running
 
-process-args "$@" || usage "$?"
+process-args "$@" || usage --short
 
 if [[ (${userData} != '') && (${userDataFile} != '') ]]; then
     error-msg 'Cannot specify both --user-data and --user-data-file.'

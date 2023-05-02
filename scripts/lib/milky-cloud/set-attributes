@@ -10,34 +10,30 @@
 # Argument parsing
 #
 
-function usage {
-    print-usage $'
-    Usage:
-
+define-usage $'
     ${name} [<opt> ...] [--] <assignment> ...
-      Sets one or more attributes on a thing-that-has-attributes. Supported
-      "things" are subnets and VPCs.
 
-      <assignment>
-        <name>=<value> Assign attribute `name` to be the indicated value.
+    Sets one or more attributes on a thing-that-has-attributes. Supported
+    "things" are subnets and VPCs.
 
-      --id=<id>
-        ID of the thing to operate on. Must be specified.
-      --loc=<region-or-zone>
-        What region to operate in. Must be specified. If specified as an
-        availability zone, only the region portion matters.
-      --progress (--no-progress to disable)
-        Print progress messages to stderr.
+    <assignment>
+      <name>=<value> Assign attribute `name` to be the indicated value.
+
+    --id=<id>
+      ID of the thing to operate on. Must be specified.
+    --loc=<region-or-zone>
+      What region to operate in. Must be specified. If specified as an
+      availability zone, only the region portion matters.
+    --progress (--no-progress to disable)
+      Print progress messages to stderr.
 
     ${name} [--help | -h]
-      Displays this message.
-    '
 
-    exit "$@"
-}
+    Displays this message.
+'
 
 # Want help?
-opt-action --call='{ usage }' help/h
+opt-action --call='{ usage; exit }' help/h
 
 # Region, passed as either region per se or availability zone.
 opt-value --required --var=region --filter=region-from-location loc
@@ -75,7 +71,7 @@ function parse-rest {
     fi
 }
 
-process-args "$@" || usage "$?"
+process-args "$@" || usage --short
 
 
 #

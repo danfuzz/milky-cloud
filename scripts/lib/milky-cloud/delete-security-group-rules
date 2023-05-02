@@ -10,43 +10,39 @@
 # Argument parsing
 #
 
-function usage {
-    print-usage $'
-    Usage:
-
+define-usage $'
     ${name} [<opt> ...] [<assignment> ...] <filter-expr> ...
-      Removes rules from an existing security group, based on given filter
-      criteria. Simple filters can be specified via options, or if no such option
-      is used, a general filter can be specified via assignment and expression
-      arguments, similar to `aws-json`. This filter is expected to accept
-      `SecurityGroupRule` objects and then re-output the ones to be removed.
 
-      On success, prints a JSON array of the IDs of all removed rules.
+    Removes rules from an existing security group, based on given filter
+    criteria. Simple filters can be specified via options, or if no such option
+    is used, a general filter can be specified via assignment and expression
+    arguments, similar to `aws-json`. This filter is expected to accept
+    `SecurityGroupRule` objects and then re-output the ones to be removed.
 
-      --all
-        Remove all rules.
-      --all-egress
-        Remove all egress rules.
-      --all-ingress
-        Remove all ingress rules.
-      --loc=<region-or-zone>
-        What region to make the security group in. Must be specified. If
-        specified as an availability zone, only the region portion matters.
-      --quiet
-        Suppress non-error output to stdout.
-      --security-group=<name-or-id>
-        Name or ID of the security group to operate on. Can also be a VPC ID, to
-        indicate the default security group for that VPC.
+    On success, prints a JSON array of the IDs of all removed rules.
+
+    --all
+      Remove all rules.
+    --all-egress
+      Remove all egress rules.
+    --all-ingress
+      Remove all ingress rules.
+    --loc=<region-or-zone>
+      What region to make the security group in. Must be specified. If
+      specified as an availability zone, only the region portion matters.
+    --quiet
+      Suppress non-error output to stdout.
+    --security-group=<name-or-id>
+      Name or ID of the security group to operate on. Can also be a VPC ID, to
+      indicate the default security group for that VPC.
 
     ${name} [--help | -h]
-      Displays this message.
-    '
 
-    exit "$@"
-}
+    Displays this message.
+'
 
 # Want help?
-opt-action --call='{ usage }' help/h
+opt-action --call='{ usage; exit }' help/h
 
 # Region, passed as either region per se or availability zone.
 opt-value --required --var=region --filter=region-from-location loc
@@ -66,7 +62,7 @@ opt-toggle --var=quiet quiet
 # Filter arguments.
 rest-arg --var=filterArgs filter-exprs
 
-process-args "$@" || usage "$?"
+process-args "$@" || usage --short
 
 if (( ${#filterArgs[@]} == 0 )); then
     if [[ ${simpleFilter} == '' ]]; then

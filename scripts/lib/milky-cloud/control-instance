@@ -10,38 +10,34 @@
 # Argument parsing
 #
 
-function usage {
-    print-usage $'
-    Usage:
-
+define-usage $'
     ${name} [<opt> ...]
-      Controls major aspects of one or more instances.
 
-      --do=<action> :: protect-off protect-on reboot start stop terminate
-        What action to perform. Must be specified.
-      --loc=<region-or-zone>
-        Where to look for instances. Must be specified.
-      --id=<id-or-name>
-        ID or name of the instance(s) to control, as with `find-instance` (see
-        which).
-      --multiple
-        Allow multiple matching instances.
-      --not-found-ok
-        Do not report an error if there are no matching instances.
-      --vpc=<name-or-id>
-        VPC where the instance must reside, named as with `find-vpc` (see which).
-        If not specified, then this command will find an instance in any VPC (in
-        the given location).
+    Controls major aspects of one or more instances.
+
+    --do=<action> :: protect-off protect-on reboot start stop terminate
+      What action to perform. Must be specified.
+    --loc=<region-or-zone>
+      Where to look for instances. Must be specified.
+    --id=<id-or-name>
+      ID or name of the instance(s) to control, as with `find-instance` (see
+      which).
+    --multiple
+      Allow multiple matching instances.
+    --not-found-ok
+      Do not report an error if there are no matching instances.
+    --vpc=<name-or-id>
+      VPC where the instance must reside, named as with `find-vpc` (see which).
+      If not specified, then this command will find an instance in any VPC (in
+      the given location).
 
     ${name} [--help | -h]
-      Displays this message.
-    '
 
-    exit "$@"
-}
+    Displays this message.
+'
 
 # Want help?
-opt-action --call='{ usage }' help/h
+opt-action --call='{ usage; exit }' help/h
 
 # What to do to the instance(s).
 opt-value --required --var=action \
@@ -62,7 +58,7 @@ opt-toggle --var=notFoundOk not-found-ok
 # VPC to require.
 opt-value --var=vpcNameOrId --filter='/./' vpc
 
-process-args "$@" || usage "$?"
+process-args "$@" || usage --short
 
 
 #

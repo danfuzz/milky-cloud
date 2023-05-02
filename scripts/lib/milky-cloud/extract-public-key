@@ -10,14 +10,12 @@
 # Argument parsing
 #
 
-function usage {
-    print-usage $'
-    Usage:
-
+define-usage $'
     ${name} [<opt> ...] [<file-path>]
-      Extracts the public key from a private key PEM or SSH file, or converts a
-      public key PEM file to different formats. If no path is given, this command
-      will read from stdin.
+
+    Extracts the public key from a private key PEM or SSH file, or converts a
+    public key PEM file to different formats. If no path is given, this command
+    will read from stdin.
 
     --output=<style>
       What to output.
@@ -31,14 +29,12 @@ function usage {
         `.ssh/authorized_keys` files.
 
     ${name} [--help | -h]
-      Displays this message.
-    '
 
-    exit "$@"
-}
+    Displays this message.
+'
 
 # Want help?
-opt-action --call='{ usage }' help/h
+opt-action --call='{ usage; exit }' help/h
 
 # What to output.
 opt-value --var=outputStyle --init=public-key \
@@ -48,7 +44,7 @@ opt-value --var=outputStyle --init=public-key \
 # File path.
 positional-arg --init='/dev/stdin' --var=path file-path
 
-process-args "$@" || usage "$?"
+process-args "$@" || usage --short
 
 
 #

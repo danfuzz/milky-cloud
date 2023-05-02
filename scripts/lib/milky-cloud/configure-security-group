@@ -10,42 +10,38 @@
 # Argument parsing
 #
 
-function usage {
-    print-usage $'
-    Usage:
-
+define-usage $'
     ${name} [<opt> ...]
-      Configures a security group in a standard way. This involves removing all
-      pre-existing rules from the group and then adding exactly what is needed.
 
-      On success, the security group allows incoming TCP traffic to the SSH, HTTP,
-      and HTTPS ports, and allows outgoing traffic to anywhere. It also allows
-      incoming traffic on all ports, from sources that are within the same
-      security group.
+    Configures a security group in a standard way. This involves removing all
+    pre-existing rules from the group and then adding exactly what is needed.
 
-      --loc=<region-or-zone>
-        What region to make the security group in. Must be specified. If specified
-        as an availability zone, only the region portion matters.
-      --name=<name>
-        Name tag to add to the security group and to all the added rules. If not
-        specified, it defaults to the name of the security group. This option is
-        particularly useful when configuring a default security group, whose name
-        is always just `default`.
-      --security-group=<name-or-id>
-        Name or ID of the security group to modify. Can also be a VPC ID, to
-        indicate the default security group for that VPC.
-      --progress (--no-progress to disable)
-        Print progress messages to stderr.
+    On success, the security group allows incoming TCP traffic to the SSH, HTTP,
+    and HTTPS ports, and allows outgoing traffic to anywhere. It also allows
+    incoming traffic on all ports, from sources that are within the same
+    security group.
+
+    --loc=<region-or-zone>
+      What region to make the security group in. Must be specified. If specified
+      as an availability zone, only the region portion matters.
+    --name=<name>
+      Name tag to add to the security group and to all the added rules. If not
+      specified, it defaults to the name of the security group. This option is
+      particularly useful when configuring a default security group, whose name
+      is always just `default`.
+    --security-group=<name-or-id>
+      Name or ID of the security group to modify. Can also be a VPC ID, to
+      indicate the default security group for that VPC.
+    --progress (--no-progress to disable)
+      Print progress messages to stderr.
 
     ${name} [--help | -h]
-      Displays this message.
-    '
 
-    exit "$@"
-}
+    Displays this message.
+'
 
 # Want help?
-opt-action --call='{ usage }' help/h
+opt-action --call='{ usage; exit }' help/h
 
 # Region, passed as either region per se or availability zone.
 opt-value --required --var=region --filter=region-from-location loc
@@ -59,7 +55,7 @@ opt-value --required --var=groupNameOrId --filter='/./' security-group
 # Progress messages?
 opt-toggle --call='{ progress-msg --set="$1" }' progress
 
-process-args "$@" || usage "$?"
+process-args "$@" || usage --short
 
 
 #

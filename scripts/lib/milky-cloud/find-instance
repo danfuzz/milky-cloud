@@ -10,42 +10,38 @@
 # Argument parsing
 #
 
-function usage {
-    print-usage $'
-    Usage:
-
+define-usage $'
     ${name} [<opt> ...] <name-or-id>
-      Finds one or more instances by name or ID, with optional extra criteria, and
-      prints some information about them. <name-or-id> accepts `*` as a wildcard
-      character.
 
-      --loc=<region-or-zone>
-        Where to look. Must be specified.
-      --multiple
-        Allow multiple matching instances. When specified, the result is a JSON
-        array instead of a single object.
-      --not-found-ok
-        Do not report an error if there are no matching instances. Instead, print
-        nothing or an empty JSON array (as appropriate, per specified options).
-      --output=<style> :: `compact` `id` `json`
-        What to output, as with `json-val`, except that `id` prints just the ID
-        of the VPC as a plain string. `id` is the default.
-      --terminated-ok
-        Match instances that are terminated. By default, these are excluded.
-      --vpc=<name-or-id>
-        VPC where the instance must reside, named as with `find-vpc` (see which).
-        If not specified, then this command will find an instance in any VPC (in
-        the given location).
+    Finds one or more instances by name or ID, with optional extra criteria, and
+    prints some information about them. <name-or-id> accepts `*` as a wildcard
+    character.
+
+    --loc=<region-or-zone>
+      Where to look. Must be specified.
+    --multiple
+      Allow multiple matching instances. When specified, the result is a JSON
+      array instead of a single object.
+    --not-found-ok
+      Do not report an error if there are no matching instances. Instead, print
+      nothing or an empty JSON array (as appropriate, per specified options).
+    --output=<style> :: `compact` `id` `json`
+      What to output, as with `json-val`, except that `id` prints just the ID
+      of the VPC as a plain string. `id` is the default.
+    --terminated-ok
+      Match instances that are terminated. By default, these are excluded.
+    --vpc=<name-or-id>
+      VPC where the instance must reside, named as with `find-vpc` (see which).
+      If not specified, then this command will find an instance in any VPC (in
+      the given location).
 
     ${name} [--help | -h]
-      Displays this message.
-    '
 
-    exit "$@"
-}
+    Displays this message.
+'
 
 # Want help?
-opt-action --call='{ usage }' help/h
+opt-action --call='{ usage; exit }' help/h
 
 # Location (region or availability zone).
 opt-value --required --var=location --filter='/[-a-z0-9]+/' loc
@@ -68,7 +64,7 @@ opt-value --var=vpcNameOrId --filter='/./' vpc
 # Name or ID to look up.
 positional-arg --required --var=nameOrId name-or-id
 
-process-args "$@" || usage "$?"
+process-args "$@" || usage --short
 
 
 #

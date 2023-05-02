@@ -10,52 +10,48 @@
 # Argument parsing
 #
 
-function usage {
-    print-usage $'
-    Usage:
-
+define-usage $'
     ${name} [<opt> ...]
-      Runs Certbot to get a certificate, saving it to a local directory. This
-      uses the DNS challenge, implemented "manually" here to call out to other
-      scripts in this project which use Route53. (Why not use Certbot\'s Route53
-      plugin? Because as of this writing, it is easier to reimplement it than to
-      get the plugins, because reasons.)
 
-      After a successful run of this command, it is safe to delete the specified
-      work directory. All certificates and Cerbot account information will have
-      been stored in the output directory. (The Certbot account information will
-      get re-used on subsequent invocations.)
+    Runs Certbot to get a certificate, saving it to a local directory. This
+    uses the DNS challenge, implemented "manually" here to call out to other
+    scripts in this project which use Route53. (Why not use Certbot\'s Route53
+    plugin? Because as of this writing, it is easier to reimplement it than to
+    get the plugins, because reasons.)
 
-      --domain=<domain-name>
-        Domain name to get a certificate for. This is required, and can be
-        specified more than once to get a certificate with alternate subjects.
-        (The first domain listed is the primary.) Wildcards are allowed, in the
-        form `*.domain.name`.
-      --email=<email-address>
-        Email address to use when making API requests. This is required. Per
-        Certbot / LetsEncrypt docs, this is just used for urgent communication.
-      --min-lifetime-days=<count>
-        Cause this command to _not_ actually get a new certificate if there are
-        at least <count> days left before an existing certificate expires. If
-        this option is not used, then the command will always get a new
-        certificate.
-      --out=<path>
-        Directory to use to store certs and Certbot account information. Defaults
-        to `out/certs` under the current directory. The directory will be created
-        if it doesn\'t exist.
-      --staging
-        Use the staging server.
-      --work-dir=<path>
-        Directory to use for Certbot intermediate file storage, including logs.
-        Defaults to `out/certbot` under the current directory. The directory
-        will be created if it doesn\'t exist.
+    After a successful run of this command, it is safe to delete the specified
+    work directory. All certificates and Cerbot account information will have
+    been stored in the output directory. (The Certbot account information will
+    get re-used on subsequent invocations.)
+
+    --domain=<domain-name>
+      Domain name to get a certificate for. This is required, and can be
+      specified more than once to get a certificate with alternate subjects.
+      (The first domain listed is the primary.) Wildcards are allowed, in the
+      form `*.domain.name`.
+    --email=<email-address>
+      Email address to use when making API requests. This is required. Per
+      Certbot / LetsEncrypt docs, this is just used for urgent communication.
+    --min-lifetime-days=<count>
+      Cause this command to _not_ actually get a new certificate if there are
+      at least <count> days left before an existing certificate expires. If
+      this option is not used, then the command will always get a new
+      certificate.
+    --out=<path>
+      Directory to use to store certs and Certbot account information. Defaults
+      to `out/certs` under the current directory. The directory will be created
+      if it doesn\'t exist.
+    --staging
+      Use the staging server.
+    --work-dir=<path>
+      Directory to use for Certbot intermediate file storage, including logs.
+      Defaults to `out/certbot` under the current directory. The directory
+      will be created if it doesn\'t exist.
 
     ${name} [--help | -h]
-      Displays this message.
-    '
 
-    exit "$@"
-}
+    Displays this message.
+'
 
 # Special logic for callbacks from `certbot` to skip the usual argument parsing
 # and just call the right hook.

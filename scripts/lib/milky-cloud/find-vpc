@@ -10,33 +10,29 @@
 # Argument parsing
 #
 
-function usage {
-    print-usage $'
-    Usage:
-
+define-usage $'
     ${name} [<opt> ...] <name-or-id>
-      Finds a VPC by name or security group ID, or validates the existence of one
-      by ID, and prints its information.
 
-      --loc=<region-or-zone>
-        Where to look. Must be specified. If specified as an availability zone,
-        only the region portion matters.
-      --not-found-ok
-        Do not report an error -- just don\'t print any output -- if there is
-        no VPC with the given name or ID.
-      --output=<style> :: `compact` `id` `json`
-        What to output, as with `json-val`, except that `id` prints just the ID
-        of the VPC as a plain string. `id` is the default.
+    Finds a VPC by name or security group ID, or validates the existence of one
+    by ID, and prints its information.
+
+    --loc=<region-or-zone>
+      Where to look. Must be specified. If specified as an availability zone,
+      only the region portion matters.
+    --not-found-ok
+      Do not report an error -- just don\'t print any output -- if there is
+      no VPC with the given name or ID.
+    --output=<style> :: `compact` `id` `json`
+      What to output, as with `json-val`, except that `id` prints just the ID
+      of the VPC as a plain string. `id` is the default.
 
     ${name} [--help | -h]
-      Displays this message.
-    '
 
-    exit "$@"
-}
+    Displays this message.
+'
 
 # Want help?
-opt-action --call='{ usage }' help/h
+opt-action --call='{ usage; exit }' help/h
 
 # Region, passed as either region per se or availability zone.
 opt-value --required --var=region --filter=region-from-location loc
@@ -50,7 +46,7 @@ opt-value --var=outputStyle --init=id --enum='compact id json' output
 # Name or ID to look up.
 positional-arg --required --var=nameOrId name-or-id
 
-process-args "$@" || usage "$?"
+process-args "$@" || usage --short
 
 
 #

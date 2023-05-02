@@ -11,10 +11,7 @@
 #
 
 # Prints the usage message.
-function usage {
-    print-usage $'
-    Usage:
-
+define-usage $'
     ${name} [<opt> ...] <command> <arg> ...
 
     Performs a calculation of some sort on a CIDR address/mask. Input CIDR values
@@ -54,17 +51,15 @@ function usage {
       in the indicated length. Prints the resulting CIDR.
 
     ${name} [--help | -h]
-      Displays this message.
-    '
 
-    exit "$@"
-}
+    Displays this message.
+'
 
 # Output style.
 opt-value --var=outputStyle --init=lines --enum='compact json lines' output
 
 # Want help?
-opt-action --call='{ usage }' help/h
+opt-action --call='{ usage; exit }' help/h
 
 # Command.
 positional-arg --required --var=command command
@@ -72,7 +67,7 @@ positional-arg --required --var=command command
 # Command arguments.
 rest-arg --var=args args
 
-process-args "$@" || usage "$?"
+process-args "$@" || usage --short
 
 
 #

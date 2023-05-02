@@ -10,38 +10,34 @@
 # Argument parsing
 #
 
-function usage {
-    print-usage $'
-    Usage:
-
+define-usage $'
     ${name} [<opt> ...] [<assignment> ...] <filter-expr> ...
-      Removes rules from an existing subnet, based on given filter criteria.
-      Simple filters can be specified via options, or if no such option is used,
-      a general filter can be specified via assignment and expression arguments,
-      similar to `aws-json`. This filter is expected to accept `Subnet` objects
-      and then re-output the ones to be removed.
 
-      On success, prints a JSON array of the IDs of all removed subnets.
+    Removes rules from an existing subnet, based on given filter criteria.
+    Simple filters can be specified via options, or if no such option is used,
+    a general filter can be specified via assignment and expression arguments,
+    similar to `aws-json`. This filter is expected to accept `Subnet` objects
+    and then re-output the ones to be removed.
 
-      --all
-        Remove all subnets.
-      --loc=<region-or-zone>
-        What region to make the security group in. Must be specified. If
-        specified as an availability zone, only the region portion matters.
-      --quiet
-        Suppress non-error output to stdout.
-      --vpc=<name-or-id>
-        Name or ID of the VPC to operate on.
+    On success, prints a JSON array of the IDs of all removed subnets.
+
+    --all
+      Remove all subnets.
+    --loc=<region-or-zone>
+      What region to make the security group in. Must be specified. If
+      specified as an availability zone, only the region portion matters.
+    --quiet
+      Suppress non-error output to stdout.
+    --vpc=<name-or-id>
+      Name or ID of the VPC to operate on.
 
     ${name} [--help | -h]
-      Displays this message.
-    '
 
-    exit "$@"
-}
+    Displays this message.
+'
 
 # Want help?
-opt-action --call='{ usage }' help/h
+opt-action --call='{ usage; exit }' help/h
 
 # Region, passed as either region per se or availability zone.
 opt-value --required --var=region --filter=region-from-location loc
@@ -59,7 +55,7 @@ opt-toggle --var=quiet quiet
 # Filter arguments.
 rest-arg --var=filterArgs filter-exprs
 
-process-args "$@" || usage "$?"
+process-args "$@" || usage --short
 
 if (( ${#filterArgs[@]} == 0 )); then
     if [[ ${simpleFilter} == '' ]]; then

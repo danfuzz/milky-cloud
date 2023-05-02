@@ -10,10 +10,7 @@
 # Argument parsing
 #
 
-function usage {
-    print-usage $'
-    Usage:
-
+define-usage $'
     ${name} [<opt> ...] <protocol> <port>
 
     Constructs and prints a JSON object suitable for use as an `IpPermissions`
@@ -25,14 +22,12 @@ function usage {
       Output style, as with `json-val`. Defaults to `json`.
 
     ${name} [--help | -h]
-      Displays this message.
-    '
 
-    exit "$@"
-}
+    Displays this message.
+'
 
 # Want help?
-opt-action --call='{ usage }' help/h
+opt-action --call='{ usage; exit }' help/h
 
 # Output style.
 opt-value --var=outputStyle --init=json --enum='compact json' output
@@ -43,7 +38,7 @@ positional-arg --required --var=protocol --enum='all tcp udp' protocol
 # Port.
 positional-arg --required --var=port --filter='/^([0-9]+|all)$/' port
 
-process-args "$@" || usage "$?"
+process-args "$@" || usage --short
 
 
 #

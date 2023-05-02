@@ -10,37 +10,33 @@
 # Argument parsing
 #
 
-function usage {
-    print-usage $'
-    Usage:
-
+define-usage $'
     ${name} [<opt> ...] <zone-or-region>
-      Parses a location -- a region or availability zone -- and if valid then
-      optionally prints out one of the components.
 
-      --input=<style>
-        `any` -- Accept either an availability zone or region as <zone-or-region>.
-          This is the default.
-        `region` -- Require a region.
-        `zone` -- Require an availability zone.
-      --output=<style>
-        `none` -- Do not produce any output. This is the default.
-        `json` -- Output parsed details, in JSON form.
-        `region` -- Output the region.
-        `zone` -- Output the availability zone (which will be the same as the
-          input). This implies `--input=zone`.
-        `zone-suffix` -- Output the zone suffix (everything after the region).
-          This implies `--input=zone`.
+    Parses a location -- a region or availability zone -- and if valid then
+    optionally prints out one of the components.
+
+    --input=<style>
+      `any` -- Accept either an availability zone or region as <zone-or-region>.
+        This is the default.
+      `region` -- Require a region.
+      `zone` -- Require an availability zone.
+    --output=<style>
+      `none` -- Do not produce any output. This is the default.
+      `json` -- Output parsed details, in JSON form.
+      `region` -- Output the region.
+      `zone` -- Output the availability zone (which will be the same as the
+        input). This implies `--input=zone`.
+      `zone-suffix` -- Output the zone suffix (everything after the region).
+        This implies `--input=zone`.
 
     ${name} [--help | -h]
-      Displays this message.
-    '
 
-    exit "$@"
-}
+    Displays this message.
+'
 
 # Want help?
-opt-action --call='{ usage }' help/h
+opt-action --call='{ usage; exit }' help/h
 
 # Input type.
 opt-value --var=inputType --init=any --enum='any region zone' input
@@ -62,7 +58,7 @@ function parse-zone-or-region {
     zoneSuffix="${BASH_REMATCH[2]}"
 }
 
-process-args "$@" || usage "$?"
+process-args "$@" || usage --short
 
 if [[ ${outputItem} =~ ^zone ]]; then
     # Don't allow region input if we are to print a zone-ish thing.
