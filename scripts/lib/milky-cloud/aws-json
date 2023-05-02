@@ -193,7 +193,7 @@ fi
 
 # Run the special case handler which manipulates the arguments to `aws`, if such
 # a handler is defined (in a sibling file to this script).
-specialCaseHandler="$(lib --path --quiet "$(this-cmd-name)_${command}_${subcommand}")"
+specialCaseHandler="$(lib --path --quiet "_aws_${command}_${subcommand}")"
 if [[ ${specialCaseHandler} != '' ]]; then
     commandParts="$("${specialCaseHandler}" "$(make-command-parts-json)")" \
     || exit 1
