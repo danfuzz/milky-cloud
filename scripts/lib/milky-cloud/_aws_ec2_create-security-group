@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# Copyright 2022 the Milky-cloud Authors (Dan Bornstein et alia).
-# Licensed AS IS and WITHOUT WARRANTY under the Apache License, Version 2.0.
-# Details: <http://www.apache.org/licenses/LICENSE-2.0>
+# Copyright 2022-2023 the Milky-cloud Authors (Dan Bornstein et alia).
+# SPDX-License-Identifier: Apache-2.0
 
 # Special case handler to rewrite the arguments to `ec2 create-security-group`,
 # so as to work around this issue: <https://github.com/aws/aws-cli/issues/7058>
