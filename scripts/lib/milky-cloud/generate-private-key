@@ -65,8 +65,9 @@ case "${type}" in
         # exit status is trivially preserved). Source of inspiration:
         #   <https://gist.github.com/kraftb/9918106>
         tmpDir="$(lib tempy mkdir)" || exit "$?"
-        outName="${tmpDir}/key"
         trap "rm -rf \"${tmpDir}\"" EXIT
+
+        outName="${tmpDir}/key"
         ln -s /dev/fd/3 "${outName}" || exit "$?"
         ln -s /dev/null "${outName}.pub" || exit "$?"
         ssh-keygen <<<'y' 3>&1 >/dev/null \
