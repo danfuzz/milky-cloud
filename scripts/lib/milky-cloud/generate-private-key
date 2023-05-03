@@ -64,7 +64,8 @@ case "${type}" in
         # after running the command, we remove the links (via `trap` so that the
         # exit status is trivially preserved). Source of inspiration:
         #   <https://gist.github.com/kraftb/9918106>
-        outName="./$(this-cmd-name)-$$"
+        tmpDir="$(lib tempy mkdir)" || exit "$?"
+        outName="${tmpDir}/key"
         trap "rm -f \"${outName}\" \"${outName}.pub\"" EXIT
         ln -s /dev/fd/3 "${outName}" || exit "$?"
         ln -s /dev/null "${outName}.pub" || exit "$?"
