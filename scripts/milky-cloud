@@ -34,20 +34,20 @@ process-args "$@" || usage --short "$?"
 # Main script
 #
 
-libsOpt='--libs=milky-cloud'
+unitsOpt='--units=milky-cloud'
 
 if [[ ${cmdName} == '' ]]; then
-    lib helpy print-all-commands "${libsOpt}" --prefix="$(this-cmd-name) "
+    lib helpy print-all-commands "${unitsOpt}" --prefix="$(this-cmd-name) "
     exit 1
 fi
 
-lib "${libsOpt}" --quiet "${cmdName}" "${args[@]}"
+lib "${unitsOpt}" --quiet "${cmdName}" "${args[@]}"
 exitCode="$?"
 
 if (( exitCode == 127 )); then
     error-msg "Command not found: ${cmdName}"
     error-msg
-    lib helpy print-all-commands "${libsOpt}" --prefix="$(this-cmd-name) "
+    lib helpy print-all-commands "${unitsOpt}" --prefix="$(this-cmd-name) "
     exit 1
 fi
 
