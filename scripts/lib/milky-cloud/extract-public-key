@@ -127,17 +127,17 @@ function do-ssh-auth {
         private-ssh)
             # Need to use a temporary file to avoid `ssh-keygen` complaints (see
             # above).
-            local tmpFile="./$(this-cmd-name)-$$"
+            local tmpDir && tmpDir="$(lib tempy mkdir)" || return "$?"
+            trap "rm -rf \"${tmpDir}\"" EXIT
+
+            local tmpFile="${tmpDir}/key"
             cat <<<"${keyFile}" >"${tmpFile}"
             chmod 600 "${tmpFile}"
-            local result error
-            result="$(ssh-keygen -y -f "${tmpFile}")"
-            error="$?"
-            rm -f "${tmpFile}"
-            if (( error == 0 )); then
-                echo "${result}"
-            fi
-            return "${error}"
+
+            local result && result="$(ssh-keygen -y -f "${tmpFile}")" \
+            || return "$?"
+
+            echo "${result}"
             ;;
     esac
 }
