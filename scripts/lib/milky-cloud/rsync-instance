@@ -65,7 +65,13 @@ function call-rsync {
     done
     rshCmd+=(--)
 
-    local rsyncCmd=(rsync --rsh="${rshCmd[*]}" "${rsyncOpts[@]}" --)
+    # Note: The main reason `--omit-dir-times` is being used here is to avoid
+    # `rsync` always saying (when `--verbose`) directories are updated even when
+    # no files changed, in the case where date stamps don't match (e.g. when
+    # sync'ing a rebuilt set of files).
+    local rsyncCmd=(
+        rsync --rsh="${rshCmd[*]}" --omit-dir-times "${rsyncOpts[@]}" --
+    )
 
     exec "${rsyncCmd[@]}" "$@"
 }
