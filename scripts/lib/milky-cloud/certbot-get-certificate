@@ -433,7 +433,7 @@ rm -rf "${workDir}/renewal/${certName}.conf"
 # Copy the pre-existing Certbot account info (if any) into the work directory.
 if [[ -d "${accountOutDir}" ]]; then
     mkdir -p "${workDir}/accounts"
-    lib rsync-local "${accountOutDir}/" "${workDir}/accounts" \
+    lib rsync-local --delete "${accountOutDir}/" "${workDir}/accounts" \
     || exit "$?"
 fi
 
@@ -467,7 +467,7 @@ mkdir -p "${certOutDir}"
 
 # Copy Certbot account info back into the output area.
 mkdir -p "${accountOutDir}"
-lib rsync-local "${workDir}/accounts/" "${accountOutDir}" \
+lib rsync-local --delete "${workDir}/accounts/" "${accountOutDir}" \
 || exit "$?"
 
 info-msg
