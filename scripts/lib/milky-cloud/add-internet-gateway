@@ -71,7 +71,7 @@ function figure-out-name {
         name="for-${vpcId}"
     fi
 
-    echo "$(lib now-stamp)-${name}"
+    echo "$(lib timey now-stamp --suffix="-${name}")"
 }
 
 

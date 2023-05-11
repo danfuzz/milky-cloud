@@ -111,7 +111,7 @@ if [[ ${cidr6} != 'none' ]]; then
 fi
 
 if [[ ${name} == '' ]]; then
-    name="$(lib now-stamp via-script)"
+    name="$(lib timey now-stamp --suffix=-via-script)"
 fi
 
 tagSpec="$(lib tag-spec --type='subnet' --name="${name}")"

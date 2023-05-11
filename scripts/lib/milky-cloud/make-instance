@@ -335,7 +335,7 @@ progress-msg "  group:  ${groupId}"
 
 # Make up a name if one wasn't provided.
 if [[ ${name} == '' ]]; then
-    name="$(lib now-stamp via-script)"
+    name="$(lib timey now-stamp --suffix=-via-script)"
 fi
 
 # Form the main command, and do it!

@@ -81,7 +81,7 @@ function figure-out-name {
         name="for-${vpcId}"
     fi
 
-    echo "$(lib now-stamp)-${name}"
+    echo "$(lib timey now-stamp --suffix="-${name}")"
 }
 
 
@@ -101,7 +101,7 @@ fi
 
 # Make up a description if not passed as an option.
 if [[ ${description} == '' ]]; then
-    description="$(lib now-stamp via-script)"
+    description="$(lib timey now-stamp --suffix=-via-script)"
 fi
 
 groupId="$(ec2-json create-security-group \
