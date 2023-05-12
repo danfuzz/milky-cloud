@@ -18,6 +18,8 @@ define-usage $'
     --do=<action> :: expire-after expire-off protect-off protect-on reboot start
         stop terminate
       What action to perform. Must be specified.
+    --expired
+      Limit the results to expired instances only.
     --id=<id-or-name>
       ID or name of the instance(s) to control, as with `find-instance` (see
       which).
@@ -46,6 +48,9 @@ opt-action --call='{ usage; exit }' help/h
 # What to do to the instance(s).
 opt-value --required --var=action \
     --enum='expire-after expire-off protect-off protect-on reboot start stop terminate' do
+
+# Expired instances only?
+opt-toggle --var=expiredOnly expired
 
 # Name or ID to look up.
 opt-value --var=nameOrId --init='*' --filter='/./' id
@@ -103,6 +108,24 @@ function change-protection {
     done
 }
 
+# Filter the given list of instance info, returning only info on expired
+# instances.
+function filter-expired {
+    local infoJson="$1"
+
+    local nowSecs="$(lib timey now-secs)"
+
+    jget "${infoJson}" \
+        nowSecs:json="${nowSecs}" '
+        map(select(
+              ((.expiredAfter // "") | match("^[0-9]+").string | fromjson)
+                as $expiredAfter
+            |
+              $expiredAfter <= $nowSecs
+        ))
+    '
+}
+
 # Performs major control (rebooting, etc.).
 function major-control {
     local action="$1"
@@ -153,7 +176,7 @@ function queue-expiry {
 
 progress-msg --enable
 
-findArgs=(--loc="${location}" --output=id)
+findArgs=(--loc="${location}" --output=json)
 if (( multipleResults )); then
     findArgs+=(--multiple)
 fi
@@ -165,7 +188,15 @@ if [[ ${vpcNameOrId} != '' ]]; then
 fi
 findArgs+=("${nameOrId}")
 
-ids=($(lib find-instance "${findArgs[@]}")) \
+instanceInfo="$(lib find-instance "${findArgs[@]}")" \
+|| exit "$?"
+
+if (( expiredOnly )); then
+    intanceInfo="$(filter-expired "${instanceInfo}")" \
+    || exit "$?"
+fi
+
+ids="$(jget "${instanceInfo}" 'map(.id)')" \
 || exit "$?"
 
 case "${action}" in
@@ -180,9 +211,7 @@ case "${action}" in
 esac
 
 progress-msg "${gerund} instance(s):"
-progress-msg --exec printf '  %s\n' "${ids[@]}"
-
-ids="$(jarray --input=strings "${ids[@]}")"
+progress-msg --exec jget --output=raw "${ids}" '.[] | "  " + .'
 
 "${func}" "${action}" "${ids}" \
 || exit "$?"
