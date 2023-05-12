@@ -17,6 +17,9 @@ define-usage $'
     prints some information about them. <name-or-id> accepts `*` as a wildcard
     character.
 
+    --attributes
+      Add info about useful attributes (as in `ec2 describe-instance-attribute`)
+      to the results.
     --expired
       Limit the results to expired instances only.
     --loc=<region-or-zone>
@@ -44,6 +47,9 @@ define-usage $'
 
 # Want help?
 opt-action --call='{ usage; exit }' help/h
+
+# Add attribute info?
+opt-toggle --var=addAttributes attributes
 
 # Expired instances only?
 opt-toggle --var=expiredOnly expired
@@ -75,6 +81,50 @@ process-args "$@" || usage --short
 #
 # Helper functions
 #
+
+# Add attribute info to the given list of instance info.
+function add-attributes {
+    local infoJson="$1"
+
+    local ids=($(jget --output=raw "${infoJson}" '.[] | .id'))
+    local atts=()
+
+    if (( ${#ids[@]} == 0 )); then
+        # No actual results to add to.
+        echo "${infoJson}"
+        return
+    fi
+
+    local id attStop attTerm
+    for id in "${ids[@]}"; do
+        attStop="$(
+            ec2-json describe-instance-attribute --loc="${location}" \
+                id="${id}" '{
+                    InstanceId: $id,
+                    Attribute:  "disableApiStop"
+                }' :: '.DisableApiStop.Value'
+        )" \
+        || return "$?"
+        attTerm="$(
+            ec2-json describe-instance-attribute --loc="${location}" \
+                id="${id}" '{
+                    InstanceId: $id,
+                    Attribute:  "disableApiTermination"
+                }' :: '.DisableApiTermination.Value'
+        )" \
+        || return "$?"
+        atts+=("$(
+            jval attStop:json="${attStop}" attTerm:json="${attTerm}" \
+                '{ disableApiStop: $attStop, disableApiTermination: $attTerm }'
+        )")
+    done
+
+    jval \
+        atts:json="$(jarray "${atts[@]}")" \
+        info:json="${infoJson}" '
+        [$info, $atts] | transpose | map({ attributes: .[1] } + .[0])
+    '
+}
 
 # Filter the given list of instance info, returning only info on expired
 # instances.
@@ -173,6 +223,12 @@ fi
 if (( expiredOnly )); then
     # Similar reasoning to above.
     resultArray="$(filter-expired "${resultArray}")" \
+    || exit "$?"
+fi
+
+if (( addAttributes )); then
+    # This is a heavyweight operation, which is why we don't just always do it.
+    resultArray="$(add-attributes "${resultArray}")" \
     || exit "$?"
 fi
 
