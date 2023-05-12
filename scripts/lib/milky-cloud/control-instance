@@ -19,7 +19,8 @@ define-usage $'
         stop terminate
       What action to perform. Must be specified.
     --expired
-      Limit the results to expired instances only.
+      Limit the results to expired instances only. This is in support for
+      commands such as `${name} --do=terminate --expired ...`.
     --id=<id-or-name>
       ID or name of the instance(s) to control, as with `find-instance` (see
       which).
