@@ -15,17 +15,21 @@ define-usage $'
 
     Controls major aspects of one or more instances.
 
-    --do=<action> :: protect-off protect-on reboot start stop terminate
+    --do=<action> :: cancel-terminate-after protect-off protect-on reboot start
+        stop terminate terminate-after
       What action to perform. Must be specified.
-    --loc=<region-or-zone>
-      Where to look for instances. Must be specified.
     --id=<id-or-name>
       ID or name of the instance(s) to control, as with `find-instance` (see
       which).
+    --loc=<region-or-zone>
+      Where to look for instances. Must be specified.
     --multiple
       Allow multiple matching instances.
     --not-found-ok
       Do not report an error if there are no matching instances.
+    --time=<secs>
+      Salient time of the action, as a Unix Epoch seconds count. Only used for
+      `terminate-after`.
     --vpc=<name-or-id>
       VPC where the instance must reside, named as with `find-vpc` (see which).
       If not specified, then this command will find an instance in any VPC (in
@@ -41,7 +45,7 @@ opt-action --call='{ usage; exit }' help/h
 
 # What to do to the instance(s).
 opt-value --required --var=action \
-    --enum='protect-off protect-on reboot start stop terminate' do
+    --enum='cancel-terminate-after protect-off protect-on reboot start stop terminate terminate-after' do
 
 # Name or ID to look up.
 opt-value --var=nameOrId --init='*' --filter='/./' id
@@ -54,6 +58,9 @@ opt-toggle --var=multipleResults multiple
 
 # Ok if no instances found?
 opt-toggle --var=notFoundOk not-found-ok
+
+# Timestamp in seconds.
+opt-value --var=timeSecs --filter='/^[0-9]{10,12}$/' time
 
 # VPC to require.
 opt-value --var=vpcNameOrId --filter='/./' vpc
@@ -108,6 +115,37 @@ function major-control {
     || return "$?"
 }
 
+# Sets or clears a termination date/time.
+function queue-terminate {
+    local action="$1"
+    local ids="$2"
+
+    local TAG_NAME='terminate-after'
+
+    # Convert `action`.
+    local cmd='error' tagsJson=''
+    case "${action}" in
+        cancel-terminate-after)
+            cmd='delete-tags'
+            tagsJson="$(lib tag-spec "${TAG_NAME}")"
+            ;;
+        terminate-after)
+            if [[ ${timeSecs} == '' ]]; then
+                error-msg 'Missing required option --time.'
+                return 1
+            fi
+            cmd='create-tags'
+            local dateStr="$(lib timey print "${timeSecs}" '+%s %Y-%m-%d-%H%M%S')"
+            tagsJson="$(lib tag-spec "${TAG_NAME}=${dateStr}")"
+            ;;
+    esac
+
+    ec2-json "${cmd}" --loc="${location}" \
+        resources:json="${ids}" \
+        tags:json="${tagsJson}" \
+        '{ Resources: $resources } + $tags'
+}
+
 
 #
 # Main script
@@ -131,12 +169,14 @@ ids=($(lib find-instance "${findArgs[@]}")) \
 || exit "$?"
 
 case "${action}" in
-    protect-off) gerund='Unprotecting'; func=change-protection ;;
-    protect-on)  gerund='Protecting';   func=change-protection ;;
-    reboot)      gerund='Rebooting';    func=major-control     ;;
-    start)       gerund='Starting';     func=major-control     ;;
-    stop)        gerund='Stopping';     func=major-control     ;;
-    terminate)   gerund='Terminating';  func=major-control     ;;
+    cancel-terminate-after) gerund='Unqueueing termination for'; func=queue-terminate   ;;
+    protect-off)            gerund='Unprotecting' ;              func=change-protection ;;
+    protect-on)             gerund='Protecting';                 func=change-protection ;;
+    reboot)                 gerund='Rebooting';                  func=major-control     ;;
+    start)                  gerund='Starting';                   func=major-control     ;;
+    stop)                   gerund='Stopping';                   func=major-control     ;;
+    terminate)              gerund='Terminating';                func=major-control     ;;
+    terminate-after)        gerund='Queuing termination for';    func=queue-terminate   ;;
 esac
 
 progress-msg "${gerund} instance(s):"
