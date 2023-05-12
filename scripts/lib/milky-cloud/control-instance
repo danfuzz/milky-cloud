@@ -15,8 +15,8 @@ define-usage $'
 
     Controls major aspects of one or more instances.
 
-    --do=<action> :: cancel-terminate-after protect-off protect-on reboot start
-        stop terminate terminate-after
+    --do=<action> :: expire-after expire-off protect-off protect-on reboot start
+        stop terminate
       What action to perform. Must be specified.
     --id=<id-or-name>
       ID or name of the instance(s) to control, as with `find-instance` (see
@@ -29,7 +29,7 @@ define-usage $'
       Do not report an error if there are no matching instances.
     --time=<secs>
       Salient time of the action, as a Unix Epoch seconds count. Only used for
-      `terminate-after`.
+      `expire-after`.
     --vpc=<name-or-id>
       VPC where the instance must reside, named as with `find-vpc` (see which).
       If not specified, then this command will find an instance in any VPC (in
@@ -45,7 +45,7 @@ opt-action --call='{ usage; exit }' help/h
 
 # What to do to the instance(s).
 opt-value --required --var=action \
-    --enum='cancel-terminate-after protect-off protect-on reboot start stop terminate terminate-after' do
+    --enum='expire-after expire-off protect-off protect-on reboot start stop terminate' do
 
 # Name or ID to look up.
 opt-value --var=nameOrId --init='*' --filter='/./' id
@@ -116,20 +116,16 @@ function major-control {
 }
 
 # Sets or clears a termination date/time.
-function queue-terminate {
+function queue-expiry {
     local action="$1"
     local ids="$2"
 
-    local TAG_NAME='terminate-after'
+    local TAG_NAME='expired-after'
 
     # Convert `action`.
     local cmd='error' tagsJson=''
     case "${action}" in
-        cancel-terminate-after)
-            cmd='delete-tags'
-            tagsJson="$(lib tag-spec "${TAG_NAME}")"
-            ;;
-        terminate-after)
+        expire-after)
             if [[ ${timeSecs} == '' ]]; then
                 error-msg 'Missing required option --time.'
                 return 1
@@ -137,6 +133,10 @@ function queue-terminate {
             cmd='create-tags'
             local dateStr="$(lib timey print "${timeSecs}" '+%s %Y-%m-%d-%H%M%S')"
             tagsJson="$(lib tag-spec "${TAG_NAME}=${dateStr}")"
+            ;;
+        expire-off)
+            cmd='delete-tags'
+            tagsJson="$(lib tag-spec "${TAG_NAME}")"
             ;;
     esac
 
@@ -169,14 +169,14 @@ ids=($(lib find-instance "${findArgs[@]}")) \
 || exit "$?"
 
 case "${action}" in
-    cancel-terminate-after) gerund='Unqueueing termination for'; func=queue-terminate   ;;
-    protect-off)            gerund='Unprotecting' ;              func=change-protection ;;
-    protect-on)             gerund='Protecting';                 func=change-protection ;;
-    reboot)                 gerund='Rebooting';                  func=major-control     ;;
-    start)                  gerund='Starting';                   func=major-control     ;;
-    stop)                   gerund='Stopping';                   func=major-control     ;;
-    terminate)              gerund='Terminating';                func=major-control     ;;
-    terminate-after)        gerund='Queuing termination for';    func=queue-terminate   ;;
+    expire-after) gerund='Expiring';     func=queue-expiry      ;;
+    expire-off)   gerund='Unexpiring';   func=queue-expiry      ;;
+    protect-off)  gerund='Unprotecting'; func=change-protection ;;
+    protect-on)   gerund='Protecting';   func=change-protection ;;
+    reboot)       gerund='Rebooting';    func=major-control     ;;
+    start)        gerund='Starting';     func=major-control     ;;
+    stop)         gerund='Stopping';     func=major-control     ;;
+    terminate)    gerund='Terminating';  func=major-control     ;;
 esac
 
 progress-msg "${gerund} instance(s):"
