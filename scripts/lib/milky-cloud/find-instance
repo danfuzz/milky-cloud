@@ -119,6 +119,7 @@ resultArray="$(ec2-json describe-instances --loc="${location}" \
         region:         $region,
         state:          .State.Name,
         subnet:         .SubnetId,
+        terminateAfter: (.Tags | map(select(.Key == "terminate-after") | .Value)[0]),
         vpc:            .VpcId,
         zone:           .Placement.AvailabilityZone
     } |
