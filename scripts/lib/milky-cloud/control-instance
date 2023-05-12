@@ -109,24 +109,6 @@ function change-protection {
     done
 }
 
-# Filter the given list of instance info, returning only info on expired
-# instances.
-function filter-expired {
-    local infoJson="$1"
-
-    local nowSecs="$(lib timey now-secs)"
-
-    jget "${infoJson}" \
-        nowSecs:json="${nowSecs}" '
-        map(select(
-              ((.expiredAfter // "") | match("^[0-9]+").string | fromjson)
-                as $expiredAfter
-            |
-              $expiredAfter <= $nowSecs
-        ))
-    '
-}
-
 # Performs major control (rebooting, etc.).
 function major-control {
     local action="$1"
@@ -187,14 +169,17 @@ fi
 if [[ ${vpcNameOrId} != '' ]]; then
     findArgs+=(--vpc="${vpcNameOrId}")
 fi
+if (( expiredOnly )); then
+    findArgs+=(--expired)
+fi
 findArgs+=("${nameOrId}")
 
 instanceInfo="$(lib find-instance "${findArgs[@]}")" \
 || exit "$?"
 
-if (( expiredOnly )); then
-    intanceInfo="$(filter-expired "${instanceInfo}")" \
-    || exit "$?"
+if (( notFoundOk && ("$(jlength "${instanceInfo}")" == 0) )); then
+    info-msg 'No matching instances found. Not taking action.'
+    exit
 fi
 
 ids="$(jget "${instanceInfo}" 'map(.id)')" \
