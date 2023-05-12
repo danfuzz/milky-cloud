@@ -108,15 +108,13 @@ jval --output="${outputStyle}" \
     |
     transpose
     |
-    reduce .[] as $binding (
+    reduce .[] as [$key, $value] (
         [];
-          $binding as [$key, $value]
-        |
-          if ($value | startswith("=")) then
-              . + [{ Key: $key, Value: $value[1:] }]
-          else
-              . + [{ Key: $key }]
-          end
+        if ($value | startswith("=")) then
+            . + [{ Key: $key, Value: $value[1:] }]
+        else
+            . + [{ Key: $key }]
+        end
     )
     |
     { Tags: . }
