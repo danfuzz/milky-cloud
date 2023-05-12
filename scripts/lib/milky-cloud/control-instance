@@ -159,10 +159,7 @@ function queue-expiry {
 
 progress-msg --enable
 
-findArgs=(--loc="${location}" --output=json)
-if (( multipleResults )); then
-    findArgs+=(--multiple)
-fi
+findArgs=(--loc="${location}" --multiple --output=json)
 if (( notFoundOk )); then
     findArgs+=(--not-found-ok)
 fi
@@ -177,9 +174,20 @@ findArgs+=("${nameOrId}")
 instanceInfo="$(lib find-instance "${findArgs[@]}")" \
 || exit "$?"
 
-if (( notFoundOk && ("$(jlength "${instanceInfo}")" == 0) )); then
-    info-msg 'No matching instances found. Not taking action.'
-    exit
+instanceCount="$(jlength "${instanceInfo}")"
+
+if (( instanceCount == 0 )); then
+    if (( notFoundOk )); then
+        info-msg 'No matching instances found. Not taking action.'
+        exit
+    else
+        error-msg 'No matching instances found.'
+        exit 1
+    fi
+elif (( (instanceCount > 1) && !multipleResults )); then
+    error-msg 'Ambiguous search matches all of:'
+    error-msg --exec jget --output=raw "${instanceInfo}" '.[] | "  " + .id'
+    exit 1
 fi
 
 ids="$(jget "${instanceInfo}" 'map(.id)')" \
