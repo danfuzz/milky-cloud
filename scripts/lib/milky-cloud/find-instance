@@ -142,6 +142,7 @@ resultArray="$(ec2-json describe-instances --loc="${location}" \
     :: \
         region="${region}" '
     [.Reservations[].Instances[] | {
+        expiredAfter:   (.Tags | map(select(.Key == "expired-after") | .Value)[0]),
         hostPublicKey:  (.Tags | map(select(.Key == "host-public-key") | .Value)[0]),
         id:             .InstanceId,
         ipv6Address:    (.NetworkInterfaces[].Ipv6Addresses[0].Ipv6Address),
@@ -152,7 +153,6 @@ resultArray="$(ec2-json describe-instances --loc="${location}" \
         region:         $region,
         state:          .State.Name,
         subnet:         .SubnetId,
-        expiredAfter:   (.Tags | map(select(.Key == "expired-after") | .Value)[0]),
         vpc:            .VpcId,
         zone:           .Placement.AvailabilityZone
     } |
