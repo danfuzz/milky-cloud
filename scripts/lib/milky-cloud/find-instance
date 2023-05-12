@@ -20,8 +20,8 @@ define-usage $'
     --loc=<region-or-zone>
       Where to look. Must be specified.
     --multiple
-      Allow multiple matching instances. When specified, the result is a JSON
-      array instead of a single object.
+      Allow multiple matching instances. When specified and when using JSON
+      output, the result is a JSON array instead of a single object.
     --not-found-ok
       Do not report an error if there are no matching instances. Instead, print
       nothing or an empty JSON array (as appropriate, per specified options).
@@ -119,6 +119,7 @@ resultArray="$(ec2-json describe-instances --loc="${location}" \
         region:         $region,
         state:          .State.Name,
         subnet:         .SubnetId,
+        expiredAfter:   (.Tags | map(select(.Key == "expired-after") | .Value)[0]),
         vpc:            .VpcId,
         zone:           .Placement.AvailabilityZone
     } |

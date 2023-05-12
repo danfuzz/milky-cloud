@@ -18,8 +18,10 @@ define-usage $'
     is the only argument) or for merging with other arguments.
 
       <spec>
-        <name>=<value> -- Use <value> as a the binding for <name>. It is invalid
-          for a given name to be used more than once.
+        <name>[=<value>] -- Use <value> as a the binding for <name>, or without
+          <value> just indicate the tag name in the result (e.g. for a call to
+          `ec2 delete-tags`). It is invalid for a given name to be used more
+          than once.
 
       --name=<value>
         Adds a spec to bind `Name` (capitalized) to the given value. This is
@@ -29,7 +31,8 @@ define-usage $'
         Output style, as with `json-val`. Defaults to `json`.
       --type=<type>
         Resource type, if `TagSpecifications` output is wanted. If not specified,
-        the output is the `Tags` form suitable for `ec2 create-tags`.
+        the output is the `Tags` form suitable for `ec2 create-tags` or `ec2
+        delete-tags`.
 
     ${name} [--help | -h]
 
@@ -59,7 +62,7 @@ function parse-specs {
 
     while (( $# > 0 )); do
         arg="$1"
-        if ! [[ ${arg} =~ ^([-_:.a-zA-Z0-9]+)=(.*)$ ]]; then
+        if ! [[ ${arg} =~ ^([-_:.a-zA-Z0-9]+)(=.*)?$ ]]; then
             error-msg 'Could not parse tag specification:' "${arg}"
             error=1
         fi
@@ -83,7 +86,7 @@ process-args "$@" || usage --short
 # Add the binding from `--name`, if used.
 if [[ ${name} != '' ]]; then
     tagNames+=('Name')
-    tagValues+=("${name}")
+    tagValues+=("=${name}")
 fi
 
 # Check for duplicate names.
@@ -105,9 +108,13 @@ jval --output="${outputStyle}" \
     |
     transpose
     |
-    reduce .[] as $binding (
+    reduce .[] as [$key, $value] (
         [];
-        $binding as [$key, $value] | . + [{ Key: $key, Value: $value }]
+        if ($value | startswith("=")) then
+            . + [{ Key: $key, Value: $value[1:] }]
+        else
+            . + [{ Key: $key }]
+        end
     )
     |
     { Tags: . }

@@ -15,17 +15,23 @@ define-usage $'
 
     Controls major aspects of one or more instances.
 
-    --do=<action> :: protect-off protect-on reboot start stop terminate
+    --do=<action> :: expire-after expire-off protect-off protect-on reboot start
+        stop terminate
       What action to perform. Must be specified.
-    --loc=<region-or-zone>
-      Where to look for instances. Must be specified.
+    --expired
+      Limit the results to expired instances only.
     --id=<id-or-name>
       ID or name of the instance(s) to control, as with `find-instance` (see
       which).
+    --loc=<region-or-zone>
+      Where to look for instances. Must be specified.
     --multiple
       Allow multiple matching instances.
     --not-found-ok
       Do not report an error if there are no matching instances.
+    --time=<secs>
+      Salient time of the action, as a Unix Epoch seconds count. Only used for
+      `expire-after`.
     --vpc=<name-or-id>
       VPC where the instance must reside, named as with `find-vpc` (see which).
       If not specified, then this command will find an instance in any VPC (in
@@ -41,7 +47,10 @@ opt-action --call='{ usage; exit }' help/h
 
 # What to do to the instance(s).
 opt-value --required --var=action \
-    --enum='protect-off protect-on reboot start stop terminate' do
+    --enum='expire-after expire-off protect-off protect-on reboot start stop terminate' do
+
+# Expired instances only?
+opt-toggle --var=expiredOnly expired
 
 # Name or ID to look up.
 opt-value --var=nameOrId --init='*' --filter='/./' id
@@ -54,6 +63,9 @@ opt-toggle --var=multipleResults multiple
 
 # Ok if no instances found?
 opt-toggle --var=notFoundOk not-found-ok
+
+# Timestamp in seconds.
+opt-value --var=timeSecs --filter='/^[0-9]{10,12}$/' time
 
 # VPC to require.
 opt-value --var=vpcNameOrId --filter='/./' vpc
@@ -96,6 +108,24 @@ function change-protection {
     done
 }
 
+# Filter the given list of instance info, returning only info on expired
+# instances.
+function filter-expired {
+    local infoJson="$1"
+
+    local nowSecs="$(lib timey now-secs)"
+
+    jget "${infoJson}" \
+        nowSecs:json="${nowSecs}" '
+        map(select(
+              ((.expiredAfter // "") | match("^[0-9]+").string | fromjson)
+                as $expiredAfter
+            |
+              $expiredAfter <= $nowSecs
+        ))
+    '
+}
+
 # Performs major control (rebooting, etc.).
 function major-control {
     local action="$1"
@@ -108,6 +138,37 @@ function major-control {
     || return "$?"
 }
 
+# Sets or clears a termination date/time.
+function queue-expiry {
+    local action="$1"
+    local ids="$2"
+
+    local TAG_NAME='expired-after'
+
+    # Convert `action`.
+    local cmd='error' tagsJson=''
+    case "${action}" in
+        expire-after)
+            if [[ ${timeSecs} == '' ]]; then
+                error-msg 'Missing required option --time.'
+                return 1
+            fi
+            cmd='create-tags'
+            local dateStr="$(lib timey print "${timeSecs}" '+%s %Y-%m-%d-%H%M%S')"
+            tagsJson="$(lib tag-spec "${TAG_NAME}=${dateStr}")"
+            ;;
+        expire-off)
+            cmd='delete-tags'
+            tagsJson="$(lib tag-spec "${TAG_NAME}")"
+            ;;
+    esac
+
+    ec2-json "${cmd}" --loc="${location}" \
+        resources:json="${ids}" \
+        tags:json="${tagsJson}" \
+        '{ Resources: $resources } + $tags'
+}
+
 
 #
 # Main script
@@ -115,7 +176,7 @@ function major-control {
 
 progress-msg --enable
 
-findArgs=(--loc="${location}" --output=id)
+findArgs=(--loc="${location}" --output=json)
 if (( multipleResults )); then
     findArgs+=(--multiple)
 fi
@@ -127,22 +188,30 @@ if [[ ${vpcNameOrId} != '' ]]; then
 fi
 findArgs+=("${nameOrId}")
 
-ids=($(lib find-instance "${findArgs[@]}")) \
+instanceInfo="$(lib find-instance "${findArgs[@]}")" \
+|| exit "$?"
+
+if (( expiredOnly )); then
+    intanceInfo="$(filter-expired "${instanceInfo}")" \
+    || exit "$?"
+fi
+
+ids="$(jget "${instanceInfo}" 'map(.id)')" \
 || exit "$?"
 
 case "${action}" in
-    protect-off) gerund='Unprotecting'; func=change-protection ;;
-    protect-on)  gerund='Protecting';   func=change-protection ;;
-    reboot)      gerund='Rebooting';    func=major-control     ;;
-    start)       gerund='Starting';     func=major-control     ;;
-    stop)        gerund='Stopping';     func=major-control     ;;
-    terminate)   gerund='Terminating';  func=major-control     ;;
+    expire-after) gerund='Expiring';     func=queue-expiry      ;;
+    expire-off)   gerund='Unexpiring';   func=queue-expiry      ;;
+    protect-off)  gerund='Unprotecting'; func=change-protection ;;
+    protect-on)   gerund='Protecting';   func=change-protection ;;
+    reboot)       gerund='Rebooting';    func=major-control     ;;
+    start)        gerund='Starting';     func=major-control     ;;
+    stop)         gerund='Stopping';     func=major-control     ;;
+    terminate)    gerund='Terminating';  func=major-control     ;;
 esac
 
 progress-msg "${gerund} instance(s):"
-progress-msg --exec printf '  %s\n' "${ids[@]}"
-
-ids="$(jarray --input=strings "${ids[@]}")"
+progress-msg --exec jget --output=raw "${ids}" '.[] | "  " + .'
 
 "${func}" "${action}" "${ids}" \
 || exit "$?"
