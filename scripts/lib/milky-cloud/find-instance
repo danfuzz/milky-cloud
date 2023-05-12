@@ -17,6 +17,8 @@ define-usage $'
     prints some information about them. <name-or-id> accepts `*` as a wildcard
     character.
 
+    --expired
+      Limit the results to expired instances only.
     --loc=<region-or-zone>
       Where to look. Must be specified.
     --multiple
@@ -43,6 +45,9 @@ define-usage $'
 # Want help?
 opt-action --call='{ usage; exit }' help/h
 
+# Expired instances only?
+opt-toggle --var=expiredOnly expired
+
 # Location (region or availability zone).
 opt-value --required --var=location --filter='/[-a-z0-9]+/' loc
 
@@ -65,6 +70,29 @@ opt-value --var=vpcNameOrId --filter='/./' vpc
 positional-arg --required --var=nameOrId name-or-id
 
 process-args "$@" || usage --short
+
+
+#
+# Helper functions
+#
+
+# Filter the given list of instance info, returning only info on expired
+# instances.
+function filter-expired {
+    local infoJson="$1"
+
+    local nowSecs="$(lib timey now-secs)"
+
+    jget "${infoJson}" \
+        nowSecs:json="${nowSecs}" '
+        map(select(
+              ((.expiredAfter // "") | match("^[0-9]+").string | fromjson)
+                as $expiredAfter
+            |
+              $expiredAfter <= $nowSecs
+        ))
+    '
+}
 
 
 #
@@ -103,6 +131,11 @@ fi
 if [[ ${zone} != '' ]]; then
     filters+=(availability-zone="${zone}")
 fi
+if (( expiredOnly )); then
+    # Will limit results to those with the tag, but then we have to filter
+    # based on the actual tag value.
+    filters+=(tag-key='expired-after')
+fi
 
 resultArray="$(ec2-json describe-instances --loc="${location}" \
     "$(lib filter-spec "${filters[@]}")" \
@@ -134,6 +167,12 @@ if (( !terminatedOk )); then
     # the AWS API doesn't have a way to say "not this value" in its filters.
     resultArray="$(jget "${resultArray}" \
         'map(select(.state != "terminated"))')" \
+    || exit "$?"
+fi
+
+if (( expiredOnly )); then
+    # Similar reasoning to above.
+    resultArray="$(filter-expired "${resultArray}")" \
     || exit "$?"
 fi
 
