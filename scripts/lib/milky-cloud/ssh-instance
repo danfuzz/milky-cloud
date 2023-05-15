@@ -169,13 +169,16 @@ function authorize-host {
     local address="$1"
     local publicKey="$2"
 
-    local hostsFile="${HOME}/.ssh/known_hosts"
+    local sshDir="${HOME}/.ssh"
+    local hostsFile="${sshDir}/known_hosts"
     local hostLine="${address} ${publicKey}"
 
     local already=''
     if [[ -e "${hostsFile}" ]]; then
         already="$(ssh-keygen -f "${hostsFile}" -F "${address}" | tail -1)" \
         || return "$?"
+    else
+        mkdir -p "${sshDir}" # Just in case.
     fi
 
     if [[ ${already} != ${hostLine} ]]; then
@@ -204,6 +207,14 @@ function find-secret {
 #
 # Main script
 #
+
+if [[ ${SSH_AUTH_SOCK+set} != 'set' ]]; then
+    # There is no SSH agent running, so just re-run this command under a new
+    # agent, which will only exist for the life of the command. Maybe there's a
+    # better way to handle this case?
+    exec ssh-agent "$(this-cmd-path)" "$@" \
+    || exit "$?"
+fi
 
 if [[ ${secretSourcePath} != '' ]]; then
     find-secret "${secretSourcePath}" \
