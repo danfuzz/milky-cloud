@@ -131,7 +131,7 @@ function add-attributes {
 function filter-expired {
     local infoJson="$1"
 
-    local nowSecs="$(lib timey now-secs)"
+    local nowSecs="$(lib timey secs now)"
 
     jget "${infoJson}" \
         nowSecs:json="${nowSecs}" '

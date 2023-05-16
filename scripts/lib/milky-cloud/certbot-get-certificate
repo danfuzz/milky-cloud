@@ -195,17 +195,6 @@ function date-util {
     fi
 
     case "${cmd}" in
-        now-secs)
-            date '+%s'
-            ;;
-        print)
-            local secs="$1"
-            if [[ ${impl} == gnu ]]; then
-                date --date="@${secs}"
-            else
-                date -r "${secs}"
-            fi
-            ;;
         rfc822-secs)
             local time="$1"
             if [[ ${impl} == gnu ]]; then
@@ -327,11 +316,11 @@ function lifetime-check {
     fi
 
     local expireSecs="$(date-util rfc822-secs "${BASH_REMATCH[1]}")"
-    local nowSecs="$(date-util now-secs)"
+    local nowSecs="$(lib timey secs now)"
     local remainingDays=$(( (expireSecs - nowSecs) / SECS_PER_DAY ))
 
     info-msg 'Existing certificate expires:'
-    info-msg "  $(date-util print "${expireSecs}")"
+    info-msg "  $(lib timey print "${expireSecs}")"
 
     case "${remainingDays}" in
         -*)
