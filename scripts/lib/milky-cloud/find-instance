@@ -19,7 +19,8 @@ define-usage $'
 
     --attributes
       Add info about useful attributes (as in `ec2 describe-instance-attribute`)
-      to the results.
+      to the results. (This is not done by default because it is unfortunately
+      heavyweight, requiring two additional AWS API calls per result.)
     --expired
       Limit the results to expired instances only.
     --loc=<region-or-zone>
