@@ -181,34 +181,6 @@ function cleanup-hook {
     fi
 }
 
-# Date utilities that work with both BSD and GNU `date`.
-function date-util {
-    local cmd="$1"
-    shift
-
-    # Gross hack: If `date` has the `--version` option then it's GNU, otherwise
-    # it's BSD.
-    if date --version 1>&/dev/null; then
-        local impl=gnu
-    else
-        local impl=bsd
-    fi
-
-    case "${cmd}" in
-        rfc822-secs)
-            local time="$1"
-            if [[ ${impl} == gnu ]]; then
-                date --date="${time}" '+%s'
-            else
-                date -j -f '%b %d %T %Y %Z' "${time}" '+%s'
-            fi
-            ;;
-        *)
-            error-msg "Unknown date command: ${cmd}"
-            return 1
-    esac
-}
-
 # "Extra clean" cleanup hook: Remove all the records from ACME (Certbot)
 # requests on all the domains used in this run.
 function extra-cleanup {
@@ -315,7 +287,7 @@ function lifetime-check {
         return 1
     fi
 
-    local expireSecs="$(date-util rfc822-secs "${BASH_REMATCH[1]}")"
+    local expireSecs="$(lib timey secs --input=rfc822 "${BASH_REMATCH[1]}")"
     local nowSecs="$(lib timey secs now)"
     local remainingDays=$(( (expireSecs - nowSecs) / SECS_PER_DAY ))
 
