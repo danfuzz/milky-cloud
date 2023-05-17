@@ -11,13 +11,13 @@
 #
 
 define-usage $'
-    ${name} [<opt> ...] <zone-or-region>
+    ${name} [<opt> ...] <location>
 
     Parses a location -- a region or availability zone -- and if valid then
     optionally prints out one of the components.
 
     --input=<style>
-      `any` -- Accept either an availability zone or region as <zone-or-region>.
+      `any` -- Accept either an availability zone or region as <location>.
         This is the default.
       `region` -- Require a region.
       `zone` -- Require an availability zone.
@@ -29,6 +29,8 @@ define-usage $'
         input). This implies `--input=zone`.
       `zone-suffix` -- Output the zone suffix (everything after the region).
         This implies `--input=zone`.
+    --quiet
+      Do not print an error if the given <location> is invalid.
 
     ${name} [--help | -h]
 
@@ -44,43 +46,60 @@ opt-value --var=inputType --init=any --enum='any region zone' input
 # Item to output.
 opt-value --var=outputItem --init=none --enum='none json region zone zone-suffix' output
 
-# Location to parse, and parsed bits.
-region=''
-zoneSuffix=''
-positional-arg --required --var=zoneOrRegion --call=parse-zone-or-region zone-or-region
-function parse-zone-or-region {
-    if [[ ! $1 =~ ^([a-z]{2}-[a-z]+-[0-9]+)([a-z]|-[a-z]+-[0-9]+[a-z])?$ ]]; then
-        error-msg 'Invalid value for argument <zone-or-region>:' "$1"
-        exit 1
-    fi
+# Quiet? (Suppress error messages?)
+opt-toggle --var=quiet quiet
 
-    region="${BASH_REMATCH[1]}"
-    zoneSuffix="${BASH_REMATCH[2]}"
-}
+# Location to parse.
+positional-arg --required --var=location location
 
 process-args "$@" || usage --short
-
-if [[ ${outputItem} =~ ^zone ]]; then
-    # Don't allow region input if we are to print a zone-ish thing.
-    inputType='zone'
-fi
 
 
 #
 # Main script
 #
 
-# Validate the required input type, if needed.
+# Basic validation and identification.
+
+region=''
+zone=''
+zoneSuffix=''
+
+# Note: The length limits are based on observation, plus a dose of leeway.
+if [[ ! ${location} =~ ^([a-z]{2}-[a-z]{3,10}-[0-9])([a-z]|-[a-z]{2,5}-[0-9][a-z])?$ ]]; then
+    if (( !quiet )); then
+        error-msg "Invalid value for argument <location>: ${location}"
+    fi
+    exit 1
+fi
+
+region="${BASH_REMATCH[1]}"
+zoneSuffix="${BASH_REMATCH[2]}"
+if [[ ${zoneSuffix} != '' ]]; then
+    zone="${location}"
+fi
+
+# Validate the specific required input type.
+
+if [[ ${outputItem} =~ ^zone ]]; then
+    # Don't allow region input if we are to print a zone-ish thing.
+    inputType='zone'
+fi
+
 case "${inputType}" in
     region)
-        if [[ ${zoneSuffix} != '' ]]; then
-            error-msg "Region required; got zone: ${zoneOrRegion}"
+        if [[ ${zone} != '' ]]; then
+            if (( !quiet )); then
+                error-msg "Region required; got zone: ${location}"
+            fi
             exit 1
         fi
         ;;
     zone)
-        if [[ ${zoneSuffix} == '' ]]; then
-            error-msg "Zone required; got region: ${zoneOrRegion}"
+        if [[ ${zone} == '' ]]; then
+            if (( !quiet )); then
+                error-msg "Zone required; got region: ${location}"
+            fi
             exit 1
         fi
         ;;
@@ -90,7 +109,7 @@ esac
 case "${outputItem}" in
     json)
         jval \
-            location="${zoneOrRegion}" \
+            location="${location}" \
             region="${region}" \
             zoneSuffix="${zoneSuffix}" '
         {
@@ -109,7 +128,7 @@ case "${outputItem}" in
         echo "${region}"
         ;;
     zone)
-        echo "${zoneOrRegion}"
+        echo "${location}"
         ;;
     zone-suffix)
         echo "${zoneSuffix}"
