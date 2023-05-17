@@ -93,10 +93,12 @@ rest-arg --var=postArgs post-arg
 
 process-args "$@" || usage --short
 
-if (( ${#postArgs[@]} != 0 )) && [[ ${postArgs[0]} != '::' ]]; then
-    error-msg 'First post-processing argument must be `::`.'
-    usage --short
-    exit 1
+if (( ${#postArgs[@]} != 0 )); then
+    jpostproc --check "${postArgs[@]}" \
+    || {
+        usage --short
+        exit 1
+    }
 fi
 
 if (( multipleResults )); then
@@ -347,11 +349,5 @@ else
     result="$(jget "${resultArray}" '.[0]')"
 fi
 
-# Perform client-directed post-processing if any.
-
-if (( ${#postArgs[@]} == 0 )); then
-    jget "${result}"
-else
-    error-msg 'Post-processing not yet available. Sorry!'
-    exit 1
-fi
+# Perform client-directed post-processing (if any).
+jpostproc <<<"${result}" "${postArgs[@]}"
