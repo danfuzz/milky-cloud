@@ -105,6 +105,7 @@ function address-info {
 
     local userid=''
     local hostPublicKey=''
+    local name=''
     local addressIsHostname=0
 
     # Split off the userid, if present.
@@ -119,9 +120,10 @@ function address-info {
     if [[ ${address} =~ ^.*[.]([^.]+)$ ]]; then
         local maybeLoc="${BASH_REMATCH[1]}"
         if ! lib parse-location --quiet "${maybeLoc}"; then
-            # Not actually a location. See if it's a hostname.
+            # Not actually a location. See if it's a hostname (or IP address).
             if host >/dev/null 2>&1 "${address}"; then
                 addressIsHostname=1
+                name="${address}"
             fi
         fi
     fi
@@ -142,6 +144,7 @@ function address-info {
 
         address="$(jget --output=raw "${infoJson}" '.publicAddress')"
         hostPublicKey="$(jget --output=raw "${infoJson}" '.hostPublicKey // ""')"
+        name="$(jget --output=raw "${infoJson}" '.fullName')"
     fi
 
     # If a userid wasn't part of the original address, and there is a default,
@@ -151,13 +154,15 @@ function address-info {
     fi
 
     jval \
-        userid="${userid}" \
         address="${address}" \
         hostPublicKey="${hostPublicKey}" \
+        name="${name}" \
+        userid="${userid}" \
         '{
-            userid:        $userid,
             address:       $address,
-            hostPublicKey: $hostPublicKey
+            hostPublicKey: $hostPublicKey,
+            name:          $name,
+            userid:        $userid
         }'
 }
 
@@ -259,7 +264,12 @@ if (( ${#command[@]} != 0 )); then
 fi
 
 if (( announce )); then
-    info-msg "Connecting to: ${address}"
+    name="$(jget --output=raw "${addressInfo}" '.name')"
+    info-msg 'Connecting to:'
+    if [[ ${name} != '' ]]; then
+        info-msg "  ${name}"
+    fi
+    info-msg "  ${address}"
 fi
 
 exec "${sshCommand[@]}"
