@@ -116,7 +116,7 @@ function rsync-callback {
 
 # What's going on: The "rsh" command passed to `rsync` is a single string, with
 # non-standard rules about how to do special-character quoting. Rather than deal
-# with this directly, we just base64-encode the `ssh-instance` arguments, and
+# with this directly, we just base64-encode the `instance ssh` arguments, and
 # tell `rsync` to call back to this script. When we get called back, we both
 # deal with the argument decoding _and_ interpreting the normal `rsh`/`ssh`
 # arguments it passes.
