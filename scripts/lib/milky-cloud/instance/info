@@ -299,12 +299,12 @@ resultArray="$(ec2-json describe-instances --loc="${location}" \
         vpcName:        .VpcId,
         zone:           .Placement.AvailabilityZone
     }
-    | .fullName = .name + "." + .vpcName + "." + .region
-    | .nameDotRegion = .name + "." + .region
     |
     if $vpcName != "" then
         .vpcName = $vpcName
     else . end
+    | .fullName = .name + "." + .vpcName + "." + .region
+    | .nameDotRegion = .name + "." + .region
     ]'
 )" \
 || exit "$?"
