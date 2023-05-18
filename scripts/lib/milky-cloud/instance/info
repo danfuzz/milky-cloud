@@ -339,7 +339,8 @@ if (( (resultLength == 0) && !notFoundOk )); then
     exit 1
 elif (( (resultLength > 1) && !multipleResults )); then
     error-msg 'Ambiguous search matches all of:'
-    error-msg --exec jget --output=raw "${resultArray}" '.[] | "  " + .id'
+    error-msg --exec jget --output=raw "${resultArray}" \
+        '.[] | "  \(.id): \(.name)"'
     exit 1
 fi
 
