@@ -1,0 +1,114 @@
+#!/bin/bash
+#
+# Copyright 2022-2023 the Milky-cloud Authors (Dan Bornstein et alia).
+# SPDX-License-Identifier: Apache-2.0
+
+. "$(dirname "$(readlink -f "$0")")/_init.sh" || exit "$?"
+. "$(this-cmd-dir)/control-help.sh"
+
+
+#
+# Argument parsing
+#
+
+define-usage $'
+    ${name} [<opt> ...]
+
+    Protects or unprotects one or more instances. When protected, the two AWS
+    attributes `disableApiStop` and `disableApiTermination` are turned on.
+    Most options are passed through to `instance info` to determine which
+    instance(s) to act on.
+
+    --off
+      Turn on instance protection. Either this or `--on` must be specified.
+    --on
+      Turn off instance protection. Either this or `--off` must be specified.
+
+    Options passed through to `instance info`:
+      --default-loc=<region-or-zone>
+      --default-vpc=<id-spec>
+      --expired=<choice> :: `exclude` `include` `only`
+      --id=<id-spec>
+      --multiple
+      --not-found-ok
+
+    ${name} [--help | -h]
+
+    Displays this message.
+'
+
+# Want help?
+opt-action --call='{ usage; exit }' help/h
+
+# Options passed through to `instance info`.
+usual-info-opts
+
+# Protection state.
+opt-toggle --var=notState --init='' off
+opt-toggle --var=state on
+
+require-exactly-one-arg-of off on
+
+process-args "$@" || usage --short
+
+# If `--off` was specified, propagate its opposite to `state`.
+if [[ ${notState} != '' ]]; then
+    state=$(( !notState ))
+fi
+
+
+#
+# Helper functions
+#
+
+# Protection implementation, plugged into the control skeleton.
+function protect-impl {
+    local ids
+    local loc
+    local state
+
+    while (( $# > 0 )); do
+        case "$1" in
+            --state=*) state="${1#*=}" ;;
+            --ids=*)   ids="${1#*=}"   ;;
+            --loc=*)   loc="${1#*=}"   ;;
+            *)
+                error-msg $'Shouldn\'t happen!'
+                return 1
+        esac
+        shift
+    done
+
+    # Convert `ids` to a regular array.
+    ids=($(jget --output=raw "${ids}" '.[]'))
+
+    local id attrib
+    for id in "${ids[@]}"; do
+        for attrib in 'DisableApiStop' 'DisableApiTermination'; do
+            ec2-json modify-instance-attribute --loc="${loc}" \
+                id="${id}" \
+                attrib="${attrib}" \
+                value:json="${state}" \
+                '{
+                    InstanceId: $id,
+                    ($attrib):  { Value: $value }
+                }' \
+            || return "$?"
+        done
+    done
+}
+
+
+#
+# Main script
+#
+
+if (( state )); then
+    label='Protecting'
+    state=true
+else
+    label='Unprotecting'
+    state=false
+fi
+
+instance-control-skeleton "${label}" protect-impl --state="${state}"
