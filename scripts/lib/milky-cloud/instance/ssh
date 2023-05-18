@@ -33,6 +33,9 @@ define-usage $'
     to the default SSH behavior (of using `~/.ssh/config` and defaulting to
     `~/.ssh/id_*`).
 
+    --announce
+      Announce info about the connection before connecting. Can be useful when
+      connecting to instances named via wildcards.
     --default-loc=<region-or-zone>
       Location to use if one is not specified in the <instance>.
     --default-vpc=<id-spec>
@@ -54,6 +57,9 @@ define-usage $'
 
 # Want help?
 opt-action --call='{ usage; exit }' help/h
+
+# Announce connection?
+opt-toggle --var=announce announce
 
 # Default location (region or zone).
 opt-value --var=defaultLocation --filter='/./' default-loc
@@ -250,6 +256,10 @@ if (( ${#command[@]} != 0 )); then
         # Apply "armor" to the command and all arguments.
         sshCommand+=($(printf '%q ' "${command[@]}"))
     fi
+fi
+
+if (( announce )); then
+    info-msg "Connecting to: ${address}"
 fi
 
 exec "${sshCommand[@]}"

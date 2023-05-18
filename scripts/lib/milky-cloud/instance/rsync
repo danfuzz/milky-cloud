@@ -16,8 +16,8 @@ define-usage $'
     `instance ssh` to make the connection (see which for details).
 
     Options passed through to `rsync`: --archive --checksum --delete --verbose
-    Options passed through to `instance ssh`: --default-loc --default-userid
-      --default-vpn --key --secret
+    Options passed through to `instance ssh`: --announce --default-loc
+      --default-userid --default-vpn --key --secret
 
     ${name} [--help | -h]
 
@@ -39,6 +39,7 @@ unset opt
 
 # Passed through to `instance ssh`.
 sshOpts=()
+opt-toggle --call='{ sshOpts+=(--announce="$1") }' announce
 opt-value --call='{ sshOpts+=(--default-loc="$1") }' default-loc
 opt-value --call='{ sshOpts+=(--default-userid="$1") }' default-userid
 opt-value --call='{ sshOpts+=(--default-vpn="$1") }' default-vpn
