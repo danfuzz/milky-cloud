@@ -44,8 +44,7 @@ define-usage $'
       Which OS to install. See `find-ami` for details about default and options.
     --output=<style> :: `id` `json` `none`
       What to print on successful output. `id` is just the plain ID (no quotes).
-      `json` is the same as what is printed by `find-instance`. Defaults to
-      `id`.
+      `json` is the same as what is printed by `instance info`. Defaults to `id`.
     --security-group=<name-or-id>
       Name or ID of the security group to use for network access control. If
       specified, this is used to derive the VPC to use, and in conjunction with
