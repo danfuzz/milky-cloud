@@ -9,10 +9,46 @@
 _control_infoOpts=()
 
 # Main implementation for control subcommands that issue one of the standard EC2
-# commands
+# commands.
 function instance-control-ec2 {
     local cmd="$1"
     local label="$2"
+
+    # No point in defining this before we need it.
+    function _control_ec2-impl {
+        local cmd
+        local ids
+        local loc
+
+        while (( $# > 0 )); do
+            case "$1" in
+                --cmd=*) cmd="${1#*=}" ;;
+                --ids=*) ids="${1#*=}" ;;
+                --loc=*) loc="${1#*=}" ;;
+                *)
+                    error-msg $'Shouldn\'t happen!'
+                    return 1
+            esac
+            shift
+        done
+
+        ec2-json "${cmd}" --loc="${loc}" \
+            ids:json="${ids}" \
+            '{ InstanceIds: $ids }' \
+            :: --output=none
+    }
+
+    instance-control-skeleton "${label}" _control_ec2-impl --cmd="${cmd}" \
+    && unset -f _control_ec2-impl
+}
+
+# Basic implementation for control subcommands, with a hole for the actual
+# control part (function passed by name).
+function instance-control-skeleton {
+    local label="$1"
+    local implFunc="$2"
+    shift 2
+    local implArgs=("$@")
 
     progress-msg --enable
 
@@ -40,10 +76,7 @@ function instance-control-ec2 {
     info-msg --exec jget --output=raw "${instanceInfo}" '
         .[] | "  \(.id): \(.name)"'
 
-    ec2-json "${cmd}" --loc="${region}" \
-        ids:json="${idsJson}" \
-        '{ InstanceIds: $ids }' \
-        :: --output=none \
+    "${implFunc}" --loc="${region}" --ids="${idsJson}" "${implArgs[@]}" \
     || return "$?"
 
     progress-msg 'Done.'
