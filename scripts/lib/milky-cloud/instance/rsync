@@ -1,0 +1,130 @@
+#!/bin/bash
+#
+# Copyright 2022-2023 the Milky-cloud Authors (Dan Bornstein et alia).
+# SPDX-License-Identifier: Apache-2.0
+
+. "$(dirname "$(readlink -f "$0")")/_init.sh" || exit "$?"
+
+#
+# Argument parsing
+#
+
+define-usage $'
+    ${name} [<opt> ...] <rsync-arg> ...
+
+    Uses `rsync` to copy files to or from the indicated instance, using
+    `instance ssh` to make the connection (see which for details).
+
+    Options passed through to `rsync`: --archive --checksum --delete --verbose
+    Options passed through to `instance ssh`: --announce --default-loc
+      --default-userid --default-vpn --key --secret
+
+    ${name} [--help | -h]
+
+    Displays this message.
+'
+
+# Want help?
+opt-action --call='{ usage; exit }' help/h
+
+# Used when this script calls through to itself via `rsync`.
+opt-toggle --var=fromRsync from-rsync
+
+# Passed through to `rsync`.
+rsyncOpts=()
+for opt in archive checksum delete verbose; do
+    opt-toggle --call="{ rsyncOpts+=(--${opt}) }" "${opt}"
+done
+unset opt
+
+# Passed through to `instance ssh`.
+sshOpts=()
+opt-toggle --call='{ sshOpts+=(--announce="$1") }' announce
+opt-value --call='{ sshOpts+=(--default-loc="$1") }' default-loc
+opt-value --call='{ sshOpts+=(--default-userid="$1") }' default-userid
+opt-value --call='{ sshOpts+=(--default-vpn="$1") }' default-vpn
+opt-value --call='{ sshOpts+=(--key="$1") }' key
+opt-value --call='{ sshOpts+=(--secret="$1") }' secret
+
+# Main arguments.
+rest-arg --var=args arg
+
+process-args "$@" || usage --short
+
+
+#
+# Helper functions
+#
+
+# Constructs and performs the call to `rsync`.
+function call-rsync {
+    local rshCmd=("$(this-cmd-path)" --from-rsync --)
+
+    local opt
+    for opt in "${sshOpts[@]}"; do
+        rshCmd+=("$(base64 <<<"${opt}")")
+    done
+    rshCmd+=('::')
+
+    # Note: The main reason `--omit-dir-times` is being used here is to avoid
+    # `rsync` always saying (when `--verbose`) that directories are updated even
+    # when no files changed in them, in the case where date stamps don't match
+    # (e.g. when sync'ing a rebuilt set of files).
+    local rsyncCmd=(
+        rsync --rsh="${rshCmd[*]}" --omit-dir-times "${rsyncOpts[@]}" --
+    )
+
+    exec "${rsyncCmd[@]}" "$@"
+}
+
+# Handles the inner callback from `rsync` to this script.
+function rsync-callback {
+    local sshCmd=("$(lib --path instance ssh)")
+
+    local arg
+    while (( $# > 0 )); do
+        arg="$1"
+        shift
+
+        if [[ ${arg} == '::' ]]; then
+            break
+        fi
+
+        sshCmd+=("$(base64 <<<"${arg}" --decode)")
+    done
+
+    local sshTarget=''
+    if [[ $1 == '-l' ]]; then
+        # This is the userid to log in as.
+        sshTarget="$2@"
+        shift 2
+    fi
+
+    local sshHost="$1"
+    shift
+    sshTarget+="${sshHost}"
+
+    sshCmd+=(--script -- "${sshTarget}" "$@")
+
+    exec "${sshCmd[@]}"
+}
+
+
+#
+# Main script
+#
+
+# What's going on: The "rsh" command passed to `rsync` is a single string, with
+# non-standard rules about how to do special-character quoting. Rather than deal
+# with this directly, we just base64-encode the `ssh-instance` arguments, and
+# tell `rsync` to call back to this script. When we get called back, we both
+# deal with the argument decoding _and_ interpreting the normal `rsh`/`ssh`
+# arguments it passes.
+
+if (( fromRsync )); then
+    # We are being called from within `rsync`.
+    rsync-callback "${args[@]}"
+else
+    # We need to build up an "rsh" command and call `rsync` with it.
+    call-rsync "${args[@]}"
+fi

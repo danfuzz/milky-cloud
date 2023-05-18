@@ -1,0 +1,46 @@
+#!/bin/bash
+#
+# Copyright 2022-2023 the Milky-cloud Authors (Dan Bornstein et alia).
+# SPDX-License-Identifier: Apache-2.0
+
+. "$(dirname "$(readlink -f "$0")")/_init.sh" || exit "$?"
+. "$(this-cmd-dir)/control-help.sh"
+
+
+#
+# Argument parsing
+#
+
+define-usage $'
+    ${name} [<opt> ...]
+
+    Reboots one or more instances. Options are passed through to `instance info`
+    to determine which instance(s) to act on.
+
+    Options:
+      --default-loc=<region-or-zone>
+      --default-vpc=<id-spec>
+      --expired=<choice> :: `exclude` `include` `only`
+      --id=<id-spec>
+      --multiple
+      --not-found-ok
+
+    ${name} [--help | -h]
+
+    Displays this message.
+'
+
+# Want help?
+opt-action --call='{ usage; exit }' help/h
+
+# Options passed through to `instance info`.
+usual-info-opts
+
+process-args "$@" || usage --short
+
+
+#
+# Main script
+#
+
+instance-control-ec2 reboot-instances 'Rebooting'

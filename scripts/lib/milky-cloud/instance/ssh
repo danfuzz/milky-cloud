@@ -1,0 +1,275 @@
+#!/bin/bash
+#
+# Copyright 2022-2023 the Milky-cloud Authors (Dan Bornstein et alia).
+# SPDX-License-Identifier: Apache-2.0
+
+. "$(dirname "$(readlink -f "$0")")/_init.sh" || exit "$?"
+
+
+#
+# Argument parsing
+#
+
+define-usage $'
+    ${name} [<opt> ...] [<user>@]<instance> [<command> <arg> ...]
+
+    Logs into the indicated instance (by name or IP address), either interactively
+    or to execute a command.
+
+    The <instance> can be specified as a DNS name, an IP address, or instance ID
+    as defined by `instance info` (see which).
+
+    If a <user> is not specified (and `--default-userid` is not used), then this
+    command will fall back to the default SSH behavior (of using `~/.ssh/config`
+    and defaulting to the local userid).
+
+    If a <command> and <arg>s are specified, these are passed through to the
+    instance such that they are unparsed by any intermediate shell (e.g., spaces
+    in arguments don\'t cause arguments to be split), _unlike_ the usual (and
+    often annoying and surprising) baseline SSH behavior. In case the usual
+    behavior is needed, the `--script` option does that.
+
+    If neither `--key` nor `--secret` is specified, this command will fall back
+    to the default SSH behavior (of using `~/.ssh/config` and defaulting to
+    `~/.ssh/id_*`).
+
+    --announce
+      Announce info about the connection before connecting. Can be useful when
+      connecting to instances named via wildcards.
+    --default-loc=<region-or-zone>
+      Location to use if one is not specified in the <instance>.
+    --default-vpc=<id-spec>
+      VPC ID to use if one is not specified in the <instance>. Accepts wildcards.
+    --default-userid=<userid>
+      Userid to log in as, if not present in the first (non-option) argument.
+    --key=<path>
+      Filesystem path to the private key (identity file).
+    --script
+      Treat <command> and <args> as a script, per default `ssh` behavior.
+    --secret=\'<source> <path>\'
+      Secret source and path for the private key. It is expected to be in the
+      space-separated form used by `secret-access` (see which).
+
+    ${name} [--help | -h]
+
+    Displays this message.
+'
+
+# Want help?
+opt-action --call='{ usage; exit }' help/h
+
+# Announce connection?
+opt-toggle --var=announce announce
+
+# Default location (region or zone).
+opt-value --var=defaultLocation --filter='/./' default-loc
+
+# Default userid.
+opt-value --var=defaultUserid --filter='/./' default-userid
+
+# Default VPC (name or ID).
+opt-value --var=defaultVpc --init='*' --filter='/./' default-vpc
+
+# Path to the key file.
+opt-value --var=keyPath --filter='/./' key
+
+# Treat positional arguments as a script?
+opt-toggle --var=script script
+
+# Secret vault path to the key file.
+opt-value --var=secretSourcePath --filter='/./' secret
+
+# Instance name with optional userid.
+positional-arg --required --var=userAtInstance user-at-instance
+
+# Command and arguments.
+rest-arg --var=command command
+
+process-args "$@" || usage --short
+
+if [[ (${keyPath} != '') && (${secretSourcePath} != '') ]]; then
+    error-msg 'Can only specify at most one of --key or --secret.'
+    exit 1
+fi
+
+
+#
+# Helper functions
+#
+
+# Interprets a `user@host` string, interpreting loc/name lookups by finding
+# instances by name. Prints JSON info of the results, for ultimate
+# recombination.
+function address-info {
+    local address="$1"
+
+    local userid=''
+    local hostPublicKey=''
+    local name=''
+    local addressIsHostname=0
+
+    # Split off the userid, if present.
+    if [[ ${address} =~ ^([^@]+)@(.+)$ ]]; then
+        userid="${BASH_REMATCH[1]}"
+        address="${BASH_REMATCH[2]}"
+    fi
+
+    # Split off the final instance component as the location, if there is more
+    # than one component. If it _doesn't_ look like an AWS location, check to
+    # see if this is just a regular hostname.
+    if [[ ${address} =~ ^.*[.]([^.]+)$ ]]; then
+        local maybeLoc="${BASH_REMATCH[1]}"
+        if ! lib parse-location --quiet "${maybeLoc}"; then
+            # Not actually a location. See if it's a hostname (or IP address).
+            if host >/dev/null 2>&1 "${address}"; then
+                addressIsHostname=1
+                name="${address}"
+            fi
+        fi
+    fi
+
+    # If we don't know it's a hostname, then look it up as an instance.
+    if (( !addressIsHostname )); then
+        local opts=(--expired=include --id="${address}")
+        if [[ ${defaultLocation} != '' ]]; then
+            opts+=(--default-loc="${defaultLocation}")
+        fi
+        if [[ ${defaultVpc} != '' ]]; then
+            opts+=(--default-vpc="${defaultVpc}")
+        fi
+
+        local infoJson
+        infoJson="$(lib instance info "${opts[@]}")" \
+        || return "$?"
+
+        address="$(jget --output=raw "${infoJson}" '.publicAddress')"
+        hostPublicKey="$(jget --output=raw "${infoJson}" '.hostPublicKey // ""')"
+        name="$(jget --output=raw "${infoJson}" '.fullName')"
+    fi
+
+    # If a userid wasn't part of the original address, and there is a default,
+    # use it.
+    if [[ (${userid} == '') && (${defaultUserid} != '') ]]; then
+        userid="${defaultUserid}"
+    fi
+
+    jval \
+        address="${address}" \
+        hostPublicKey="${hostPublicKey}" \
+        name="${name}" \
+        userid="${userid}" \
+        '{
+            address:       $address,
+            hostPublicKey: $hostPublicKey,
+            name:          $name,
+            userid:        $userid
+        }'
+}
+
+# Adds a host public key to the user's `known_hosts` file.
+function authorize-host {
+    local address="$1"
+    local publicKey="$2"
+
+    local sshDir="${HOME}/.ssh"
+    local hostsFile="${sshDir}/known_hosts"
+    local hostLine="${address} ${publicKey}"
+
+    local already=''
+    if [[ -e "${hostsFile}" ]]; then
+        already="$(ssh-keygen -f "${hostsFile}" -F "${address}" | tail -1)" \
+        || return "$?"
+    else
+        mkdir -p "${sshDir}" # Just in case.
+    fi
+
+    if [[ ${already} != ${hostLine} ]]; then
+        if [[ ${already} != '' ]]; then
+            ssh-keygen -f "${hostsFile}" -R "${address}" >/dev/null 2>&1 \
+            || return "$?"
+        fi
+        echo "${hostLine}" >>"${hostsFile}"
+    fi
+}
+
+# Finds the indicated secret via `secret-access`, which is presumed to be a
+# private key file. Adds it to the set of IDs known to `ssh-agent`.
+function find-secret {
+    local sourcePath="$1"
+
+    local secretValue
+    secretValue="$(lib secret-access --output=text x="${sourcePath}")" \
+    || return "$?"
+
+    ssh-add -q - <<<"${secretValue}" \
+    || return "$?"
+}
+
+
+#
+# Main script
+#
+
+if [[ ${SSH_AUTH_SOCK+set} != 'set' ]]; then
+    # There is no SSH agent running, so just re-run this command under a new
+    # agent, which will only exist for the life of the command. Maybe there's a
+    # better way to handle this case?
+    exec ssh-agent "$(this-cmd-path)" "$@" \
+    || exit "$?"
+fi
+
+if [[ ${secretSourcePath} != '' ]]; then
+    find-secret "${secretSourcePath}" \
+    || exit "$?"
+fi
+
+addressInfo="$(address-info "${userAtInstance}")" \
+|| exit "$?"
+
+userid="$(jget --output=raw "${addressInfo}" '.userid')"
+address="$(jget --output=raw "${addressInfo}" '.address')"
+hostPublicKey="$(jget --output=raw "${addressInfo}" '.hostPublicKey')"
+
+if [[ ${hostPublicKey} != '' ]]; then
+    authorize-host "${address}" "${hostPublicKey}" \
+    || exit "$?"
+fi
+
+sshCommand=(ssh)
+
+if [[ ${keyPath} != '' ]]; then
+    sshCommand+=('-i' "${keyPath}")
+fi
+
+if [[ -t 1 ]]; then
+    # `stdout` is a TTY, so tell that to SSH. (This should only make a
+    # difference if running a command, not just logging in.)
+    sshCommand+=('-t')
+fi
+
+if [[ ${userid} != '' ]]; then
+    sshCommand+=("${userid}@${address}")
+else
+    sshCommand+=("${address}")
+fi
+
+if (( ${#command[@]} != 0 )); then
+    if (( script )); then
+        # Append command and arguments as-is.
+        sshCommand+=("${command[@]}")
+    else
+        # Apply "armor" to the command and all arguments.
+        sshCommand+=($(printf '%q ' "${command[@]}"))
+    fi
+fi
+
+if (( announce )); then
+    name="$(jget --output=raw "${addressInfo}" '.name')"
+    info-msg 'Connecting to:'
+    if [[ ${name} != '' ]]; then
+        info-msg "  ${name}"
+    fi
+    info-msg "  ${address}"
+fi
+
+exec "${sshCommand[@]}"

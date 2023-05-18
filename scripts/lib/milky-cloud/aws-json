@@ -12,7 +12,7 @@
 
 define-usage $'
     ${name} <cmd> <subcommand> [<opt> ...] [--] [<jval-expr> ...]
-    [:: [<out-opt> ...] [<jval-expr> ...]
+    [:: [<out-opt> ...] [<jval-expr> ...]]
 
     Makes an AWS call with a JSON value constructed with `json-val`, and with
     successful result optionally post-processed through `json-val`. If no

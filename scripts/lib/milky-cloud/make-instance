@@ -44,8 +44,7 @@ define-usage $'
       Which OS to install. See `find-ami` for details about default and options.
     --output=<style> :: `id` `json` `none`
       What to print on successful output. `id` is just the plain ID (no quotes).
-      `json` is the same as what is printed by `find-instance`. Defaults to
-      `id`.
+      `json` is the same as what is printed by `instance info`. Defaults to `id`.
     --security-group=<name-or-id>
       Name or ID of the security group to use for network access control. If
       specified, this is used to derive the VPC to use, and in conjunction with
@@ -225,13 +224,14 @@ function extract-host-key {
     progress-msg "  ${key}"
 
     local sshAuth="ssh-${keyAlgorithm} ${key}"
+    local tagName='host-public-key'
     ec2-json create-tags --loc="${zone}" \
         id="${instanceId}" \
-        tagSpec:json="$(lib tag-spec host-public-key="${sshAuth}")" \
+        tagSpec:json="$(lib tag-spec "${tagName}=${sshAuth}")" \
         '{ Resources: [$id] } + $tagSpec' \
     || return "$?"
 
-    progress-msg "Key stored as instance tag ${tag}."
+    progress-msg "Key stored as instance tag \`${tagName}\`."
 }
 
 # Waits until the instance is in state `running`.
@@ -244,7 +244,7 @@ function wait-until-running {
     while true; do
         local infoJson
         infoJson="$(
-            lib find-instance --loc="${zone}" --output=json "${instanceId}"
+            lib instance info --id="${instanceId}.${zone}"
         )" \
         || return "$?"
 
@@ -404,6 +404,6 @@ case "${outputStyle}" in
         echo "${instanceId}"
         ;;
     json)
-        lib find-instance --output=json --loc="${zone}" "${instanceId}"
+        lib instance info --id="${instanceId}.${zone}"
         ;;
 esac
