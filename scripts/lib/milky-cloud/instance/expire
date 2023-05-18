@@ -1,0 +1,124 @@
+#!/bin/bash
+#
+# Copyright 2022-2023 the Milky-cloud Authors (Dan Bornstein et alia).
+# SPDX-License-Identifier: Apache-2.0
+
+. "$(dirname "$(readlink -f "$0")")/_init.sh" || exit "$?"
+. "$(this-cmd-dir)/control-help.sh"
+
+
+#
+# Argument parsing
+#
+
+define-usage $'
+    ${name} [<opt> ...]
+
+    Sets or clears an expiry time on one or more instances. When an expiry time
+    is set on an instance, then it is considered "expired" once that time has
+    passed. The only difference this makes is whether or not the instance passes
+    the `--expired` filter on `instance info` (which is of course also used by
+    other `instance` subcommands, such as, notably `instance terminate`).
+
+    --after=<time-secs>
+      Sets the instance(s) to be expired after <time-secs>. <time-secs> is a Unix
+      Epoch Time in seconds (that is, a timestamp and not a count / duration).
+      Either this or `--off` must be specified.
+    --off
+      Clears expiration; that is, remove an expiration time if it had been set.
+      Either this or `--after` must be specified.
+
+    Options passed through to `instance info`:
+      --default-loc=<region-or-zone>
+      --default-vpc=<id-spec>
+      --expired=<choice> :: `exclude` `include` `only`
+      --id=<id-spec>
+      --multiple
+      --not-found-ok
+
+    ${name} [--help | -h]
+
+    Displays this message.
+'
+
+# Want help?
+opt-action --call='{ usage; exit }' help/h
+
+# Options passed through to `instance info`.
+usual-info-opts
+
+# Expiration timestamp in seconds.
+opt-value --var=afterTimeSecs --filter='/^[0-9]{10,12}$/' after
+
+# Unexpire?
+opt-toggle --var=off off
+
+require-exactly-one-arg-of after off
+
+process-args "$@" || usage --short
+
+# If `--off` was specified, make sure it wasn't `--no-off` (etc.).
+if (( !off )) && [[ ${afterTimeSecs} == '' ]]; then
+    error-msg $'Sorry! Can\'t do --no-off.'
+    usage --short
+    exit 1
+fi
+
+
+#
+# Helper functions
+#
+
+# Expiration implementation, plugged into the control skeleton.
+function expire-impl {
+    local ids
+    local loc
+    local after
+
+    while (( $# > 0 )); do
+        case "$1" in
+            --after=*) after="${1#*=}" ;;
+            --ids=*)   ids="${1#*=}"   ;;
+            --loc=*)   loc="${1#*=}"   ;;
+            *)
+                error-msg $'Shouldn\'t happen!'
+                return 1
+        esac
+        shift
+    done
+
+    local TAG_NAME='expired-after'
+
+    # Convert `after`.
+    local cmd='error' tagsJson=''
+    case "${after}" in
+        off)
+            cmd='delete-tags'
+            tagsJson="$(lib tag-spec "${TAG_NAME}")"
+            ;;
+        *)
+            cmd='create-tags'
+            local dateStr="$(lib timey print "${after}" '+%s %Y-%m-%d-%H%M%S')"
+            tagsJson="$(lib tag-spec "${TAG_NAME}=${dateStr}")"
+            ;;
+    esac
+
+    ec2-json "${cmd}" --loc="${loc}" \
+        resources:json="${ids}" \
+        tags:json="${tagsJson}" \
+        '{ Resources: $resources } + $tags'
+}
+
+
+#
+# Main script
+#
+
+if (( off )); then
+    label='Clearing expiration time'
+    afterTimeSecs=off
+else
+    label='Setting expiration time'
+fi
+
+instance-control-skeleton "${label}" expire-impl --after="${afterTimeSecs}"
