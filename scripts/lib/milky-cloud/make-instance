@@ -225,13 +225,14 @@ function extract-host-key {
     progress-msg "  ${key}"
 
     local sshAuth="ssh-${keyAlgorithm} ${key}"
+    local tagName='host-public-key'
     ec2-json create-tags --loc="${zone}" \
         id="${instanceId}" \
-        tagSpec:json="$(lib tag-spec host-public-key="${sshAuth}")" \
+        tagSpec:json="$(lib tag-spec "${tagName}=${sshAuth}")" \
         '{ Resources: [$id] } + $tagSpec' \
     || return "$?"
 
-    progress-msg "Key stored as instance tag ${tag}."
+    progress-msg "Key stored as instance tag \`${tagName}\`."
 }
 
 # Waits until the instance is in state `running`.
@@ -244,7 +245,7 @@ function wait-until-running {
     while true; do
         local infoJson
         infoJson="$(
-            lib find-instance --loc="${zone}" --output=json "${instanceId}"
+            lib instance info --id="${instanceId}.${zone}"
         )" \
         || return "$?"
 
@@ -404,6 +405,6 @@ case "${outputStyle}" in
         echo "${instanceId}"
         ;;
     json)
-        lib find-instance --output=json --loc="${zone}" "${instanceId}"
+        lib instance info --id="${instanceId}.${zone}"
         ;;
 esac
