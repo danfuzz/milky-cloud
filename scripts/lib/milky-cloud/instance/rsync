@@ -32,10 +32,10 @@ opt-toggle --var=fromRsync from-rsync
 
 # Passed through to `rsync`.
 rsyncOpts=()
-for opt in archive checksum delete verbose; do
-    opt-toggle --call="{ rsyncOpts+=(--${opt}) }" "${opt}"
-done
-unset opt
+opt-toggle --call='{ rsyncOpts+=(--archive="$1") }' archive
+opt-toggle --call='{ rsyncOpts+=(--checksum="$1") }' checksum
+opt-toggle --call='{ rsyncOpts+=(--delete="$1") }' delete
+opt-toggle --call='{ rsyncOpts+=(--verbose="$1") }' verbose
 
 # Passed through to `instance ssh`.
 sshOpts=()
