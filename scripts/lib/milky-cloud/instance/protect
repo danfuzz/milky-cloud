@@ -12,12 +12,16 @@
 #
 
 define-usage $'
-    ${name} [<opt> ...]
+    ${name} [<opt> ...] [:: [<out-opt> ...] [<jval-expr> ...]]
 
     Protects or unprotects one or more instances. When protected, the two AWS
     attributes `disableApiStop` and `disableApiTermination` are turned on.
     Most options are passed through to `instance info` to determine which
     instance(s) to act on.
+
+    By default, this command prints the result of the `instance info` which
+    selected instances. This can be altered via the `--output=<style>` option and
+    any post-processing arguments.
 
     --off
       Turn on instance protection. Either this or `--on` must be specified.
@@ -31,6 +35,7 @@ define-usage $'
       --id=<id-spec>
       --multiple
       --not-found-ok
+      --output (sort of; applies to final output)
 
     ${name} [--help | -h]
 

@@ -12,13 +12,17 @@
 #
 
 define-usage $'
-    ${name} [<opt> ...]
+    ${name} [<opt> ...] [:: [<out-opt> ...] [<jval-expr> ...]]
 
     Sets or clears an expiry time on one or more instances. When an expiry time
     is set on an instance, then it is considered "expired" once that time has
     passed. The only difference this makes is whether or not the instance passes
     the `--expired` filter on `instance info` (which is of course also used by
     other `instance` subcommands, such as, notably `instance terminate`).
+
+    By default, this command prints the result of the `instance info` which
+    selected instances. This can be altered via the `--output=<style>` option and
+    any post-processing arguments.
 
     --after=<time-secs>
       Sets the instance(s) to be expired after <time-secs>. <time-secs> is a Unix
@@ -35,6 +39,7 @@ define-usage $'
       --id=<id-spec>
       --multiple
       --not-found-ok
+      --output (sort of; applies to final output)
 
     ${name} [--help | -h]
 

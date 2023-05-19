@@ -12,10 +12,14 @@
 #
 
 define-usage $'
-    ${name} [<opt> ...]
+    ${name} [<opt> ...] [:: [<out-opt> ...] [<jval-expr> ...]]
 
     Reboots one or more instances. Options are passed through to `instance info`
     to determine which instance(s) to act on.
+
+    By default, this command prints the result of the `instance info` which
+    selected instances. This can be altered via the `--output=<style>` option and
+    any post-processing arguments.
 
     Options:
       --default-loc=<region-or-zone>
@@ -24,6 +28,7 @@ define-usage $'
       --id=<id-spec>
       --multiple
       --not-found-ok
+      --output (sort of; applies to final output)
 
     ${name} [--help | -h]
 

@@ -5,7 +5,9 @@
 
 # Helper library for `instance` subcommands that control instances.
 
-# Where the usual info options land when parsed.
+. "$(this-cmd-dir)/info-help.sh"
+
+# Where most of the usual info options land when parsed.
 _control_infoOpts=()
 
 # Main implementation for control subcommands that issue one of the standard EC2
@@ -50,6 +52,9 @@ function instance-control-skeleton {
     shift 2
     local implArgs=("$@")
 
+    check-info-output-args \
+    || return "$?"
+
     progress-msg --enable
 
     local instanceInfo
@@ -80,9 +85,11 @@ function instance-control-skeleton {
     || return "$?"
 
     progress-msg 'Done.'
+
+    postproc-info-output "${instanceInfo}"
 }
 
-# Sets up a subcommand to take the usual `instance info` options, storing them
+# Sets up a subcommand to take the usual `instance info` arguments, storing them
 # so they can be found by other parts of this helper library.
 function usual-info-opts {
     opt-value --call='{ _control_infoOpts+=(--default-loc="$1") }' default-loc
@@ -91,4 +98,6 @@ function usual-info-opts {
     opt-value --call='{ _control_infoOpts+=(--id="$1") }' id
     opt-toggle --call='{ _control_infoOpts+=(--multiple="$1") }' multiple
     opt-toggle --call='{ _control_infoOpts+=(--not-found-ok="$1") }' not-found-ok
+
+    usual-info-output-args
 }
