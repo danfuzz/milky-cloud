@@ -10,7 +10,7 @@
 _info_outputStyle=
 
 # Where postprocessing arguments land when parsed.
-_info_postProc=()
+_info_postArgs=()
 
 # Checks output arguments for sanity.
 function check-info-output-args {
