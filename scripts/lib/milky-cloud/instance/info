@@ -16,7 +16,7 @@ define-usage $'
     Finds one or more instances by name or ID, with optional extra criteria, and
     prints some information about them. <name-or-id> accepts `*` as a wildcard
     character. Prints a separate JSON object of information about each match,
-    or an array (given `--output-array`).
+    or an array (given `--output=array`).
 
     `--multiple` and `--not-found-ok` control the number of instances that will
     be returned without error; by default it is an error if anything other than
@@ -52,8 +52,12 @@ define-usage $'
       Allow multiple results? Implies `--not-found-ok`.
     --not-found-ok
       Do not report an error if there are no matching instances.
-    --output-array
-      Output a JSON array, instead of individual objects.
+    --output=<style> :: array json none
+      What to output. This controls the initial output, not postprocessing if
+      any (which can specify its own `--output`).
+      * `array` -- Output a JSON array (instead of individual objects).
+      * `json` -- Output a sequence of JSON objects. This is the default.
+      * `none` -- Do not output anything.
     --terminated=<choice> :: exclude include only
       Whether or not to include terminated instances, or _only_ include them.
       Default `exclude`.
@@ -87,8 +91,8 @@ opt-toggle --var=multipleResults multiple
 # Ok if no instance found?
 opt-toggle --var=notFoundOk not-found-ok
 
-# Output an array (instead of individual info objects)?
-opt-toggle --var=outputArray output-array
+# Output style.
+opt-value --var=outputStyle --init='json' --enum='array json none' output
 
 # Terminated instance inclusion.
 opt-value --var=terminated --init='exclude' --enum='exclude include only' terminated
@@ -99,6 +103,12 @@ rest-arg --var=postArgs post-arg
 process-args "$@" || usage --short
 
 if (( ${#postArgs[@]} != 0 )); then
+    if [[ ${outputStyle} == 'none' ]]; then
+        error-msg 'Cannot do post-processing given `--output=none`.'
+        usage --short
+        exit 1
+    fi
+
     jpostproc --check "${postArgs[@]}" \
     || {
         usage --short
@@ -344,12 +354,20 @@ elif (( (resultLength > 1) && !multipleResults )); then
     exit 1
 fi
 
-if (( outputArray )); then
-    result="${resultArray}"
-else
-    # Extract the results out of the array, to form a sequence of JSON objects.
-    result="$(jget "${resultArray}" '.[]')"
-fi
-
-# Perform client-directed post-processing (if any).
-jpostproc <<<"${result}" "${postArgs[@]}"
+case "${outputStyle}" in
+    array)
+        jpostproc <<<"${resultArray}" "${postArgs[@]}"
+        ;;
+    json)
+        # Extract the results out of the array, to form a "naked" sequence of
+        # JSON objects, and pass that into the post-processor if necessary.
+        if (( ${#postArgs[@]} == 0 )); then
+            jget "${resultArray}" '.[]'
+        else
+            jget "${resultArray}" '.[]' | jpostproc "${postArgs[@]}"
+        fi
+        ;;
+    none)
+        : # Nothing to do.
+        ;;
+esac

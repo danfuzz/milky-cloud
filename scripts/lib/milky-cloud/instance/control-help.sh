@@ -54,7 +54,7 @@ function instance-control-skeleton {
 
     local instanceInfo
     instanceInfo="$(
-        lib instance info --output-array "${_control_infoOpts[@]}"
+        lib instance info --output=array "${_control_infoOpts[@]}"
     )" \
     || exit "$?"
 
