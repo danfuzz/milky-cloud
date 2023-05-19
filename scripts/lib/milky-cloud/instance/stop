@@ -22,6 +22,7 @@ define-usage $'
     any post-processing arguments.
 
     Options:
+      --attributes
       --default-loc=<region-or-zone>
       --default-vpc=<id-spec>
       --expired=<choice> :: `exclude` `include` `only`

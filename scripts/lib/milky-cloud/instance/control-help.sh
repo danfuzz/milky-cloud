@@ -92,6 +92,7 @@ function instance-control-skeleton {
 # Sets up a subcommand to take the usual `instance info` arguments, storing them
 # so they can be found by other parts of this helper library.
 function usual-info-args {
+    opt-toggle --call='{ _control_infoOpts+=(--attributes="$1") }' attributes
     opt-value --call='{ _control_infoOpts+=(--default-loc="$1") }' default-loc
     opt-value --call='{ _control_infoOpts+=(--default-vpc="$1") }' default-vpc
     opt-value --call='{ _control_infoOpts+=(--expired="$1") }' expired

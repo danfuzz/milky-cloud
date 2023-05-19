@@ -33,6 +33,7 @@ define-usage $'
       Either this or `--after` must be specified.
 
     Options passed through to `instance info`:
+      --attributes
       --default-loc=<region-or-zone>
       --default-vpc=<id-spec>
       --expired=<choice> :: `exclude` `include` `only`

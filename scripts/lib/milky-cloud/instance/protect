@@ -29,6 +29,7 @@ define-usage $'
       Turn off instance protection. Either this or `--off` must be specified.
 
     Options passed through to `instance info`:
+      --attributes
       --default-loc=<region-or-zone>
       --default-vpc=<id-spec>
       --expired=<choice> :: `exclude` `include` `only`
