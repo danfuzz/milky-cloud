@@ -97,7 +97,7 @@ function do-find {
             if (( notFoundOk )); then
                 return
             else
-                error-msg 'No such VPC.'
+                error-msg "No such VPC: ${nameOrId}"
                 return 1
             fi
             ;;
