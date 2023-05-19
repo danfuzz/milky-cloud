@@ -4,6 +4,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 . "$(dirname "$(readlink -f "$0")")/_init.sh" || exit "$?"
+. "$(this-cmd-dir)/info-help.sh"
 
 
 #
@@ -70,6 +71,9 @@ define-usage $'
 # Want help?
 opt-action --call='{ usage; exit }' help/h
 
+# Handles `--output` and post-processing arguments.
+usual-info-output-args
+
 # Add attribute info?
 opt-toggle --var=addAttributes attributes
 
@@ -91,30 +95,13 @@ opt-toggle --var=multipleResults multiple
 # Ok if no instance found?
 opt-toggle --var=notFoundOk not-found-ok
 
-# Output style.
-opt-value --var=outputStyle --init='json' --enum='array json none' output
-
 # Terminated instance inclusion.
 opt-value --var=terminated --init='exclude' --enum='exclude include only' terminated
 
-# Optional post-processing arguments.
-rest-arg --var=postArgs post-arg
-
 process-args "$@" || usage --short
 
-if (( ${#postArgs[@]} != 0 )); then
-    if [[ ${outputStyle} == 'none' ]]; then
-        error-msg 'Cannot do post-processing given `--output=none`.'
-        usage --short
-        exit 1
-    fi
-
-    jpostproc --check "${postArgs[@]}" \
-    || {
-        usage --short
-        exit 1
-    }
-fi
+check-info-output-args \
+|| exit "$?"
 
 if (( multipleResults )); then
     notFoundOk=1
@@ -354,20 +341,4 @@ elif (( (resultLength > 1) && !multipleResults )); then
     exit 1
 fi
 
-case "${outputStyle}" in
-    array)
-        jpostproc <<<"${resultArray}" "${postArgs[@]}"
-        ;;
-    json)
-        # Extract the results out of the array, to form a "naked" sequence of
-        # JSON objects, and pass that into the post-processor if necessary.
-        if (( ${#postArgs[@]} == 0 )); then
-            jget "${resultArray}" '.[]'
-        else
-            jget "${resultArray}" '.[]' | jpostproc "${postArgs[@]}"
-        fi
-        ;;
-    none)
-        : # Nothing to do.
-        ;;
-esac
+postproc-info-output "${resultArray}"
