@@ -57,8 +57,8 @@ function instance-control-skeleton {
 
     progress-msg --enable
 
-    local instanceInfo
-    instanceInfo="$(
+    local infoArray
+    infoArray="$(
         lib instance info --output=array "${_control_infoOpts[@]}"
     )" \
     || exit "$?"
@@ -67,7 +67,7 @@ function instance-control-skeleton {
     # safely as of this writing -- that all found instances will be in the same
     # region. This also serves to figure out if there were any results at all.
     local region="$(
-        jget --output=raw "${instanceInfo}" '.[0].region // "no-results"'
+        jget --output=raw "${infoArray}" '.[0].region // "no-results"'
     )"
 
     if [[ ${region} == 'no-results' ]]; then
@@ -75,10 +75,10 @@ function instance-control-skeleton {
         exit
     fi
 
-    local idsJson="$(jget "${instanceInfo}" 'map(.id)')"
+    local idsJson="$(jget "${infoArray}" 'map(.id)')"
 
     progress-msg "${label}:"
-    info-msg --exec jget --output=raw "${instanceInfo}" '
+    info-msg --exec jget --output=raw "${infoArray}" '
         .[] | "  \(.id): \(.name)"'
 
     "${implFunc}" --loc="${region}" --ids="${idsJson}" "${implArgs[@]}" \
@@ -86,12 +86,12 @@ function instance-control-skeleton {
 
     progress-msg 'Done.'
 
-    postproc-info-output "${instanceInfo}"
+    postproc-info-output "${infoArray}"
 }
 
 # Sets up a subcommand to take the usual `instance info` arguments, storing them
 # so they can be found by other parts of this helper library.
-function usual-info-opts {
+function usual-info-args {
     opt-value --call='{ _control_infoOpts+=(--default-loc="$1") }' default-loc
     opt-value --call='{ _control_infoOpts+=(--default-vpc="$1") }' default-vpc
     opt-value --call='{ _control_infoOpts+=(--expired="$1") }' expired
