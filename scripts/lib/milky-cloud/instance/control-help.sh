@@ -61,7 +61,7 @@ function instance-control-skeleton {
     infoArray="$(
         lib instance info --output=array "${_control_infoOpts[@]}"
     )" \
-    || exit "$?"
+    || return "$?"
 
     # We need to extract the region for the ultimate AWS call. This assumes --
     # safely as of this writing -- that all found instances will be in the same
@@ -72,7 +72,8 @@ function instance-control-skeleton {
 
     if [[ ${region} == 'no-results' ]]; then
         info-msg 'No matching instances found. Not taking action.'
-        exit
+        postproc-info-output '[]'
+        return
     fi
 
     local idsJson="$(jget "${infoArray}" 'map(.id)')"
