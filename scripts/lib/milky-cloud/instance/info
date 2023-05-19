@@ -293,7 +293,6 @@ resultArray="$(ec2-json describe-instances --loc="${location}" \
         id:             .InstanceId,
         ipv6Address:    (.NetworkInterfaces[].Ipv6Addresses[0].Ipv6Address),
         name:           (.Tags | map(select(.Key == "Name") | .Value)[0]),
-        nameDotRegion:  "filled-in-below",
         privateAddress: .PrivateIpAddress,
         publicAddress:  .PublicIpAddress,
         region:         $region,
@@ -304,7 +303,6 @@ resultArray="$(ec2-json describe-instances --loc="${location}" \
         zone:           .Placement.AvailabilityZone
     }
     | .fullName = .name + "." + .vpcName + "." + .region
-    | .nameDotRegion = .name + "." + .region
     ]'
 )" \
 || exit "$?"
