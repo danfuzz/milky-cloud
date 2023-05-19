@@ -42,7 +42,7 @@ sshOpts=()
 opt-toggle --call='{ sshOpts+=(--announce="$1") }' announce
 opt-value --call='{ sshOpts+=(--default-loc="$1") }' default-loc
 opt-value --call='{ sshOpts+=(--default-userid="$1") }' default-userid
-opt-value --call='{ sshOpts+=(--default-vpn="$1") }' default-vpn
+opt-value --call='{ sshOpts+=(--default-vpc="$1") }' default-vpc
 opt-value --call='{ sshOpts+=(--key="$1") }' key
 opt-value --call='{ sshOpts+=(--secret="$1") }' secret
 
