@@ -85,9 +85,12 @@ positional-arg --required --var=userAtInstance user-at-instance
 # Command and arguments.
 rest-arg --var=command command
 
-require-exactly-one-arg-of key secret
-
 process-args "$@" || usage --short
+
+if [[ (${keyPath} != '') && (${secretSourcePath} != '') ]]; then
+    error-msg 'Can only specify at most one of --key or --secret.'
+    exit 1
+fi
 
 
 #
