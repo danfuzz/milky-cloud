@@ -61,7 +61,8 @@ define-usage $'
       * `none` -- Do not output anything.
     --terminated=<choice> :: exclude include only
       Whether or not to include terminated instances, or _only_ include them.
-      Default `exclude`.
+      Instances in state `shutting-down` also count as terminated for the sake
+      of this option. Default `exclude`.
 
     ${name} [--help | -h]
 
@@ -188,7 +189,8 @@ function filter-terminated {
 
     jget "${infoJson}" \
         choice="${choice}" '
-        def isTerminated: .state == "terminated";
+        def isTerminated:
+            (.state == "terminated") or (.state == "shutting-down");
         if $choice == "only" then
             map(select(isTerminated))
         else
