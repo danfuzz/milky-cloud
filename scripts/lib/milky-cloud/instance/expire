@@ -12,13 +12,17 @@
 #
 
 define-usage $'
-    ${name} [<opt> ...]
+    ${name} [<opt> ...] [:: [<out-opt> ...] [<jval-expr> ...]]
 
     Sets or clears an expiry time on one or more instances. When an expiry time
     is set on an instance, then it is considered "expired" once that time has
     passed. The only difference this makes is whether or not the instance passes
     the `--expired` filter on `instance info` (which is of course also used by
     other `instance` subcommands, such as, notably `instance terminate`).
+
+    By default, this command prints the result of the `instance info` which
+    selected instances. This can be altered via the `--output=<style>` option and
+    any post-processing arguments.
 
     --after=<time-secs>
       Sets the instance(s) to be expired after <time-secs>. <time-secs> is a Unix
@@ -29,12 +33,14 @@ define-usage $'
       Either this or `--after` must be specified.
 
     Options passed through to `instance info`:
+      --attributes
       --default-loc=<region-or-zone>
       --default-vpc=<id-spec>
       --expired=<choice> :: `exclude` `include` `only`
       --id=<id-spec>
       --multiple
       --not-found-ok
+      --output (sort of; applies to final output)
 
     ${name} [--help | -h]
 
@@ -44,8 +50,8 @@ define-usage $'
 # Want help?
 opt-action --call='{ usage; exit }' help/h
 
-# Options passed through to `instance info`.
-usual-info-opts
+# Options and arguments passed through to `instance info`.
+usual-info-args
 
 # Expiration timestamp in seconds.
 opt-value --var=afterTimeSecs --filter='/^[0-9]{10,12}$/' after

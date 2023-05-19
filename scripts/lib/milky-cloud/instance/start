@@ -12,18 +12,24 @@
 #
 
 define-usage $'
-    ${name} [<opt> ...]
+    ${name} [<opt> ...] [:: [<out-opt> ...] [<jval-expr> ...]]
 
     Starts one or more instances. Options are passed through to `instance info`
     to determine which instance(s) to act on.
 
+    By default, this command prints the result of the `instance info` which
+    selected instances. This can be altered via the `--output=<style>` option and
+    any post-processing arguments.
+
     Options:
+      --attributes
       --default-loc=<region-or-zone>
       --default-vpc=<id-spec>
       --expired=<choice> :: `exclude` `include` `only`
       --id=<id-spec>
       --multiple
       --not-found-ok
+      --output (sort of; applies to final output)
 
     ${name} [--help | -h]
 
@@ -33,8 +39,8 @@ define-usage $'
 # Want help?
 opt-action --call='{ usage; exit }' help/h
 
-# Options passed through to `instance info`.
-usual-info-opts
+# Options and arguments passed through to `instance info`.
+usual-info-args
 
 process-args "$@" || usage --short
 
