@@ -50,7 +50,7 @@ process-args "$@" || usage --short
 #
 
 # Wait for just one instance to be in state `running`.
-function wait-for-one {
+function wait-for-one-running {
     local fullName="$1"
 
     local state
@@ -108,7 +108,7 @@ function wait-impl {
 
     local id trouble=()
     for id in "${ids[@]}"; do
-        if ! wait-for-one "${id}.${loc}"; then
+        if ! wait-for-one-running "${id}.${loc}"; then
             trouble+=("${id}")
             progress-msg "  ${id}: cannot run"
         else
