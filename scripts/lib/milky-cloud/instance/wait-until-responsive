@@ -14,8 +14,10 @@
 define-usage $'
     ${name} [<opt> ...] [:: [<out-opt> ...] [<jval-expr> ...]]
 
-    Waits until one or more instances are all in state `running`. Options are
-    passed through to `instance info` to determine which instance(s) to act on.
+    Waits until one or more instances are all responsive. "Responsive" in this
+    case means that an instance is in state `running` and can answer an SSH
+    connection enough to provide its host keys. Options are passed through to
+    `instance info` to determine which instance(s) to act on.
 
     By default, this command prints the result of the `instance info` which
     selected instances. This can be altered via the `--output=<style>` option and
