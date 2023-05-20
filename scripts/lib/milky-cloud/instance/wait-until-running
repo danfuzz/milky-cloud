@@ -51,8 +51,30 @@ process-args "$@" || usage --short
 
 # Wait for just one instance.
 function wait-for-one {
-    info-msg TODO
-    return 1
+    local fullName="$1"
+
+    local state
+    while true; do
+        infoJson="$(lib instance info --id="${fullName}")" || return "$?"
+
+        if [[ ${infoJson} == '' ]]; then
+            error-msg "Cannot wait for ${name}; no such instance."
+            return 1
+        fi
+
+        state="$(jget --output=raw "${infoJson}" '.state')"
+        if [[ ${state} != 'pending' ]]; then
+            break
+        fi
+
+        sleep 1
+    done
+
+    if [[ ${state} != 'running' ]]; then
+        # Cannot possibly become `running`. Error message is printed by our
+        # caller.
+        return 1
+    fi
 }
 
 # Wait implementation, plugged into the control skeleton.
@@ -71,28 +93,38 @@ function wait-impl {
         shift
     done
 
+    progress-msg 'Status:'
+
+    # Print the ones that are already `running`.
+    progress-msg --exec jget --output=raw "${infoJson}" \
+        '.[] | select(.state == "running") | "  \(.id): already running"'
+
     # Extract the `id`s of just the instances that aren't already `running`, as
     # a regular Bash array.
     local ids=($(
-        jget --output=raw "${infoJson}" '.[] | select(.state != "running") | .id'
+        jget --output=raw "${infoJson}" \
+            '.[] | select(.state != "running") | .id'
     ))
 
     local id trouble=()
     for id in "${ids[@]}"; do
-        if ! wait-for-one "${id}"; then
+        if ! wait-for-one "${id}.${loc}"; then
             trouble+=("${id}")
+            progress-msg "  ${id}: cannot run"
+        else
+            progress-msg "  ${id}: running"
         fi
     done
+
+    # TODO: Check for SSH access on all instances.
+    error-msg 'TODO SSH check'
+    return 1
 
     if (( ${#trouble[@]} != 0 )); then
         error-msg 'Trouble with:'
         error-msg --exec printf '  %s\n' "${trouble[@]}"
         return 1
     fi
-
-    # TODO: Check for SSH access on all instances.
-    error-msg 'TODO SSH check'
-    return 1
 }
 
 
