@@ -62,8 +62,8 @@ function wait-impl {
 
     while (( $# > 0 )); do
         case "$1" in
-            --info=*) infoJson="${1#*=}"   ;;
-            --loc=*)  loc="${1#*=}"   ;;
+            --info=*) infoJson="${1#*=}" ;;
+            --loc=*)  loc="${1#*=}"      ;;
             *)
                 error-msg $'Shouldn\'t happen!'
                 return 1
