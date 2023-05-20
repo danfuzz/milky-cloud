@@ -47,6 +47,12 @@ function instance-control-ec2 {
 # Basic implementation for control subcommands, with a hole for the actual
 # control part (function passed by name).
 function instance-control-skeleton {
+    fullInfo=0
+    if [[ $1 == --full-info ]]; then
+        fullInfo=1
+        shift
+    fi
+
     local label="$1"
     local implFunc="$2"
     shift 2
@@ -76,13 +82,19 @@ function instance-control-skeleton {
         return
     fi
 
-    local idsJson="$(jget "${infoArray}" 'map(.id)')"
+    local args=(--loc="${region}")
+
+    if (( fullInfo )); then
+        args+=(--info="${infoArray}")
+    else
+        args+=(--ids="$(jget "${infoArray}" 'map(.id)')")
+    fi
 
     progress-msg "${label}:"
     info-msg --exec jget --output=raw "${infoArray}" '
         .[] | "  \(.id): \(.name)"'
 
-    "${implFunc}" --loc="${region}" --ids="${idsJson}" "${implArgs[@]}" \
+    "${implFunc}" "${args[@]}" "${implArgs[@]}" \
     || return "$?"
 
     progress-msg 'Done.'

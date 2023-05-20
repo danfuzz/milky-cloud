@@ -57,13 +57,13 @@ function wait-for-one {
 
 # Wait implementation, plugged into the control skeleton.
 function wait-impl {
-    local ids
+    local infoJson
     local loc
 
     while (( $# > 0 )); do
         case "$1" in
-            --ids=*)   ids="${1#*=}"   ;;
-            --loc=*)   loc="${1#*=}"   ;;
+            --info=*) infoJson="${1#*=}"   ;;
+            --loc=*)  loc="${1#*=}"   ;;
             *)
                 error-msg $'Shouldn\'t happen!'
                 return 1
@@ -71,8 +71,11 @@ function wait-impl {
         shift
     done
 
-    # Convert `ids` to a regular array.
-    ids=($(jget --output=raw "${ids}" '.[]'))
+    # Extract the `id`s of just the instances that aren't already `running`, as
+    # a regular Bash array.
+    local ids=($(
+        jget --output=raw "${infoJson}" '.[] | select(.state != "running") | .id'
+    ))
 
     local id trouble=()
     for id in "${ids[@]}"; do
@@ -93,7 +96,7 @@ function wait-impl {
 # Main script
 #
 
-instance-control-skeleton 'Waiting for running' wait-impl
+instance-control-skeleton --full-info 'Waiting for running' wait-impl
 
 exit 1
 #########################################
