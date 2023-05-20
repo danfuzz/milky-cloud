@@ -49,7 +49,7 @@ process-args "$@" || usage --short
 # Helper functions
 #
 
-# Wait for just one instance.
+# Wait for just one instance to be in state `running`.
 function wait-for-one {
     local fullName="$1"
 
