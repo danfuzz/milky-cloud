@@ -89,6 +89,10 @@ function wait-impl {
         error-msg --exec printf '  %s\n' "${trouble[@]}"
         return 1
     fi
+
+    # TODO: Check for SSH access on all instances.
+    error-msg 'TODO SSH check'
+    return 1
 }
 
 
