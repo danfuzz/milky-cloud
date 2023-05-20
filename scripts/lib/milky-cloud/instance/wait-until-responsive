@@ -58,7 +58,21 @@ process-args "$@" || usage --short
 # Helper functions
 #
 
-# Wait for just one instance to be in state `running`.
+# Splits a multi-line string into an array. Assigns the indicated variable.
+function lines-array-from {
+    # Note: Because we use `eval`, local variables are given name prefixes to
+    # avoid conflicts with the caller.
+    local _lines_name="$1"
+    local _lines_value="$2"
+
+    # No choice but `eval` for Bash-3.2 compatibility.
+    local _lines_oldIfs="${IFS}"
+    IFS=$'\n'
+    eval "${_lines_name}=(\${_lines_value})"
+    IFS="${_lines_oldIfs}"
+}
+
+# Waits for just one instance to be in state `running`.
 function wait-for-one-running {
     local fullName="$1"
 
@@ -86,6 +100,15 @@ function wait-for-one-running {
     fi
 }
 
+# Waits for one instance to be ssh-accessible. Optionally checks the host key.
+function wait-for-one-ssh {
+    error-msg TODO
+
+    echo 'ssh unreachable (ip4)'
+    echo 'ssh unreachable (ip6)'
+    return 1
+}
+
 # Wait implementation, plugged into the control skeleton.
 function wait-impl {
     local infoJson
@@ -104,30 +127,41 @@ function wait-impl {
 
     progress-msg 'Status:'
 
-    # Print the ones that are already `running`.
-    progress-msg --exec jget --output=raw "${infoJson}" \
-        '.[] | select(.state == "running") | "  \(.id): already running"'
+    # Extract the `id`s of the instances, as a regular Bash array.
+    local ids=($(jget --output=raw "${infoJson}" '.[] | .id'))
 
-    # Extract the `id`s of just the instances that aren't already `running`, as
-    # a regular Bash array.
-    local ids=($(
-        jget --output=raw "${infoJson}" \
-            '.[] | select(.state != "running") | .id'
-    ))
+    local trouble=()
 
-    local id trouble=()
-    for id in "${ids[@]}"; do
-        if ! wait-for-one-running "${id}.${loc}"; then
+    local i
+    for i in "${!ids[@]}"; do
+        local id="${ids[i]}"
+        local info="$(
+            jget "${infoJson}" id="${id}" '.[] | select(.id == $id)'
+        )"
+        local state="$(jget --output=raw "${info}" '.state')"
+        if [[ ${state} == 'running' ]]; then
+            progress-msg "  ${id}: already running"
+        elif ! wait-for-one-running "${id}.${loc}"; then
             trouble+=("${id}")
+            unset ids[i]
             progress-msg "  ${id}: cannot run"
         else
             progress-msg "  ${id}: running"
         fi
     done
 
-    # TODO: Check for SSH access on all instances.
-    error-msg 'TODO SSH check'
-    return 1
+    for i in "${!ids[@]}"; do
+        local id="${ids[i]}"
+        local info="$(
+            jget "${infoJson}" id="${id}" '.[] | select(.id == $id)'
+        )"
+        local errMsgs
+        errMsgs="$(wait-for-one-ssh "${info}")" || {
+            trouble+=("${id}")
+            lines-array-from errMsgs "${errMsgs}"
+            progress-msg --exec printf "  ${id}: %s\n" "${errMsgs[@]}"
+        }
+    done
 
     if (( ${#trouble[@]} != 0 )); then
         error-msg 'Trouble with:'
