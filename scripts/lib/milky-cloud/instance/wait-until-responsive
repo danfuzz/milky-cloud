@@ -16,14 +16,18 @@ define-usage $'
 
     Waits until one or more instances are all responsive. "Responsive" in this
     case means that an instance is in state `running` and can answer an SSH
-    connection enough to provide its host keys. Options are passed through to
-    `instance info` to determine which instance(s) to act on.
+    connection enough to provide its host keys. Most options are passed through
+    to `instance info` to determine which instance(s) to act on.
 
     By default, this command prints the result of the `instance info` which
     selected instances. This can be altered via the `--output=<style>` option and
     any post-processing arguments.
 
-    Options:
+    --[no-]check-host-keys
+      Compare the host keys with what is stored in the instances\' corresponding
+      tag. This is _on_ by default.
+
+    Options passed through to `instance info`:
       --attributes
       --default-loc=<region-or-zone>
       --default-vpc=<id-spec>
@@ -43,6 +47,9 @@ opt-action --call='{ usage; exit }' help/h
 
 # Options and arguments passed through to `instance info`.
 usual-info-args
+
+# Check the host keys?
+opt-toggle --var=checkHostKeys --init=1 check-host-keys
 
 process-args "$@" || usage --short
 
