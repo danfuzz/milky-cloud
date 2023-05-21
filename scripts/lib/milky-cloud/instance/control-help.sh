@@ -112,6 +112,7 @@ function usual-info-args {
     opt-value --call='{ _control_infoOpts+=(--id="$1") }' id
     opt-toggle --call='{ _control_infoOpts+=(--multiple="$1") }' multiple
     opt-toggle --call='{ _control_infoOpts+=(--not-found-ok="$1") }' not-found-ok
+    opt-value --call='{ _control_infoOpts+=(--protected="$1") }' protected
 
     usual-info-output-args
 }

@@ -59,6 +59,11 @@ define-usage $'
       * `array` -- Output a JSON array (instead of individual objects).
       * `json` -- Output a sequence of JSON objects. This is the default.
       * `none` -- Do not output anything.
+    --protected=<choice> :: exclude include only
+      Whether or not to include protected instances, or _only_ include them.
+      An instance is considered "protected" if it has either stop or termination
+      protection enabled. Implies `--attributes` if specified as `exclude` or
+      `only`. Default `include`.
     --terminated=<choice> :: exclude include only
       Whether or not to include terminated instances, or _only_ include them.
       Instances in state `shutting-down` also count as terminated for the sake
@@ -96,6 +101,9 @@ opt-toggle --var=multipleResults multiple
 # Ok if no instance found?
 opt-toggle --var=notFoundOk not-found-ok
 
+# Protected instance inclusion.
+opt-value --var=protected --init='include' --enum='exclude include only' protected
+
 # Terminated instance inclusion.
 opt-value --var=terminated --init='exclude' --enum='exclude include only' terminated
 
@@ -106,6 +114,10 @@ check-info-output-args \
 
 if (( multipleResults )); then
     notFoundOk=1
+fi
+
+if [[ ${protected} != 'include' ]];then
+    addAttributes=1
 fi
 
 
@@ -178,6 +190,23 @@ function filter-expired {
             map(select(isExpired))
         else
             map(select(isExpired | not))
+        end
+    '
+}
+
+# Filter the given list of instance info, based on protection state.
+function filter-protected {
+    local choice="$1"
+    local infoJson="$2"
+
+    jget "${infoJson}" \
+        choice="${choice}" '
+        def isProtected:
+            .attributes.disableApiStop or .attributes.disableApiTermination;
+        if $choice == "only" then
+            map(select(isProtected))
+        else
+            map(select(isProtected | not))
         end
     '
 }
@@ -325,6 +354,12 @@ fi
 if (( addAttributes )); then
     # This is a heavyweight operation, which is why we don't just always do it.
     resultArray="$(add-attributes "${resultArray}")" \
+    || exit "$?"
+fi
+
+if [[ ${protected} != 'include' ]]; then
+    # Note: This has to happen after attributes have been added.
+    resultArray="$(filter-protected "${protected}" "${resultArray}")" \
     || exit "$?"
 fi
 
