@@ -60,19 +60,30 @@ process-args "$@" || usage --short
 
 # Waits for just one instance to be in state `running`.
 function wait-for-one-running {
-    local fullName="$1"
+    local infoJson="$1"
+    local msg="$2"
 
-    local state
+    local state="$(jget --output=raw "${info}" '.state')"
+    local idZone="$(jget --output=raw "${info}" '"\(.id).\(.zone)"')"
+
+    if [[ ${state} == 'running' ]]; then
+        _msg-callback 'already running'
+        jget "${info}"
+        return
+    fi
+
     while true; do
-        infoJson="$(lib instance info --id="${fullName}")" || return "$?"
+        state="$(
+            lib instance info --not-found-ok --id="${idZone}" \
+                :: --output=raw '.state'
+        )" \
+        || return "$?"
 
-        if [[ ${infoJson} == '' ]]; then
-            error-msg "Cannot wait for ${name}; no such instance."
+        if [[ ${state} == '' ]]; then
+            # Shouldn't happen.
+            "${msg}" 'no such instance?'
             return 1
-        fi
-
-        state="$(jget --output=raw "${infoJson}" '.state')"
-        if [[ ${state} != 'pending' ]]; then
+        elif [[ ${state} != 'pending' ]]; then
             break
         fi
 
@@ -80,18 +91,22 @@ function wait-for-one-running {
     done
 
     if [[ ${state} != 'running' ]]; then
-        # Cannot possibly become `running`. Error message is printed by our
-        # caller.
+        # Cannot possibly become `running`.
+        "${msg}" "cannot run; state: ${state}"
         return 1
     fi
+
+    "${msg}" 'running'
 }
 
 # Waits for one instance to be ssh-accessible. Optionally checks the host key.
 function wait-for-one-ssh {
-    error-msg TODO
+    local infoJson="$1"
+    local msg="$2"
 
-    echo 'ssh unreachable (ip4)'
-    echo 'ssh unreachable (ip6)'
+    "${msg}" 'TODO'
+    "${msg}" 'ssh unreachable (ip4)'
+    "${msg}" 'ssh unreachable (ip6)'
     return 1
 }
 
@@ -124,16 +139,17 @@ function wait-impl {
         local info="$(
             jget "${infoJson}" id="${id}" '.[] | select(.id == $id)'
         )"
-        local state="$(jget --output=raw "${info}" '.state')"
-        if [[ ${state} == 'running' ]]; then
-            progress-msg "  ${id}: already running"
-        elif ! wait-for-one-running "${id}.${loc}"; then
+
+        function _msg-callback {
+            progress-msg "  ${id}: $1"
+        }
+
+        if ! wait-for-one-running "${info}" _msg-callback; then
             trouble+=("${id}")
             unset ids[i]
-            progress-msg "  ${id}: cannot run"
-        else
-            progress-msg "  ${id}: running"
         fi
+
+        unset -f _msg-callback
     done
 
     for i in "${!ids[@]}"; do
@@ -141,12 +157,17 @@ function wait-impl {
         local info="$(
             jget "${infoJson}" id="${id}" '.[] | select(.id == $id)'
         )"
-        local errMsgs
-        errMsgs="$(wait-for-one-ssh "${info}")" || {
-            trouble+=("${id}")
-            set-array-from-lines errMsgs "${errMsgs}"
-            progress-msg --exec printf "  ${id}: %s\n" "${errMsgs[@]}"
+
+        function _msg-callback {
+            progress-msg "  ${id}: $1"
         }
+
+        if ! wait-for-one-ssh "${info}" _msg-callback; then
+            trouble+=("${id}")
+            unset ids[i]
+        fi
+
+        unset -f _msg-callback
     done
 
     if (( ${#trouble[@]} != 0 )); then
