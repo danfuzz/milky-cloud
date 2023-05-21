@@ -67,7 +67,7 @@ function wait-for-one-running {
     local idZone="$(jget --output=raw "${info}" '"\(.id).\(.zone)"')"
 
     if [[ ${state} == 'running' ]]; then
-        _msg-callback 'already running'
+        "${msg}" 'already running'
         return
     fi
 
