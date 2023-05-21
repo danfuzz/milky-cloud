@@ -127,7 +127,8 @@ function wait-for-one-ssh {
                 shownBootMsg=1
             fi
             sleep 1
-        elif (( checkHostKeys )) && [[ (${expectedKey} != '') && (${expectedKey} != ${gotKey}) ]]; then
+        elif (( checkHostKeys )) &&
+                [[ (${expectedKey} != '') && (${expectedKey} != ${gotKey}) ]]; then
             responsive=1
             if (( !shownKeyMsg )); then
                 "${msg}" 'booting (host key not yet set)'
