@@ -61,8 +61,6 @@ define-usage $'
       Name or ID of the VPC to launch into. If specified, then the instance
       will be in the default security group of the indicated VPC. It is not
       valid to specify both this option and `--security-group`.
-    --wait-until-running
-      After launching, wait until the instance is in state `running`.
 
     ${name} [--help | -h]
 
@@ -107,9 +105,6 @@ opt-value --var=userDataFile --filter='/./' user-data-file
 
 # Name or ID of the VPC to be in.
 opt-value --var=vpcNameOrId --filter='/./' vpc
-
-# Wait until the instance is running?
-opt-toggle --var=waitUntilRunning wait-until-running
 
 process-args "$@" || usage --short
 
@@ -172,41 +167,6 @@ function build-user-data {
             cat <<<"${passedIn}"
         fi
     fi
-}
-
-# Waits until the instance is in state `running`.
-function wait-until-running {
-    local instanceId="$1"
-
-    progress-msg 'Waiting for instance to be `running`...'
-
-    local state
-    while true; do
-        local infoJson
-        infoJson="$(
-            lib instance info --id="${instanceId}.${zone}"
-        )" \
-        || return "$?"
-
-        if [[ ${infoJson} == '' ]]; then
-            error-msg "Cannot wait for ${name}; no such instance."
-            return 1
-        fi
-
-        state="$(jget --output=raw "${infoJson}" '.state')"
-        if [[ ${state} != 'pending' ]]; then
-            break
-        fi
-
-        sleep 1
-    done
-
-    if [[ ${state} != 'running' ]]; then
-        error-msg "Instance ${name} in state ${state}; cannot become running."
-        return 1
-    fi
-
-    progress-msg 'Instance is now `running`.'
 }
 
 
@@ -328,11 +288,6 @@ instanceId="$(ec2-json run-instances \
 
 progress-msg 'Launched!'
 progress-msg "Instance ID: ${instanceId}"
-
-if (( waitUntilRunning )); then
-    wait-until-running "${instanceId}" \
-    || exit "$?"
-fi
 
 case "${outputStyle}" in
     id)
