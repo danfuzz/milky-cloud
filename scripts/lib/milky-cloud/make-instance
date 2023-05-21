@@ -20,10 +20,6 @@ define-usage $'
     for the specified availability zone (which, TBQH, is probably not what you
     want).
 
-    --extract-host-key
-      Using the EC2 console, extract the host public key for the ED25519
-      algorithm (which has gloriously short keys). This implies
-      `--wait-until-running`.
     --host-key=<key>
       Specify a host key to use, overriding the one(s) created during the
       instance\'s first boot. This can be used to avoid a potential MITM attack
@@ -78,9 +74,6 @@ opt-action --call='{ usage; exit }' help/h
 
 # Availability zone.
 opt-value --required --var=zone --call=parse-zone loc
-
-# Extract host public key for ED25519?
-opt-toggle --var=extractHostKey extract-host-key
 
 # Host key to use.
 opt-value --var=hostKey host-key
@@ -179,59 +172,6 @@ function build-user-data {
             cat <<<"${passedIn}"
         fi
     fi
-}
-
-# Extracts the host public key for ED25519 from the console logs.
-function extract-host-key {
-    local instanceId="$1"
-    local keyAlgorithm='ed25519'
-
-    progress-msg 'Extracting host public key...'
-
-    local attempt=0
-    local key=''
-    while [[ ${key} == '' ]]; do
-        (( attempt++ ))
-        if (( attempt != 1 )); then
-            if (( attempt == 2 )); then
-                progress-msg 'This can take a while...'
-            elif (( (attempt % 6) == 0 )); then
-                progress-msg 'Still waiting for console output...'
-            fi
-            sleep 10
-        fi
-        local key
-        key="$(
-            ec2-json get-console-output --loc="${zone}" \
-                id="${instanceId}" \
-                '{ InstanceId: $id }' \
-                :: --output=raw \
-                    alg="${keyAlgorithm}" \
-                '
-                  (.Output // "")
-                | split("\n")
-                | (index("-----BEGIN SSH HOST KEY KEYS-----") + 1) as $startIndex
-                | index("-----END SSH HOST KEY KEYS-----") as $endIndex
-                | .[$startIndex:$endIndex]
-                | map(split(" ") | select(.[0] == "ssh-" + $alg) | .[1])
-                | .[0] // ""
-                '
-        )" \
-        || return "$?"
-    done
-
-    progress-msg "Got ${keyAlgorithm} key:"
-    progress-msg "  ${key}"
-
-    local sshAuth="ssh-${keyAlgorithm} ${key}"
-    local tagName='host-public-key'
-    ec2-json create-tags --loc="${zone}" \
-        id="${instanceId}" \
-        tagSpec:json="$(lib tag-spec "${tagName}=${sshAuth}")" \
-        '{ Resources: [$id] } + $tagSpec' \
-    || return "$?"
-
-    progress-msg "Key stored as instance tag \`${tagName}\`."
 }
 
 # Waits until the instance is in state `running`.
@@ -389,13 +329,8 @@ instanceId="$(ec2-json run-instances \
 progress-msg 'Launched!'
 progress-msg "Instance ID: ${instanceId}"
 
-if (( waitUntilRunning || extractHostKey )); then
+if (( waitUntilRunning )); then
     wait-until-running "${instanceId}" \
-    || exit "$?"
-fi
-
-if (( extractHostKey )); then
-    extract-host-key "${instanceId}" \
     || exit "$?"
 fi
 
