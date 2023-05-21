@@ -36,6 +36,7 @@ define-usage $'
       --multiple
       --not-found-ok
       --output (sort of; applies to final output)
+      --protected
 
     ${name} [--help | -h]
 
