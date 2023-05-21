@@ -68,7 +68,6 @@ function wait-for-one-running {
 
     if [[ ${state} == 'running' ]]; then
         _msg-callback 'already running'
-        jget "${info}"
         return
     fi
 
@@ -104,10 +103,61 @@ function wait-for-one-ssh {
     local infoJson="$1"
     local msg="$2"
 
-    "${msg}" 'TODO'
-    "${msg}" 'ssh unreachable (ip4)'
-    "${msg}" 'ssh unreachable (ip6)'
-    return 1
+    local v4Addr="$(jget --output=raw "${infoJson}" '.publicAddress')"
+    local v6Addr="$(jget --output=raw "${infoJson}" '.ipv6Address')"
+    local expectedKey="$(jget --output=raw "${infoJson}" '.hostPublicKey // ""')"
+
+    local tries=30
+    local success=0
+    local responsive=0
+    local shownKeyMsg=0
+    local shownBootMsg=0
+
+    while (( !success && (tries-- > 0) )); do
+        local gotKey="$(
+            # `-T 60` == one minute timeout. `awk` to print just the key.
+            ssh-keyscan 2>/dev/null -T 60 -t ed25519 "${v4Addr}" \
+            | awk '{print $2, $3}'
+        )"
+
+        if [[ ${gotKey} == '' ]]; then
+            # Host is apparently unreachable, or it might be _almost_ ready.
+            if (( !shownBootMsg )); then
+                "${msg}" 'booting'
+                shownBootMsg=1
+            fi
+            sleep 1
+        elif (( checkHostKeys )) && [[ (${expectedKey} != '') && (${expectedKey} != ${gotKey}) ]]; then
+            responsive=1
+            if (( !shownKeyMsg )); then
+                "${msg}" 'booting (host key not yet set)'
+                shownKeyMsg=1
+            fi
+            sleep 1
+        else
+            "${msg}" 'ssh reachable via IPv4'
+            success=1
+        fi
+    done
+
+    if (( !success )); then
+        "${msg}" 'ssh unreachable via IPv4'
+        return 1
+    fi
+
+    local gotKey="$(
+        # `-T 60` == one minute timeout. `awk` to print just the key.
+        ssh-keyscan 2>/dev/null -T 60 -t ed25519 "${v6Addr}" \
+        | awk '{print $2, $3}'
+    )"
+
+    # Don't bother re-checking the key; just care if we got one.
+    if [[ ${gotKey} == '' ]]; then
+        "${msg}" 'ssh unreachable via IPv6'
+        return 1
+    fi
+
+    "${msg}" 'ssh reachable via IPv6'
 }
 
 # Wait implementation, plugged into the control skeleton.
