@@ -44,7 +44,7 @@ opt-toggle --var=notFoundOk not-found-ok
 opt-value --var=outputStyle --init=json --enum='id json' output
 
 # Domain name or ID to look up.
-opt-value --required --var=nameOrId domain
+opt-value --required --var=nameOrId --filter='/^[-./a-zA-Z0-9]+$/' domain
 
 process-args "$@" || usage --short
 
