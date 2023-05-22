@@ -336,7 +336,14 @@ resultArray="$(ec2-json describe-instances --loc="${location}" \
         vpcName:        (if $vpcName == "" then .VpcId else $vpcName end),
         zone:           .Placement.AvailabilityZone
     }
-    | .fullName = .name + "." + .vpcName + "." + .region
+    |
+        if ($vpcName != "") and (.name | endswith(".\($vpcName)")) then
+            # Avoid duplicating the VPC name. TODO: Remove this once instances
+            # consistently do not have the VPC name in their (tagged) name.
+            .fullName = "\(.name).\(.region)"
+        else
+            .fullName = "\(.name).\(.vpcName).\(.region)"
+        end
     ]'
 )" \
 || exit "$?"
