@@ -19,6 +19,10 @@ define-usage $'
     Options passed through to `instance ssh`: --announce --default-loc
       --default-userid --default-vpn --key --secret
 
+    --ssh-cmd=<path>
+      Path to an alternative SSH command to use. Must be argument-compatible
+      with `instance ssh`.
+
     ${name} [--help | -h]
 
     Displays this message.
@@ -30,6 +34,9 @@ opt-action --call='{ usage; exit }' help/h
 # Used when this script calls through to itself via `rsync`.
 opt-toggle --var=fromRsync from-rsync
 
+# Alternative SSH command.
+opt-value --var=sshCmd --filter='/./' ssh-cmd
+
 # Passed through to `rsync`.
 rsyncOpts=()
 opt-toggle --call='{ rsyncOpts+=(--archive="$1") }' archive
@@ -37,7 +44,7 @@ opt-toggle --call='{ rsyncOpts+=(--checksum="$1") }' checksum
 opt-toggle --call='{ rsyncOpts+=(--delete="$1") }' delete
 opt-toggle --call='{ rsyncOpts+=(--verbose="$1") }' verbose
 
-# Passed through to `instance ssh`.
+# Passed through to `instance ssh` (or the `--ssh-cmd`).
 sshOpts=()
 opt-toggle --call='{ sshOpts+=(--announce="$1") }' announce
 opt-value --call='{ sshOpts+=(--default-loc="$1") }' default-loc
@@ -58,7 +65,17 @@ process-args "$@" || usage --short
 
 # Constructs and performs the call to `rsync`.
 function call-rsync {
-    local rshCmd=("$(this-cmd-path)" --from-rsync --)
+    local rshCmd=("$(this-cmd-path)" --from-rsync)
+
+    if [[ ${sshCmd} != '' ]]; then
+        if [[ !((-f ${sshCmd}) && (-x ${sshCmd})) ]]; then
+            error-msg "Cannot execute \`ssh-cmd\`: ${sshCmd}"
+            exit 1
+        fi
+        rshCmd+=(--ssh-cmd="${sshCmd}")
+    fi
+
+    rshCmd+=(--)
 
     local opt
     for opt in "${sshOpts[@]}"; do
@@ -79,7 +96,13 @@ function call-rsync {
 
 # Handles the inner callback from `rsync` to this script.
 function rsync-callback {
-    local sshCmd=("$(lib --path instance ssh)")
+    local sshFullCmd=()
+
+    if [[ ${sshCmd} == '' ]]; then
+        sshFullCmd+=("$(lib --path instance ssh)") || return "$?"
+    else
+        sshFullCmd+=("${sshCmd}")
+    fi
 
     local arg
     while (( $# > 0 )); do
@@ -90,7 +113,7 @@ function rsync-callback {
             break
         fi
 
-        sshCmd+=("$(base64 <<<"${arg}" --decode)")
+        sshFullCmd+=("$(base64 <<<"${arg}" --decode)")
     done
 
     local sshTarget=''
@@ -104,9 +127,9 @@ function rsync-callback {
     shift
     sshTarget+="${sshHost}"
 
-    sshCmd+=(--script -- "${sshTarget}" "$@")
+    sshFullCmd+=(--script -- "${sshTarget}" "$@")
 
-    exec "${sshCmd[@]}"
+    exec "${sshFullCmd[@]}"
 }
 
 
