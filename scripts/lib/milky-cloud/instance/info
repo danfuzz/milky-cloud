@@ -296,11 +296,6 @@ if is-instance-id "${instanceSpec}"; then
     filters+=(instance-id="${instanceSpec}")
 else
     filters+=(tag:Name="${instanceSpec}")
-    if [[ ${vpcName} != '' ]]; then
-        # Accept names that end with the VPC name. TODO: Remove this once
-        # instances are consistently only named without a VPC name.
-        filters+=(tag:Name="${instanceSpec}.${vpcName}")
-    fi
 fi
 
 if [[ ${zone} != '' ]]; then
@@ -337,13 +332,7 @@ resultArray="$(ec2-json describe-instances --loc="${location}" \
         zone:           .Placement.AvailabilityZone
     }
     |
-        if ($vpcName != "") and (.name | endswith(".\($vpcName)")) then
-            # Avoid duplicating the VPC name. TODO: Remove this once instances
-            # consistently do not have the VPC name in their (tagged) name.
-            .fullName = "\(.name).\(.region)"
-        else
-            .fullName = "\(.name).\(.vpcName).\(.region)"
-        end
+    .fullName = "\(.name).\(.vpcName).\(.region)"
     ]'
 )" \
 || exit "$?"
