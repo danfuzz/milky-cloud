@@ -183,8 +183,8 @@ result="$(lib aws-json route53 list-resource-record-sets --global \
         .
     end' \
     :: \
-    domain="${domain}" \
     fullName="${fullName}" \
+    notFoundOk:json="${notFoundOk}" \
     types:json="${types}" '
     .ResourceRecordSets
     |
@@ -200,10 +200,24 @@ result="$(lib aws-json route53 list-resource-record-sets --global \
         ttl:    .TTL,
         values: (.ResourceRecords | map(.Value))
     })
+    |
+    if ($notFoundOk == 1) or (length == ($types | length)) then
+        .
+    else
+        { count: length }
+    end
     '
 )" \
 || exit "$?"
 
-# TODO: not-found-ok
+if [[ ${result} =~ ^'{' ]]; then
+    len="$(jget "${result}" '.count')"
+    if (( len == 0 )); then
+        error-msg 'No matching records found.'
+    else
+        error-msg "Insufficient matching records found. (Found ${len}.)"
+    fi
+    exit 1
+fi
 
 postproc-output "${result}"
