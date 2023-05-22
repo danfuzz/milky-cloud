@@ -57,16 +57,21 @@ process-args "$@" || usage --short
 function find-from-domain {
     local domain="$1"
 
-    # Extract the main domain, and append `.` to make it officially "absolute."
+    # Extract the main domain, canonicalized here _without_ a final `.`.
     [[ ${domain} =~ ([^.]+[.][^.]+)[.]?$ ]] || return "$1"
-    domain="${BASH_REMATCH[1]}."
+    domain="${BASH_REMATCH[1]}"
 
     lib aws-json route53 list-hosted-zones-by-name --global \
         domain="${domain}" \
-        '{ DNSName: $domain }' \
+        '{ DNSName: "\($domain)." }' \
         :: \
-        domain="${domain}" \
-        '.HostedZones[] | select(.Name == $domain) | { id: .Id, name: .Name }'
+        domain="${domain}" '
+            .HostedZones[]
+            | select(.Name == "\($domain).")
+            | {
+                id: .Id,
+                name: $domain # Note: _Without_ the final `.`.
+            }'
 }
 
 # Finds the zone info for a given zone ID.
@@ -81,7 +86,13 @@ function find-from-id {
     lib aws-json route53 get-hosted-zone --global \
         id="${fullId}" \
         '{ Id: $id }' \
-        :: '.HostedZone | { id: .Id, name: .Name }'
+        :: '
+            .HostedZone
+            | {
+                id: .Id,
+                name: (.Name | sub("[.]$"; "")) # Drop the final `.`.
+            }
+        '
 
     echo "${zoneInfo}"
 }
