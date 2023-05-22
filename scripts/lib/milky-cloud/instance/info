@@ -278,12 +278,6 @@ fi
 
 filters=()
 
-if is-instance-id "${instanceSpec}"; then
-    filters+=(instance-id="${instanceSpec}")
-else
-    filters+=(tag:Name="${instanceSpec}")
-fi
-
 vpcName=''
 if is-vpc-id "${vpcSpec}"; then
     filters+=(vpc-id="${vpcSpec}")
@@ -296,6 +290,17 @@ elif [[ ${vpcSpec} != '*' ]]; then
         '(.Tags | map(select(.Key == "Name") | .Value)[0]) // ""'
     )"
     filters+=(vpc-id="${vpcId}")
+fi
+
+if is-instance-id "${instanceSpec}"; then
+    filters+=(instance-id="${instanceSpec}")
+else
+    filters+=(tag:Name="${instanceSpec}")
+    if [[ ${vpcName} != '' ]]; then
+        # Accept names that end with the VPC name. TODO: Remove this once
+        # instances are consistently only named without a VPC name.
+        filters+=(tag:Name="${instanceSpec}.${vpcName}")
+    fi
 fi
 
 if [[ ${zone} != '' ]]; then
@@ -368,6 +373,7 @@ resultLength="$(jlength "${resultArray}")" \
 
 if (( (resultLength == 0) && !notFoundOk )); then
     error-msg 'No matching instances found.'
+    error-msg "  id: ${idSpec}"
     exit 1
 elif (( (resultLength > 1) && !multipleResults )); then
     error-msg 'Ambiguous search matches all of:'
