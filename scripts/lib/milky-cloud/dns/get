@@ -1,0 +1,203 @@
+#!/bin/bash
+#
+# Copyright 2022-2023 the Milk-prod Authors (Dan Bornstein et alia).
+# This project is PROPRIETARY and UNLICENSED.
+
+. "$(dirname "$(readlink -f "$0")")/_init.sh" || exit "$?"
+
+
+#
+# Argument parsing
+#
+
+define-usage $'
+    ${name} [<opt> ...] [:: [<out-opt> ...] [<jval-expr> ...]]
+
+    Gets a set of DNS records that match the indicated query. Prints a sequence
+    of JSON results or an array thereof (depending on options).
+
+    An optional `::` followed by additional arguments causes the initial output
+    to be further processed by `json-val`, in a manner analogous to how
+    `aws-json` works, see which for details.
+
+    Note: This command only handles regular DNS records, and not aliases or
+    other AWS-specific stuff.
+
+    --domain=<name>
+      Main domain to match. Required.
+    --name=<name>
+      Name and subdomain (but not main domain name) to match. Use `.` to indicate
+      an apex record. Required.
+    --not-found-ok
+      Do not report an error if fewer records were found than implied by the
+      given number of `--type`s.
+    --output=<style> :: array json none
+      What to output. This controls the initial output, not postprocessing if
+      any (which can specify its own `--output`).
+      * `array` -- Output a JSON array (instead of individual objects).
+      * `json` -- Output a sequence of JSON objects. This is the default.
+      * `none` -- Do not output anything.
+    --type=<list>
+      A space-separated list of one or more record types (in lower case).
+      Required.
+
+    ${name} [--help | -h]
+
+    Displays this message.
+'
+
+# Want help?
+opt-action --call='{ usage; exit }' help/h
+
+# Domain to find.
+opt-value --required --var=domain --filter='/^[-.a-z0-9]+$/' domain
+
+# Name to find.
+opt-value --required --var=name --filter='/^[-_.a-z0-9]+$/' name
+
+# Ok if not all records found?
+opt-toggle --var=notFoundOk not-found-ok
+
+# Output style.
+opt-value --var=outputStyle --init=json --enum='array json none' output
+
+# Types to find.
+opt-value --required --var=types --filter='/^[ a-z]+$/' type
+
+# Optional post-processing arguments.
+rest-arg --var=postArgs post-arg
+
+process-args "$@" || usage --short
+
+# TODO: This is copied from `info-help.sh`. Should be unified.
+if (( ${#postArgs[@]} != 0 )); then
+    if [[ ${outputStyle} == 'none' ]]; then
+        error-msg 'Cannot do post-processing given `--output=none`.'
+        usage --short
+        return 1
+    fi
+
+    jpostproc --check "${postArgs[@]}" \
+    || {
+        usage --short
+        return 1
+    }
+fi
+
+
+#
+# Helper functions
+#
+
+# Performs output postprocessing.
+# TODO: This is copied from `info-help.sh`. Should be unified.
+function postproc-output {
+    local resultArray="$1"
+
+    case "${outputStyle}" in
+        array)
+            jpostproc <<<"${resultArray}" "${postArgs[@]}"
+            ;;
+        json)
+            # Extract the results out of the array, to form a "naked" sequence
+            # of JSON objects, and pass that into the post-processor if
+            # necessary.
+            if (( ${#postArgs[@]} == 0 )); then
+                jget "${resultArray}" '.[]'
+            else
+                jget "${resultArray}" '.[]' | jpostproc "${postArgs[@]}"
+            fi
+            ;;
+        none)
+            : # Nothing to do.
+            ;;
+    esac
+}
+
+
+#
+# Main script
+#
+
+# Canonicalize the `name` by ensuring it does not end with a `.`
+if [[ ${name} =~ ^(.*)[.]$ ]]; then
+    name="${BASH_REMATCH[1]}"
+fi
+
+# Canonicalize the `domain` by ensuring it does not end with a `.`
+if [[ ${domain} =~ ^(.*)[.]$ ]]; then
+    domain="${BASH_REMATCH[1]}"
+fi
+
+# Avoid weirdness: Reject `name` if it ends with the domain name.
+if [[ ${name} =~ ".${domain}" ]]; then
+    error-msg 'Do not append the `--domain` to the `--name`.'
+    exit 1
+fi
+
+# Convert `types` to a sorted JSON array of uppercase names.
+types="$(
+    jval types="${types}" '
+        $types
+        | split(" "; "g")
+        | map(select(. != "") | ascii_upcase)
+        | sort'
+)" \
+|| exit "$?"
+
+if [[ ${types} == '[]' ]]; then
+    error-msg 'No types listed!'
+    usage --short
+    exit 1
+fi
+
+zoneId="$(lib find-dns-zone --output=id "${domain}")" \
+|| exit "$?"
+
+fullName=
+if [[ ${name} == '' ]]; then
+    fullName="${domain}."
+else
+    fullName="${name}.${domain}."
+fi
+
+result="$(lib aws-json route53 list-resource-record-sets --global \
+    fullName="${fullName}" \
+    types:json="${types}" \
+    zoneId="${zoneId}" '
+    {
+        HostedZoneId:    $zoneId,
+        StartRecordName: $fullName,
+        StartRecordType: $types[0]
+    }
+    +
+    if ($types | length) == 1 then
+        { MaxItems: "1" }
+    else
+        .
+    end' \
+    :: \
+    domain="${domain}" \
+    fullName="${fullName}" \
+    types:json="${types}" '
+    .ResourceRecordSets
+    |
+    map(select(
+        (.Name == $fullName)
+        and
+        ((.Type as $type | $types | bsearch($type)) >= 0)
+    ))
+    |
+    map({
+        name:   .Name,
+        type:   .Type,
+        ttl:    .TTL,
+        values: (.ResourceRecords | map(.Value))
+    })
+    '
+)" \
+|| exit "$?"
+
+# TODO: not-found-ok
+
+postproc-output "${result}"
