@@ -241,7 +241,7 @@ function extra-cleanup {
 function find-zone-id {
     local domain="$1"
 
-    lib find-dns-zone --output=id "${domain}" \
+    lib dns find-zone --output=id --domain="${domain}" \
     || return "$?"
 }
 
