@@ -23,8 +23,9 @@ define-usage $'
     Note: This command only handles regular DNS records, and not aliases or
     other AWS-specific stuff.
 
-    --domain=<name>
-      Main domain to match. Required.
+    --domain=<name-or-id>
+      Main domain to match. Can be either a domain name per se or a Zone ID.
+      Required.
     --name=<name>
       Name and subdomain (but not main domain name) to match. Use `.` to indicate
       an apex record. Required.
@@ -50,7 +51,7 @@ define-usage $'
 opt-action --call='{ usage; exit }' help/h
 
 # Domain to find.
-opt-value --required --var=domain --filter='/^[-.a-z0-9]+$/' domain
+opt-value --required --var=domain --filter='/^[-./a-zA-Z0-9]+$/' domain
 
 # Name to find.
 opt-value --required --var=name --filter='/^[-_.a-z0-9]+$/' name
@@ -151,8 +152,13 @@ if [[ ${types} == '[]' ]]; then
     exit 1
 fi
 
-zoneId="$(lib find-dns-zone --output=id "${domain}")" \
+zoneInfo="$(lib dns find-zone --domain="${domain}")" \
 || exit "$?"
+
+# Extract the domain name and ID. (We need to get the domain name, because the
+# original `--domain` might have been specified as an ID.)
+zoneId="$(jget --output=raw "${zoneInfo}" '.id')"
+domain="$(jget --output=raw "${zoneInfo}" '.name')"
 
 fullName=
 if [[ ${name} == '' ]]; then
