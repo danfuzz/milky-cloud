@@ -95,11 +95,80 @@ process-args "$@" || usage --short
 # Helper functions
 #
 
-# Retrieves existing records associated with any name/type mentioned in the
+# Retrieves all existing records associated with any name/type mentioned in the
 # <bindings>. This is needed when merging.
 function get-existing-records {
+    local zoneId="$1"
+    local treeJson="$2"
+
+    local result
+    result="$(lib aws-json route53 list-resource-record-sets --global \
+        zoneId="${zoneId}" '{ HostedZoneId: $zoneId }' \
+        :: \
+        tree:json="${treeJson}" '
+        def doExtract:
+            ($tree | keys) as $names
+            |
+            map(
+                .Name as $name
+                |
+                .Type as $type
+                |
+                select($tree[$name][$type] != null)
+                |
+                {
+                    name:   .Name,
+                    type:   .Type,
+                    values: (.ResourceRecords | map(.Value))
+                }
+            )
+            |
+            # This forms the tree.
+            reduce .[] as $item (null; .[$item.name][$item.type] += $item.values)
+        ;
+
+        if .IsTruncated == true then
+            "truncated"
+        else
+            .ResourceRecordSets | doExtract
+        end
+        '
+    )" \
+    || exit "$?"
+
+    if [[ ${existingJson} == '"truncated"' ]]; then
+        error-msg 'Cannot handle truncated response from Route53. Sorry!'
+        return 1
+    fi
+
+    echo "${result}"
+}
+
+# Makes a tree out of the parallel arrays that define the bindings. The result
+# is along the lines of:
+#
+# ```
+# {
+#   "florp.murtbo.net.": {
+#     "TXT": [
+#       "\"one\"",
+#       "\"two\""
+#     ]
+#   },
+#   "murtbo.net.": {
+#     "A": [
+#       "10.1.2.3"
+#     ],
+#     "AAAA": [
+#       "10::10"
+#     ]
+#   }
+# }
+# ```
+function make-binding-tree {
     : TODO
 }
+
 
 #
 # Main script
@@ -161,50 +230,18 @@ treeJson="$(jval \
 )" \
 || exit "$?"
 
-# Get any records associated with the names being manipulated. Produces an
-# object in the same form as `treeJson`.
 
-existingJson="$(lib aws-json route53 list-resource-record-sets --global \
-    zoneId="${zoneId}" '{ HostedZoneId: $zoneId }' \
-    :: \
-    tree:json="${treeJson}" '
-    def doExtract:
-        ($tree | keys) as $names
-        |
-        map(
-            .Name as $name
-            |
-            .Type as $type
-            |
-            select($tree[$name][$type] != null)
-            |
-            {
-                name:   .Name,
-                type:   .Type,
-                values: (.ResourceRecords | map(.Value))
-            }
-        )
-        |
-        reduce .[] as $item (null; .[$item.name][$item.type] += $item.values)
-    ;
-    if .IsTruncated == true then
-        "truncated"
-    else
-        .ResourceRecordSets | doExtract
-    end
-    '
-)" \
-|| exit "$?"
-
-if [[ ${existingJson} == '"truncated"' ]]; then
-    error-msg 'Cannot handle truncated response from Route53. Sorry!'
-    exit 1
+if (( doMerge )); then
+    existingJson="$(get-existing-records "${zoneId}" "${treeJson}")" \
+    || exit "$?"
+    info-msg '####### EXISTING'
+    jget "${existingJson}"
+    info-msg '#######'
 fi
+
 
 info-msg '########## TREE'
 jget "${treeJson}"
-info-msg '########## EXISTING'
-jget "${existingJson}"
 info-msg '##########'
 
 # TODO: Retrieve any salient existing records (e.g. to determine add vs.
