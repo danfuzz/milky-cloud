@@ -50,6 +50,9 @@ define-usage $'
 # Want help?
 opt-action --call='{ usage; exit }' help/h
 
+# Handles JSON `--output` and post-processing arguments.
+usual-json-output-args
+
 # Domain to find.
 opt-value --required --var=domain --filter='/^[-./a-zA-Z0-9]+$/' domain
 
@@ -59,31 +62,13 @@ opt-value --required --var=name --filter='/^[-_.a-z0-9]+$/' name
 # Ok if not all records found?
 opt-toggle --var=notFoundOk not-found-ok
 
-# Output style.
-opt-value --var=outputStyle --init=json --enum='array json none' output
-
 # Types to find.
 opt-value --required --var=types --filter='/^[ a-z]+$/' type
 
-# Optional post-processing arguments.
-rest-arg --var=postArgs post-arg
-
 process-args "$@" || usage --short
 
-# TODO: This is copied from `info-help.sh`. Should be unified.
-if (( ${#postArgs[@]} != 0 )); then
-    if [[ ${outputStyle} == 'none' ]]; then
-        error-msg 'Cannot do post-processing given `--output=none`.'
-        usage --short
-        return 1
-    fi
-
-    jpostproc --check "${postArgs[@]}" \
-    || {
-        usage --short
-        return 1
-    }
-fi
+check-json-output-args \
+|| exit "$?"
 
 
 #
@@ -167,7 +152,7 @@ else
     fullName="${name}.${domain}."
 fi
 
-result="$(lib aws-json route53 list-resource-record-sets --global \
+resultArray="$(lib aws-json route53 list-resource-record-sets --global \
     fullName="${fullName}" \
     types:json="${types}" \
     zoneId="${zoneId}" '
@@ -210,8 +195,8 @@ result="$(lib aws-json route53 list-resource-record-sets --global \
 )" \
 || exit "$?"
 
-if [[ ${result} =~ ^'{' ]]; then
-    len="$(jget "${result}" '.count')"
+if [[ ${resultArray} =~ ^'{' ]]; then
+    len="$(jget "${resultArray}" '.count')"
     if (( len == 0 )); then
         error-msg 'No matching records found.'
     else
@@ -220,4 +205,4 @@ if [[ ${result} =~ ^'{' ]]; then
     exit 1
 fi
 
-postproc-output "${result}"
+json-postproc-output "${resultArray}"
