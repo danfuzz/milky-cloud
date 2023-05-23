@@ -97,29 +97,26 @@ else
     changesArray="$(
         jget "${recordsArray}" \
             findValue="${findValue}" '
+            def makeResult($action; $record):
+                $record
+                |
+                {
+                    Action: $action,
+                    ResourceRecordSet: {
+                        Name: .name,
+                        Type: (.type | ascii_upcase),
+                        TTL:  .ttl,
+                        ResourceRecords: [.values | map({ Value: . })]
+                    }
+                }
+            ;
             map(
                 (.values | map(select(. != $findValue))) as $newValues
                 |
                 if $newValues == [] then
-                    {
-                        Action: "DELETE",
-                        ResourceRecordSet: {
-                            Name: .name,
-                            Type: (.type | ascii_upcase),
-                            TTL:  .ttl,
-                            ResourceRecords: [.values | map({ Value: . })]
-                        }
-                    }
+                    makeResult("DELETE"; .)
                 else
-                    {
-                        Action: "UPSERT",
-                        ResourceRecordSet: {
-                            Name: .name,
-                            Type: (.type | ascii_upcase),
-                            TTL:  .ttl,
-                            ResourceRecords: [$newValues | map({ Value: . })]
-                        }
-                    }
+                    makeResult("UPSERT"; .values = $newValues)
                 end
             )
     ')"
