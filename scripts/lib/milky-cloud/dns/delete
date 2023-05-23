@@ -107,7 +107,7 @@ changesArray="$(
             (if $findValue == "" then
                 []
             else
-                (.values | map(select(. != $findValue)))
+                .values - [$findValue]
             end)
             as $newValues
             |
@@ -139,13 +139,11 @@ fi
 
 resultArray="$(jval \
     changeId="${changeId}" \
-    domain="${domain}" \
-    records:json="${recordsArray}" \
-    zoneId="${zoneId}" '[{
+    records:json="${recordsArray}" '[{
         changeId: $changeId,
-        domain: $domain,
-        zoneId: $zoneId,
-        originalRecords: $records
+        domain: $records[0].domain,
+        zoneId: $records[0].zoneId,
+        originalRecords: ($records | map(del(.domain) | del(.zoneId)))
     }]'
 )"
 
