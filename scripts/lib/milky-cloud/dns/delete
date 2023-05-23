@@ -1,0 +1,178 @@
+#!/bin/bash
+#
+# Copyright 2022-2023 the Milk-prod Authors (Dan Bornstein et alia).
+# This project is PROPRIETARY and UNLICENSED.
+
+. "$(dirname "$(readlink -f "$0")")/_init.sh" || exit "$?"
+
+
+#
+# Argument parsing
+#
+
+define-usage $'
+    ${name} [<opt> ...] [:: [<out-opt> ...] [<jval-expr> ...]]
+
+    Deletes all DNS records that match the indicated query, which is performed
+    using the same options as `dns get` (see which). And output is also the same
+    as `dns get`.
+
+    --domain=<name-or-id>
+      Main domain to match. Can be either a domain name per se or a Zone ID.
+      Required.
+    --name=<name>
+      Name and subdomain (but not main domain name) to match. Use `.` to indicate
+      an apex record. Required.
+    --not-found-ok
+      Do not report an error if fewer records were found than implied by the
+      given number of `--type`s.
+    --output=<style> :: array json none
+      What to output, as with `dns get`.
+    --type=<list>
+      A space-separated list of one or more record types (in lower case).
+      Required.
+    --value=<value>
+      Specific value to delete. If specified, only this value will be deleted,
+      and other values in matched records are left alone.
+
+    ${name} [--help | -h]
+
+    Displays this message.
+'
+
+# Want help?
+opt-action --call='{ usage; exit }' help/h
+
+# Handles JSON `--output` and post-processing arguments.
+usual-json-output-args
+
+# Domain to find.
+opt-value --required --var=domain --filter='/^[-./a-zA-Z0-9]+$/' domain
+
+# Name to find.
+opt-value --required --var=name --filter='/^[-_.a-z0-9]+$/' name
+
+# Ok if not all records found?
+opt-toggle --var=notFoundOk not-found-ok
+
+# Types to find.
+opt-value --required --var=types --filter='/^[ a-z]+$/' type
+
+# Specific value to find.
+opt-value --var=value value
+
+process-args "$@" || usage --short
+
+check-json-output-args \
+|| exit "$?"
+
+
+#
+# Main script
+#
+
+sdlfkjsdflk sdlfkjs dfkjhsd fkjsdfk jsdghfkjsdhf kjsdf s
+error-msg TODO
+exit 1
+
+# Canonicalize the `name` by ensuring it does not end with a `.`
+if [[ ${name} =~ ^(.*)[.]$ ]]; then
+    name="${BASH_REMATCH[1]}"
+fi
+
+# Canonicalize the `domain` by ensuring it does not end with a `.`
+if [[ ${domain} =~ ^(.*)[.]$ ]]; then
+    domain="${BASH_REMATCH[1]}"
+fi
+
+# Avoid weirdness: Reject `name` if it ends with the domain name.
+if [[ ${name} =~ ".${domain}" ]]; then
+    error-msg 'Do not append the `--domain` to the `--name`.'
+    exit 1
+fi
+
+# Convert `types` to a sorted JSON array of uppercase names.
+types="$(
+    jval types="${types}" '
+        $types
+        | split(" "; "g")
+        | map(select(. != "") | ascii_upcase)
+        | sort'
+)" \
+|| exit "$?"
+
+if [[ ${types} == '[]' ]]; then
+    error-msg 'No types listed!'
+    usage --short
+    exit 1
+fi
+
+zoneInfo="$(lib dns find-zone --domain="${domain}")" \
+|| exit "$?"
+
+# Extract the domain name and ID. (We need to get the domain name, because the
+# original `--domain` might have been specified as an ID.)
+zoneId="$(jget --output=raw "${zoneInfo}" '.id')"
+domain="$(jget --output=raw "${zoneInfo}" '.name')"
+
+fullName=
+if [[ ${name} == '' ]]; then
+    fullName="${domain}."
+else
+    fullName="${name}.${domain}."
+fi
+
+result="$(lib aws-json route53 list-resource-record-sets --global \
+    fullName="${fullName}" \
+    types:json="${types}" \
+    zoneId="${zoneId}" '
+    {
+        HostedZoneId:    $zoneId,
+        StartRecordName: $fullName,
+        StartRecordType: $types[0]
+    }
+    +
+    if ($types | length) == 1 then
+        { MaxItems: "1" }
+    else
+        .
+    end' \
+    :: \
+    fullName="${fullName}" \
+    notFoundOk:json="${notFoundOk}" \
+    types:json="${types}" '
+    .ResourceRecordSets
+    |
+    map(select(
+        (.Name == $fullName)
+        and
+        ((.Type as $type | $types | bsearch($type)) >= 0)
+    ))
+    |
+    map({
+        name:   .Name,
+        type:   .Type,
+        ttl:    .TTL,
+        values: (.ResourceRecords | map(.Value))
+    })
+    |
+    if ($notFoundOk == 1) or (length == ($types | length)) then
+        .
+    else
+        { count: length }
+    end
+    '
+)" \
+|| exit "$?"
+
+if [[ ${result} =~ ^'{' ]]; then
+    len="$(jget "${result}" '.count')"
+    if (( len == 0 )); then
+        error-msg 'No matching records found.'
+    else
+        error-msg "Insufficient matching records found. (Found ${len}.)"
+    fi
+    exit 1
+fi
+
+json-postproc-output "${result}"
