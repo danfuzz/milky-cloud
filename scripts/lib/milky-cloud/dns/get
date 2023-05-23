@@ -159,7 +159,7 @@ resultArray="$(lib aws-json route53 list-resource-record-sets --global \
                     | sub("[.]$"; "")
                     | if . == "" then "." else . end
                 ),
-        type:   .Type,
+        type:   (.Type | ascii_downcase),
         ttl:    .TTL,
         values: (.ResourceRecords | map(.Value)),
         zoneId: $zoneId
