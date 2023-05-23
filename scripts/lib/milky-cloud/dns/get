@@ -153,7 +153,12 @@ resultArray="$(lib aws-json route53 list-resource-record-sets --global \
     |
     map({
         domain: $domain,
-        name:   .Name,
+        fullName: (.Name | sub("[.]$"; "")),
+        name:   (
+                    .Name[:-($domain | length) - 1]
+                    | sub("[.]$"; "")
+                    | if . == "" then "." else . end
+                ),
         type:   .Type,
         ttl:    .TTL,
         values: (.ResourceRecords | map(.Value)),
