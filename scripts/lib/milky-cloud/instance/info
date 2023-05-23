@@ -4,7 +4,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 . "$(dirname "$(readlink -f "$0")")/_init.sh" || exit "$?"
-. "$(this-cmd-dir)/info-help.sh"
 
 
 #
@@ -77,8 +76,8 @@ define-usage $'
 # Want help?
 opt-action --call='{ usage; exit }' help/h
 
-# Handles `--output` and post-processing arguments.
-usual-info-output-args
+# Handles JSON `--output` and post-processing arguments.
+usual-json-output-args
 
 # Add attribute info?
 opt-toggle --var=addAttributes attributes
@@ -109,7 +108,7 @@ opt-value --var=terminated --init='exclude' --enum='exclude include only' termin
 
 process-args "$@" || usage --short
 
-check-info-output-args \
+check-json-output-args \
 || exit "$?"
 
 if (( multipleResults )); then
@@ -378,4 +377,4 @@ elif (( (resultLength > 1) && !multipleResults )); then
     exit 1
 fi
 
-postproc-info-output "${resultArray}"
+json-postproc-output "${resultArray}"

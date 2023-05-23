@@ -3,9 +3,9 @@
 # Copyright 2022-2023 the Milky-cloud Authors (Dan Bornstein et alia).
 # SPDX-License-Identifier: Apache-2.0
 
+#
 # Helper library for `instance` subcommands that control instances.
-
-. "$(this-cmd-dir)/info-help.sh"
+#
 
 # Where most of the usual info options land when parsed.
 _control_infoOpts=()
@@ -58,7 +58,7 @@ function instance-control-skeleton {
     shift 2
     local implArgs=("$@")
 
-    check-info-output-args \
+    check-json-output-args \
     || return "$?"
 
     progress-msg --enable
@@ -78,7 +78,7 @@ function instance-control-skeleton {
 
     if [[ ${region} == 'no-results' ]]; then
         info-msg 'No matching instances found. Not taking action.'
-        postproc-info-output '[]'
+        json-postproc-output '[]'
         return
     fi
 
@@ -99,7 +99,7 @@ function instance-control-skeleton {
 
     progress-msg 'Done.'
 
-    postproc-info-output "${infoArray}"
+    json-postproc-output "${infoArray}"
 }
 
 # Sets up a subcommand to take the usual `instance info` arguments, storing them
@@ -114,5 +114,5 @@ function usual-info-args {
     opt-toggle --call='{ _control_infoOpts+=(--not-found-ok="$1") }' not-found-ok
     opt-value --call='{ _control_infoOpts+=(--protected="$1") }' protected
 
-    usual-info-output-args
+    usual-json-output-args
 }
