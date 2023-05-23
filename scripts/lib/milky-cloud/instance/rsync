@@ -65,21 +65,21 @@ process-args "$@" || usage --short
 
 # Constructs and performs the call to `rsync`.
 function call-rsync {
-    local rshCmd=("$(this-cmd-path)" --from-rsync)
+    local rshCmd=("$(rsh-quote "$(this-cmd-path)")" --from-rsync)
 
     if [[ ${sshCmd} != '' ]]; then
         if [[ !((-f ${sshCmd}) && (-x ${sshCmd})) ]]; then
             error-msg "Cannot execute \`ssh-cmd\`: ${sshCmd}"
             exit 1
         fi
-        rshCmd+=(--ssh-cmd="${sshCmd}")
+        rshCmd+=("$(rsh-quote --ssh-cmd="${sshCmd}")")
     fi
 
     rshCmd+=(--)
 
     local opt
     for opt in "${sshOpts[@]}"; do
-        rshCmd+=("$(base64 <<<"${opt}")")
+        rshCmd+=("$(rsh-quote "${opt}")")
     done
     rshCmd+=('::')
 
@@ -113,7 +113,7 @@ function rsync-callback {
             break
         fi
 
-        sshFullCmd+=("$(base64 <<<"${arg}" --decode)")
+        sshFullCmd+=("${arg}")
     done
 
     local sshTarget=''
@@ -132,17 +132,48 @@ function rsync-callback {
     exec "${sshFullCmd[@]}"
 }
 
+# Quotes an argument so it can be passed via the `--rsh` option to `rsync` and
+# then be received on the other side as a single argument. Note that the rules
+# for this quoting are _not_ the same as regular shell quoting. (The rules are
+# documented on the `rsync` manpage, in the full description of the option.)
+function rsh-quote {
+    local arg="$1"
+
+    if ! [[ ${arg} =~ [\ \'\"] ]]; then
+        # Nothing needs to be quoted.
+        printf '%s' "${arg}"
+        return
+    fi
+
+    # For simplicity we pick single-quote as the wrapper (even though maybe
+    # double-quote might have turned out to be a more efficient choice in some
+    # cases). As such, we need to double each single-quote, and wrap the whole
+    # argument in them too.
+
+    local processed=''
+
+    while [[ ${arg} =~ ^([^\']*)\'(.*)$ ]]; do
+        local prefix="${BASH_REMATCH[1]}"
+        local suffix="${BASH_REMATCH[2]}"
+        processed+="${prefix}''"
+        arg="${suffix}"
+    done
+
+    processed="'${processed}${arg}'"
+
+    printf '%s' "${processed}"
+}
+
 
 #
 # Main script
 #
 
 # What's going on: The "rsh" command passed to `rsync` is a single string, with
-# non-standard rules about how to do special-character quoting. Rather than deal
-# with this directly, we just base64-encode the `instance ssh` arguments, and
-# tell `rsync` to call back to this script. When we get called back, we both
-# deal with the argument decoding _and_ interpreting the normal `rsh`/`ssh`
-# arguments it passes.
+# non-standard rules about how to do special-character quoting. We construct an
+# appropriately-quoted command string which calls back to this very script, at
+# which point we use the embedded arguments to make the ultimate call to
+# `instance ssh` arguments.
 
 if (( fromRsync )); then
     # We are being called from within `rsync`.
