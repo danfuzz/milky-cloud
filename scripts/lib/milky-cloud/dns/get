@@ -175,7 +175,7 @@ resultArray="$(lib aws-json route53 list-resource-record-sets --global \
         .
     else
         # Filter out elements where `.values` does not contain the one we want.
-        map(select([.values[] | select(. == $findValue)] != []))
+        map(select((.values - [$findValue]) != .values))
     end
     |
     if ($notFoundOk == 1) or (length == ($types | length)) then
