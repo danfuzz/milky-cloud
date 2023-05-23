@@ -41,6 +41,8 @@ define-usage $'
     --type=<list>
       A space-separated list of one or more record types (in lower case).
       Required.
+    --value=<value>
+      Specific value which must be present in the matched records.
 
     ${name} [--help | -h]
 
@@ -64,6 +66,9 @@ opt-toggle --var=notFoundOk not-found-ok
 
 # Types to find.
 opt-value --required --var=types --filter='/^[ a-z]+$/' type
+
+# Value required to be in the result.
+opt-value --var=findValue --filter='/./' value
 
 process-args "$@" || usage --short
 
@@ -139,6 +144,7 @@ resultArray="$(lib aws-json route53 list-resource-record-sets --global \
     end' \
     :: \
     domain="${domain}" \
+    findValue="${findValue}" \
     fullName="${fullName}" \
     notFoundOk:json="${notFoundOk}" \
     types:json="${types}" \
@@ -164,6 +170,13 @@ resultArray="$(lib aws-json route53 list-resource-record-sets --global \
         values: (.ResourceRecords | map(.Value)),
         zoneId: $zoneId
     })
+    |
+    if $findValue == "" then
+        .
+    else
+        # Filter out elements where `.values` does not contain the one we want.
+        map(select([.values[] | select(. == $findValue)] != []))
+    end
     |
     if ($notFoundOk == 1) or (length == ($types | length)) then
         .
