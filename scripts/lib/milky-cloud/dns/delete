@@ -78,49 +78,37 @@ domain="$(jget --output=raw "${recordsArray}" '.[0].domain')"
 zoneId="$(jget --output=raw "${recordsArray}" '.[0].zoneId')"
 
 # Filter the records array, transforming it into a list of deletes and upserts.
-changesArray=
-if [[ ${findValue} == '' ]]; then
-    # Not just removing a single value, so turn everything into a delete.
-    changesArray="$(
-        jget "${recordsArray}" '
-            map({
-                Action: "DELETE",
+changesArray="$(
+    jget "${recordsArray}" \
+        findValue="${findValue}" '
+        def makeResult($action; $record):
+            $record
+            |
+            {
+                Action: $action,
                 ResourceRecordSet: {
                     Name: .name,
                     Type: (.type | ascii_upcase),
                     TTL:  .ttl,
                     ResourceRecords: [.values | map({ Value: . })]
                 }
-            })
-    ')"
-else
-    changesArray="$(
-        jget "${recordsArray}" \
-            findValue="${findValue}" '
-            def makeResult($action; $record):
-                $record
-                |
-                {
-                    Action: $action,
-                    ResourceRecordSet: {
-                        Name: .name,
-                        Type: (.type | ascii_upcase),
-                        TTL:  .ttl,
-                        ResourceRecords: [.values | map({ Value: . })]
-                    }
-                }
-            ;
-            map(
-                (.values | map(select(. != $findValue))) as $newValues
-                |
-                if $newValues == [] then
-                    makeResult("DELETE"; .)
-                else
-                    makeResult("UPSERT"; .values = $newValues)
-                end
-            )
-    ')"
-fi
+            }
+        ;
+        map(
+            (if $findValue == "" then
+                []
+            else
+                (.values | map(select(. != $findValue)))
+            end)
+            as $newValues
+            |
+            if $newValues == [] then
+                makeResult("DELETE"; .)
+            else
+                makeResult("UPSERT"; .values = $newValues)
+            end
+        )
+')"
 
 # TODO: Pass the changes array into the AWS call.
 
