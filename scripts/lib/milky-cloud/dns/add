@@ -106,6 +106,7 @@ function get-existing-records {
         zoneId="${zoneId}" '{ HostedZoneId: $zoneId }' \
         :: \
         tree:json="${treeJson}" '
+
         def doExtract:
             ($tree | keys) as $names
             |
@@ -177,6 +178,7 @@ function make-binding-tree {
         names:json="${namesJson}" \
         types:json="${typesJson}" \
         values:json="${valuesJson}" '
+
         def makeName($name):
             if $name == "." then "\($domain)." else "\($name).\($domain)." end;
         [$names, $types, $values]
@@ -192,7 +194,25 @@ function make-binding-tree {
         # This produces an object which maps names to an object that maps types to
         # arrays of values.
         reduce .[] as $item (null; .[$item.name][$item.type] += [$item.value])
-        '
+    '
+}
+
+# Merges two trees (per above) together, producing value arrays that contain the
+# union of values of the two at each corresponding element.
+function merge-trees {
+    local tree1="$1"
+    local tree2="$2"
+
+    jval \
+        tree1:json="${tree1}" \
+        tree2:json="${tree2}" '
+
+        reduce ($tree2 | to_entries[]) as { key: $name, value: $typeMap } (
+            $tree1;
+            # TODO: NOT DONE!!!!
+            .[$name].new = $typeMap
+        )
+    '
 }
 
 
@@ -236,6 +256,8 @@ if (( doMerge )); then
     || exit "$?"
     info-msg '####### EXISTING'
     jget "${existingJson}"
+    info-msg '####### MERGE'
+    merge-trees "${existingJson}" "${treeJson}"
     info-msg '#######'
 fi
 
