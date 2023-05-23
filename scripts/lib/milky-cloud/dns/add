@@ -1,0 +1,130 @@
+#!/bin/bash
+#
+# Copyright 2022-2023 the Milk-prod Authors (Dan Bornstein et alia).
+# This project is PROPRIETARY and UNLICENSED.
+
+. "$(dirname "$(readlink -f "$0")")/_init.sh" || exit "$?"
+
+
+#
+# Argument parsing
+#
+
+define-usage $'
+    ${name} [<opt> ...] <binding> ...
+
+    Adds, merges, or replaces one or more DNS records. Prints out JSON information
+    about the DNS change which was created as a result.
+
+    Note: This command only handles regular DNS records, and not aliases or
+    other AWS-specific stuff.
+
+    <binding>
+      [<name>.]<type>=<value> -- Create a record of the given type with the
+        given value. With `<name>` uses that as the name-and-subdomain; without
+        it, then the `--name` option provides the name to bind. It is valid to
+        repeat the same name and type multiple times; this indicates a
+        multi-valued record.
+
+    --domain=<name-or-id>
+      Main domain to operate on. Can be either a domain name per se or a Zone ID.
+      Required.
+    --name=<name>
+      Name and subdomain (but not main domain name) to operate on, for <binding>s
+      that don\'t specify one. Use `.` to indicate an apex record. Required if
+      any <binding>s do not include a name.
+    --merge
+      Merges records, keeping old values for a given name/type, and just adding
+      to them. Without this option, existing records are replaced (and
+      nonexistent records are created).
+    --[no-]wait
+      Wait for the DNS records to be synchronized? `--wait` is the default.
+
+    ${name} [--help | -h]
+
+    Displays this message.
+'
+
+# Want help?
+opt-action --call='{ usage; exit }' help/h
+
+# TODO: Handle usual output arguments. It's hard here because we also take
+# other rest args.
+
+# Domain to operate on.
+opt-value --required --var=domain --filter='/^[-./a-zA-Z0-9]+$/' domain
+
+# Name to operate on by default.
+opt-value --var=name --filter='/^[-_.a-z0-9]+$/' name
+
+# Merge instead of replace?
+opt-toggle --var=doMerge merge
+
+# List of bindings, as parallel arrays of name, type, and value.
+bindNames=()
+bindTypes=()
+bindValues=()
+
+rest-arg --call=parse-bindings bindings
+function parse-bindings {
+    local arg
+    local error=0
+
+    while (( $# > 0 )); do
+        arg="$1"
+        shift
+
+        if ! [[ ${arg} =~ ^([-_.a-zA-Z0-9]+)=(.+)$ ]]; then
+            error-msg 'Could not parse binding:' "${arg}"
+            error=1
+            continue
+        fi
+
+        local nameType="${BASH_REMATCH[1]}"
+        bindValues+=("${BASH_REMATCH[2]}")
+
+        if ! [[ ${nameType} =~ ^([^.].*[.])?([^.]+)$ ]]; then
+            error-msg 'Could not parse binding:' "${arg}"
+            error=1
+            continue
+        fi
+
+        bindNames+=("${BASH_REMATCH[1]%.}") # `%.` to remove the trailing dot.
+        bindTypes+=("${BASH_REMATCH[2]}")
+    done
+
+    return "${error}"
+}
+
+process-args "$@" || usage --short
+
+
+#
+# Main script
+#
+
+# Fill in the name on any bindings that don't have one.
+for n in "${!bindNames[@]}"; do
+    if [[ ${bindNames[n]} == '' ]]; then
+        if [[ ${name} == '' ]]; then
+            error-msg 'Must supply `--name` when using nameless bindings.'
+            usage --short
+            exit 1
+        fi
+        bindNames[n]="${name}"
+    fi
+done
+
+for n in "${!bindNames[@]}"; do
+    info-msg "### >>${bindNames[n]}<< >>${bindTypes[n]}<< >>${bindValues[n]}<<"
+done
+
+# TODO: Form into nascent records.
+
+# TODO: Retrieve any salient existing records (e.g. to determine add vs.
+# upsert, and provide the baseline for merges).
+
+# TODO: Make final Route53 call.
+
+error-msg TODO
+exit 1
