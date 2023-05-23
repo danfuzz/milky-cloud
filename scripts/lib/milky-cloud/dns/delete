@@ -4,6 +4,7 @@
 # This project is PROPRIETARY and UNLICENSED.
 
 . "$(dirname "$(readlink -f "$0")")/_init.sh" || exit "$?"
+. "$(this-cmd-dir)/dns-help.sh"
 
 
 #
@@ -70,6 +71,8 @@ check-json-output-args \
 # Main script
 #
 
+progress-msg --enable
+
 # Get the existing records.
 recordsArray="$(lib dns get "${getOpts[@]}" --output=array)" \
 || exit "$?"
@@ -85,6 +88,7 @@ zoneId="$(jget --output=raw "${recordsArray}" '.[0].zoneId')"
 # Filter the records array, transforming it into a list of deletes and upserts.
 changesArray="$(
     jget "${recordsArray}" \
+        domain="${domain}" \
         findValue="${findValue}" '
         def makeResult($action; $record):
             $record
@@ -92,10 +96,10 @@ changesArray="$(
             {
                 Action: $action,
                 ResourceRecordSet: {
-                    Name: .name,
+                    Name: "\(.name).\($domain).",
                     Type: (.type | ascii_upcase),
                     TTL:  .ttl,
-                    ResourceRecords: [.values | map({ Value: . })]
+                    ResourceRecords: [.values[] | { Value: . }]
                 }
             }
         ;
@@ -115,113 +119,34 @@ changesArray="$(
         )
 ')"
 
-# TODO: Pass the changes array into the AWS call.
-
-jget "${changesArray}"
-error-msg TODO
-exit 1
-
-##################################
-# STUFF FROM `dns get`
-
-# Canonicalize the `name` by ensuring it does not end with a `.`
-if [[ ${name} =~ ^(.*)[.]$ ]]; then
-    name="${BASH_REMATCH[1]}"
-fi
-
-# Canonicalize the `domain` by ensuring it does not end with a `.`
-if [[ ${domain} =~ ^(.*)[.]$ ]]; then
-    domain="${BASH_REMATCH[1]}"
-fi
-
-# Avoid weirdness: Reject `name` if it ends with the domain name.
-if [[ ${name} =~ ".${domain}" ]]; then
-    error-msg 'Do not append the `--domain` to the `--name`.'
-    exit 1
-fi
-
-# Convert `types` to a sorted JSON array of uppercase names.
-types="$(
-    jval types="${types}" '
-        $types
-        | split(" "; "g")
-        | map(select(. != "") | ascii_upcase)
-        | sort'
+changeId="$(lib aws-json route53 change-resource-record-sets --global \
+    changes:json="${changesArray}" \
+    zoneId="${zoneId}" '{
+        HostedZoneId: $zoneId,
+        ChangeBatch: {
+            Comment: "Via `dns delete`",
+            Changes: $changes
+        }
+    }' \
+    :: --output=raw '.ChangeInfo.Id'
 )" \
 || exit "$?"
 
-if [[ ${types} == '[]' ]]; then
-    error-msg 'No types listed!'
-    usage --short
-    exit 1
+if (( waitForSync )); then
+    wait-for-dns-sync "${changeId}" \
+    || exit "$?"
 fi
 
-zoneInfo="$(lib dns find-zone --domain="${domain}")" \
-|| exit "$?"
+resultArray="$(jval \
+    changeId="${changeId}" \
+    domain="${domain}" \
+    records:json="${recordsArray}" \
+    zoneId="${zoneId}" '[{
+        changeId: $changeId,
+        domain: $domain,
+        zoneId: $zoneId,
+        originalRecords: $records
+    }]'
+)"
 
-# Extract the domain name and ID. (We need to get the domain name, because the
-# original `--domain` might have been specified as an ID.)
-zoneId="$(jget --output=raw "${zoneInfo}" '.id')"
-domain="$(jget --output=raw "${zoneInfo}" '.name')"
-
-fullName=
-if [[ ${name} == '' ]]; then
-    fullName="${domain}."
-else
-    fullName="${name}.${domain}."
-fi
-
-result="$(lib aws-json route53 list-resource-record-sets --global \
-    fullName="${fullName}" \
-    types:json="${types}" \
-    zoneId="${zoneId}" '
-    {
-        HostedZoneId:    $zoneId,
-        StartRecordName: $fullName,
-        StartRecordType: $types[0]
-    }
-    +
-    if ($types | length) == 1 then
-        { MaxItems: "1" }
-    else
-        .
-    end' \
-    :: \
-    fullName="${fullName}" \
-    notFoundOk:json="${notFoundOk}" \
-    types:json="${types}" '
-    .ResourceRecordSets
-    |
-    map(select(
-        (.Name == $fullName)
-        and
-        ((.Type as $type | $types | bsearch($type)) >= 0)
-    ))
-    |
-    map({
-        name:   .Name,
-        type:   .Type,
-        ttl:    .TTL,
-        values: (.ResourceRecords | map(.Value))
-    })
-    |
-    if ($notFoundOk == 1) or (length == ($types | length)) then
-        .
-    else
-        { count: length }
-    end
-    '
-)" \
-|| exit "$?"
-
-if [[ ${result} =~ ^'{' ]]; then
-    len="$(jget "${result}" '.count')"
-    if (( len == 0 )); then
-        error-msg 'No matching records found.'
-    else
-        error-msg "Insufficient matching records found. (Found ${len}.)"
-    fi
-    exit 1
-fi
-
-json-postproc-output "${result}"
+json-postproc-output "${resultArray}"
