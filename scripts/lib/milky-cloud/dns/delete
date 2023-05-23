@@ -48,13 +48,12 @@ usual-json-output-args
 
 # Options passed to `dns get`
 getOpts=()
+findValue=''
 opt-value --call='{ getOpts+=(--domain="$1") }' domain
 opt-value --call='{ getOpts+=(--name="$1") }' name
 opt-toggle --call='{ getOpts+=(--not-found-ok="$1") }' not-found-ok
 opt-value --call='{ getOpts+=(--type="$1") }' type
-
-# Specific value to find.
-opt-value --var=value value
+opt-value --call='{ getOpts+=(--value="$1"); findValue="$1" }' value
 
 process-args "$@" || usage --short
 
@@ -66,18 +65,69 @@ check-json-output-args \
 # Main script
 #
 
-# Get the existing records to delete.
+# Get the existing records.
 recordsArray="$(lib dns get "${getOpts[@]}" --output=array)" \
 || exit "$?"
-
-# TODO: Filter to select only the indicated `value` if specified
 
 if [[ ${recordsArray} == '[]' ]]; then
     info-msg 'Nothing to delete; no matching records.'
     exit
 fi
 
-jget "${recordsArray}"
+domain="$(jget --output=raw "${recordsArray}" '.[0].domain')"
+zoneId="$(jget --output=raw "${recordsArray}" '.[0].zoneId')"
+
+# Filter the records array, transforming it into a list of deletes and upserts.
+changesArray=
+if [[ ${findValue} == '' ]]; then
+    # Not just removing a single value, so turn everything into a delete.
+    changesArray="$(
+        jget "${recordsArray}" '
+            map({
+                Action: "DELETE",
+                ResourceRecordSet: {
+                    Name: .name,
+                    Type: (.type | ascii_upcase),
+                    TTL:  .ttl,
+                    ResourceRecords: [.values | map({ Value: . })]
+                }
+            })
+    ')"
+else
+    changesArray="$(
+        jget "${recordsArray}" \
+            findValue="${findValue}" '
+            map(
+                (.values | map(select(. != $findValue))) as $newValues
+                |
+                if $newValues == [] then
+                    {
+                        Action: "DELETE",
+                        ResourceRecordSet: {
+                            Name: .name,
+                            Type: (.type | ascii_upcase),
+                            TTL:  .ttl,
+                            ResourceRecords: [.values | map({ Value: . })]
+                        }
+                    }
+                else
+                    {
+                        Action: "UPSERT",
+                        ResourceRecordSet: {
+                            Name: .name,
+                            Type: (.type | ascii_upcase),
+                            TTL:  .ttl,
+                            ResourceRecords: [$newValues | map({ Value: . })]
+                        }
+                    }
+                end
+            )
+    ')"
+fi
+
+# TODO: Pass the changes array into the AWS call.
+
+jget "${changesArray}"
 error-msg TODO
 exit 1
 
