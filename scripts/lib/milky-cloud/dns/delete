@@ -34,6 +34,8 @@ define-usage $'
     --value=<value>
       Specific value to delete. If specified, only this value will be deleted,
       and other values in matched records are left alone.
+    --[no-]wait
+      Wait for the DNS records to be synchronized? `--wait` is the default.
 
     ${name} [--help | -h]
 
@@ -54,6 +56,9 @@ opt-value --call='{ getOpts+=(--name="$1") }' name
 opt-toggle --call='{ getOpts+=(--not-found-ok="$1") }' not-found-ok
 opt-value --call='{ getOpts+=(--type="$1") }' type
 opt-value --call='{ getOpts+=(--value="$1"); findValue="$1" }' value
+
+# Wait for DNS records to be in synch?
+opt-toggle --var=waitForSync --init=1 wait
 
 process-args "$@" || usage --short
 
