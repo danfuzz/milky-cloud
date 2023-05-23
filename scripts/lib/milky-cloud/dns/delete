@@ -14,8 +14,8 @@ define-usage $'
     ${name} [<opt> ...] [:: [<out-opt> ...] [<jval-expr> ...]]
 
     Deletes all DNS records that match the indicated query, which is performed
-    using the same options as `dns get` (see which). And output is also the same
-    as `dns get`.
+    using the same options as `dns get` (see which). Output is a single JSON
+    object binding information about the DNS change request.
 
     --domain=<name-or-id>
       Main domain to match. Can be either a domain name per se or a Zone ID.
@@ -46,17 +46,12 @@ opt-action --call='{ usage; exit }' help/h
 # Handles JSON `--output` and post-processing arguments.
 usual-json-output-args
 
-# Domain to find.
-opt-value --required --var=domain --filter='/^[-./a-zA-Z0-9]+$/' domain
-
-# Name to find.
-opt-value --required --var=name --filter='/^[-_.a-z0-9]+$/' name
-
-# Ok if not all records found?
-opt-toggle --var=notFoundOk not-found-ok
-
-# Types to find.
-opt-value --required --var=types --filter='/^[ a-z]+$/' type
+# Options passed to `dns get`
+getOpts=()
+opt-value --call='{ getOpts+=(--domain="$1") }' domain
+opt-value --call='{ getOpts+=(--name="$1") }' name
+opt-toggle --call='{ getOpts+=(--not-found-ok="$1") }' not-found-ok
+opt-value --call='{ getOpts+=(--type="$1") }' type
 
 # Specific value to find.
 opt-value --var=value value
@@ -71,9 +66,23 @@ check-json-output-args \
 # Main script
 #
 
-sdlfkjsdflk sdlfkjs dfkjhsd fkjsdfk jsdghfkjsdhf kjsdf s
+# Get the existing records to delete.
+recordsArray="$(lib dns get "${getOpts[@]}" --output=array)" \
+|| exit "$?"
+
+# TODO: Filter to select only the indicated `value` if specified
+
+if [[ ${recordsArray} == '[]' ]]; then
+    info-msg 'Nothing to delete; no matching records.'
+    exit
+fi
+
+jget "${recordsArray}"
 error-msg TODO
 exit 1
+
+##################################
+# STUFF FROM `dns get`
 
 # Canonicalize the `name` by ensuring it does not end with a `.`
 if [[ ${name} =~ ^(.*)[.]$ ]]; then
