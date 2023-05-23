@@ -92,10 +92,21 @@ process-args "$@" || usage --short
 
 
 #
+# Helper functions
+#
+
+# Retrieves existing records associated with any name/type mentioned in the
+# <bindings>. This is needed when merging.
+function get-existing-records {
+    : TODO
+}
+
+#
 # Main script
 #
 
 # Fill in the name on any bindings that don't have one.
+
 for n in "${!bindNames[@]}"; do
     if [[ ${bindNames[n]} == '' ]]; then
         if [[ ${name} == '' ]]; then
@@ -111,7 +122,90 @@ for n in "${!bindNames[@]}"; do
     info-msg "### >>${bindNames[n]}<< >>${bindTypes[n]}<< >>${bindValues[n]}<<"
 done
 
-# TODO: Form into nascent records.
+# Look up the domain, and extract the name and ID. (We need to get the domain
+# name, because the original `--domain` might have been specified as an ID.)
+
+zoneInfo="$(lib dns find-zone --domain="${domain}")" \
+|| exit "$?"
+
+# Extract the domain name and ID. (We need to get the domain name, because the
+# original `--domain` might have been specified as an ID.)
+zoneId="$(jget --output=raw "${zoneInfo}" '.id')"
+domain="$(jget --output=raw "${zoneInfo}" '.name')"
+
+# Produce an object that maps names to an object that maps types to arrays of
+# values. The names are expanded into their canonical form for use with AWS, and
+# likewise types are upcased.
+
+treeJson="$(jval \
+    domain="${domain}" \
+    names:json="$(jarray --input=strings "${bindNames[@]}")" \
+    types:json="$(jarray --input=strings "${bindTypes[@]}")" \
+    values:json="$(jarray --input=strings "${bindValues[@]}")" '
+    def makeName($name):
+        if $name == "." then "\($domain)." else "\($name).\($domain)." end;
+    [$names, $types, $values]
+    |
+    transpose
+    |
+    map({
+        name:  makeName(.[0]),
+        type:  (.[1] | ascii_upcase),
+        value: .[2]
+    })
+    |
+    # This produces an object which maps names to an object that maps types to
+    # arrays of values.
+    reduce .[] as $item (null; .[$item.name][$item.type] += [$item.value])
+    '
+)" \
+|| exit "$?"
+
+# Get any records associated with the names being manipulated. Produces an
+# object in the same form as `treeJson`.
+
+existingJson="$(lib aws-json route53 list-resource-record-sets --global \
+    zoneId="${zoneId}" '{ HostedZoneId: $zoneId }' \
+    :: \
+    tree:json="${treeJson}" '
+    def doExtract:
+        ($tree | keys) as $names
+        |
+        map(
+            .Name as $name
+            |
+            .Type as $type
+            |
+            select($tree[$name][$type] != null)
+            |
+            {
+                name:   .Name,
+                type:   .Type,
+                values: (.ResourceRecords | map(.Value))
+            }
+        )
+        |
+        reduce .[] as $item (null; .[$item.name][$item.type] += $item.values)
+    ;
+    if .IsTruncated == true then
+        "truncated"
+    else
+        .ResourceRecordSets | doExtract
+    end
+    '
+)" \
+|| exit "$?"
+
+if [[ ${existingJson} == '"truncated"' ]]; then
+    error-msg 'Cannot handle truncated response from Route53. Sorry!'
+    exit 1
+fi
+
+info-msg '########## TREE'
+jget "${treeJson}"
+info-msg '########## EXISTING'
+jget "${existingJson}"
+info-msg '##########'
 
 # TODO: Retrieve any salient existing records (e.g. to determine add vs.
 # upsert, and provide the baseline for merges).
