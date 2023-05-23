@@ -138,9 +138,11 @@ resultArray="$(lib aws-json route53 list-resource-record-sets --global \
         .
     end' \
     :: \
+    domain="${domain}" \
     fullName="${fullName}" \
     notFoundOk:json="${notFoundOk}" \
-    types:json="${types}" '
+    types:json="${types}" \
+    zoneId="${zoneId}" '
     .ResourceRecordSets
     |
     map(select(
@@ -150,10 +152,12 @@ resultArray="$(lib aws-json route53 list-resource-record-sets --global \
     ))
     |
     map({
+        domain: $domain,
         name:   .Name,
         type:   .Type,
         ttl:    .TTL,
-        values: (.ResourceRecords | map(.Value))
+        values: (.ResourceRecords | map(.Value)),
+        zoneId: $zoneId
     })
     |
     if ($notFoundOk == 1) or (length == ($types | length)) then
