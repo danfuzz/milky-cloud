@@ -72,36 +72,6 @@ check-json-output-args \
 
 
 #
-# Helper functions
-#
-
-# Performs output postprocessing.
-# TODO: This is copied from `info-help.sh`. Should be unified.
-function postproc-output {
-    local resultArray="$1"
-
-    case "${outputStyle}" in
-        array)
-            jpostproc <<<"${resultArray}" "${postArgs[@]}"
-            ;;
-        json)
-            # Extract the results out of the array, to form a "naked" sequence
-            # of JSON objects, and pass that into the post-processor if
-            # necessary.
-            if (( ${#postArgs[@]} == 0 )); then
-                jget "${resultArray}" '.[]'
-            else
-                jget "${resultArray}" '.[]' | jpostproc "${postArgs[@]}"
-            fi
-            ;;
-        none)
-            : # Nothing to do.
-            ;;
-    esac
-}
-
-
-#
 # Main script
 #
 
