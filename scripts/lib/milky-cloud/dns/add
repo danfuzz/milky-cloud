@@ -145,7 +145,8 @@ function get-existing-records {
 }
 
 # Makes a tree out of the parallel arrays that define the bindings. The result
-# is along the lines of:
+# is along the lines of the following, and note that the names are fully
+# expanded and types are upcased:
 #
 # ```
 # {
@@ -166,7 +167,32 @@ function get-existing-records {
 # }
 # ```
 function make-binding-tree {
-    : TODO
+    local domain="$1"
+    local namesJson="$2"
+    local typesJson="$3"
+    local valuesJson="$4"
+
+    jval \
+        domain="${domain}" \
+        names:json="${namesJson}" \
+        types:json="${typesJson}" \
+        values:json="${valuesJson}" '
+        def makeName($name):
+            if $name == "." then "\($domain)." else "\($name).\($domain)." end;
+        [$names, $types, $values]
+        |
+        transpose
+        |
+        map({
+            name:  makeName(.[0]),
+            type:  (.[1] | ascii_upcase),
+            value: .[2]
+        })
+        |
+        # This produces an object which maps names to an object that maps types to
+        # arrays of values.
+        reduce .[] as $item (null; .[$item.name][$item.type] += [$item.value])
+        '
 }
 
 
@@ -193,43 +219,17 @@ done
 
 # Look up the domain, and extract the name and ID. (We need to get the domain
 # name, because the original `--domain` might have been specified as an ID.)
-
-zoneInfo="$(lib dns find-zone --domain="${domain}")" \
-|| exit "$?"
-
-# Extract the domain name and ID. (We need to get the domain name, because the
-# original `--domain` might have been specified as an ID.)
+zoneInfo="$(lib dns find-zone --domain="${domain}")" || exit "$?"
 zoneId="$(jget --output=raw "${zoneInfo}" '.id')"
 domain="$(jget --output=raw "${zoneInfo}" '.name')"
 
-# Produce an object that maps names to an object that maps types to arrays of
-# values. The names are expanded into their canonical form for use with AWS, and
-# likewise types are upcased.
-
-treeJson="$(jval \
-    domain="${domain}" \
-    names:json="$(jarray --input=strings "${bindNames[@]}")" \
-    types:json="$(jarray --input=strings "${bindTypes[@]}")" \
-    values:json="$(jarray --input=strings "${bindValues[@]}")" '
-    def makeName($name):
-        if $name == "." then "\($domain)." else "\($name).\($domain)." end;
-    [$names, $types, $values]
-    |
-    transpose
-    |
-    map({
-        name:  makeName(.[0]),
-        type:  (.[1] | ascii_upcase),
-        value: .[2]
-    })
-    |
-    # This produces an object which maps names to an object that maps types to
-    # arrays of values.
-    reduce .[] as $item (null; .[$item.name][$item.type] += [$item.value])
-    '
+# Convert bindings into a tree form.
+treeJson="$(make-binding-tree "${domain}" \
+    "$(jarray --input=strings "${bindNames[@]}")" \
+    "$(jarray --input=strings "${bindTypes[@]}")" \
+    "$(jarray --input=strings "${bindValues[@]}")"
 )" \
 || exit "$?"
-
 
 if (( doMerge )); then
     existingJson="$(get-existing-records "${zoneId}" "${treeJson}")" \
