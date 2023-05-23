@@ -20,8 +20,8 @@ define-usage $'
     other AWS-specific stuff.
 
     <binding>
-      [<name>.]<type>=<value> -- Create a record of the given type with the
-        given value. With `<name>` uses that as the name-and-subdomain; without
+      [<name>:]<type>=<value> -- Create a record of the given type with the
+        given value. With `<name>`, uses that as the name-and-subdomain; without
         it, then the `--name` option provides the name to bind. It is valid to
         repeat the same name and type multiple times; this indicates a
         multi-valued record.
@@ -74,23 +74,15 @@ function parse-bindings {
         arg="$1"
         shift
 
-        if ! [[ ${arg} =~ ^([-_.a-zA-Z0-9]+)=(.+)$ ]]; then
+        if ! [[ ${arg} =~ ^([-_.a-zA-Z0-9]+:)?([a-z]+)=(.+)$ ]]; then
             error-msg 'Could not parse binding:' "${arg}"
             error=1
             continue
         fi
 
-        local nameType="${BASH_REMATCH[1]}"
-        bindValues+=("${BASH_REMATCH[2]}")
-
-        if ! [[ ${nameType} =~ ^([^.].*[.])?([^.]+)$ ]]; then
-            error-msg 'Could not parse binding:' "${arg}"
-            error=1
-            continue
-        fi
-
-        bindNames+=("${BASH_REMATCH[1]%.}") # `%.` to remove the trailing dot.
+        bindNames+=("${BASH_REMATCH[1]%:}") # `%:` to remove the trailing colon.
         bindTypes+=("${BASH_REMATCH[2]}")
+        bindValues+=("${BASH_REMATCH[3]}")
     done
 
     return "${error}"
