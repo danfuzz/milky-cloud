@@ -124,17 +124,27 @@ function change-list-from-tree {
             if $name == "." then "\($domain)." else "\($name).\($domain)." end
         ;
 
+        def expandTypeMap($name; $typeMap):
+            $typeMap | to_entries[]
+            |
+            . as { key: $type, value: $values }
+            |
+            {
+                Name: $name,
+                Type: $type | ascii_upcase,
+                TTL:  $ttl,
+                ResourceRecords: [
+                    $values[]
+                ]
+            }
+        ;
+
         [
             $tree | to_entries[]
             |
             . as { key: $name, value: $typeMap }
             |
-            {
-                name:   makeName($name),
-                type:   $typeMap,
-                ttl:    $ttl,
-                values: []
-            }
+            expandTypeMap(makeName($name); $typeMap)
         ]
         '
 }
