@@ -16,7 +16,9 @@ define-usage $'
 
     Adds, merges, or replaces one or more DNS records. Prints out JSON information
     about the DNS change which was created as a result, with records in the
-    same form as returned by `dns get`.
+    same form as returned by `dns get`. Note that the returned `oldRecords` will
+    be empty unless `--merge` was specified (that is, unless old records were
+    actually retrieved).
 
     Note: This command only handles regular DNS records, and not aliases or
     other AWS-specific stuff.
@@ -165,111 +167,6 @@ function get-existing-records {
     echo "${result}"
 }
 
-# Retrieves all existing records associated with any name/type mentioned in the
-# <bindings>. This is used when merging records. Note that the result uses
-# names without the final domain and lowercase types.
-function get-existing-records-tree {
-    local domain="$1"
-    local zoneId="$2"
-    local treeJson="$3"
-
-    local result
-    result="$(lib aws-json route53 list-resource-record-sets --global \
-        zoneId="${zoneId}" '{ HostedZoneId: $zoneId }' \
-        :: \
-        domain="${domain}" \
-        tree:json="${treeJson}" '
-        def simpleName($name):
-            $name
-            | rtrimstr("\($domain).")
-            | if . == "" then "." else . end
-        ;
-
-        def doExtract:
-            ($tree | keys) as $names
-            |
-            map(
-                simpleName(.Name) as $name
-                |
-                (.Type | ascii_downcase) as $type
-                |
-                select($tree[$name][$type] != null)
-                |
-                {
-                    name:   $name,
-                    type:   $type,
-                    values: (.ResourceRecords | map(.Value))
-                }
-            )
-            |
-            # This forms the tree.
-            reduce .[] as $item (null; .[$item.name][$item.type] += $item.values)
-        ;
-
-        if .IsTruncated == true then
-            "truncated"
-        else
-            .ResourceRecordSets | doExtract
-        end
-        '
-    )" \
-    || exit "$?"
-
-    if [[ ${existingJson} == '"truncated"' ]]; then
-        error-msg 'Cannot handle truncated response from Route53. Sorry!'
-        return 1
-    fi
-
-    echo "${result}"
-}
-
-# Makes a tree out of the parallel arrays that define the bindings. The result
-# is along the lines of the following:
-#
-# ```
-# {
-#   "florp": {
-#     "txt": [
-#       "\"one\"",
-#       "\"two\""
-#     ]
-#   },
-#   ".": {
-#     "a": [
-#       "10.1.2.3"
-#     ],
-#     "aaaa": [
-#       "10::10"
-#     ]
-#   }
-# }
-# ```
-function make-binding-tree {
-    local namesJson="$1"
-    local typesJson="$2"
-    local valuesJson="$3"
-
-    jval \
-        names:json="${namesJson}" \
-        types:json="${typesJson}" \
-        values:json="${valuesJson}" '
-
-        [$names, $types, $values]
-        |
-        transpose
-        |
-        map({
-            name:  .[0],
-            type:  .[1],
-            value: .[2]
-        })
-        |
-        # This produces an object which maps names to an object that maps types to
-        # arrays of values.
-        reduce .[] as $item (null; .[$item.name][$item.type] += [$item.value])
-    '
-}
-
 # Merges two record lists (in the form used by this project) together, producing
 # a result with value arrays that contain the union of values of the two inputs
 # at each corresponding element. In case of overlap/mismatch (e.g. two different
@@ -292,58 +189,6 @@ function merge-record-lists {
             values: (map(.values) | add | sort)
         })
         '
-}
-
-# Merges two trees (per above) together, producing value arrays that contain the
-# union of values of the two at each corresponding element.
-function merge-trees {
-    local tree1="$1"
-    local tree2="$2"
-
-    jval \
-        tree1:json="${tree1}" \
-        tree2:json="${tree2}" '
-
-        def merge($v1; $v2):
-
-            def mergeArrays($v1; $v2):
-                ($v1 + $v2) | unique
-            ;
-
-            def mergeObjects($v1; $v2):
-                reduce ($v2 | to_entries[]) as { key: $key, value: $sub2 } (
-                    $v1;
-                    . as $soFar
-                    |
-                    .[$key] as $sub1
-                    |
-                    merge($sub1; $sub2)
-                    |
-                    $soFar + { ($key): . }
-                )
-            ;
-
-            ($v1 | type) as $type1 # Assumes same type for `$v2`.
-            |
-            ($v2 | type) as $type2
-            |
-            if $v1 == null then
-                $v2
-            elif $v2 == null then
-                $v1
-            elif $type1 != $type2 then
-                halt_error("Type mismatch at (\($v1), \($v2)).")
-            elif $type1 == "array" then
-                mergeArrays($v1; $v2)
-            elif $type1 == "object" then
-                mergeObjects($v1; $v2)
-            else
-                halt_error("Cannot merge type \($type1) at  (\($v1), \($v2)).")
-            end
-        ;
-
-        merge($tree1; $tree2)
-    '
 }
 
 # Converts the parallel arrays that are formed from the arguments to this
@@ -380,39 +225,6 @@ function record-list-from-arrays {
             values: map(.value)
         })
     '
-}
-
-# Converts a tree of bindings to a list of records in the form used by this
-# project.
-function record-list-from-tree {
-    local ttl="$1"
-    local treeJson="$2"
-
-    jval \
-        tree:json="${treeJson}" \
-        ttl:json="${ttl}" '
-
-        def expandTypeMap($name; $typeMap):
-            $typeMap | to_entries[]
-            |
-            . as { key: $type, value: $values }
-            |
-            {
-                name:   $name,
-                type:   $type,
-                ttl:    $ttl,
-                values: $values
-            }
-        ;
-
-        [
-            $tree | to_entries[]
-            |
-            . as { key: $name, value: $typeMap }
-            |
-            expandTypeMap($name; $typeMap)
-        ]
-        '
 }
 
 # Converts a record list in the form used in this project to the change list
