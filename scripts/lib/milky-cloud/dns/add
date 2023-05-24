@@ -4,6 +4,7 @@
 # This project is PROPRIETARY and UNLICENSED.
 
 . "$(dirname "$(readlink -f "$0")")/_init.sh" || exit "$?"
+. "$(this-cmd-dir)/dns-help.sh"
 
 
 #
@@ -335,6 +336,8 @@ function route53-change-list {
 # Main script
 #
 
+progress-msg --enable
+
 # Fill in the name on any bindings that don't have one.
 
 for n in "${!bindNames[@]}"; do
@@ -388,10 +391,35 @@ info-msg '########## CHANGES'
 jget "${changesJson}"
 info-msg '##########'
 
-# TODO: Retrieve any salient existing records (e.g. to determine add vs.
-# upsert, and provide the baseline for merges).
+changeId="$(lib aws-json route53 change-resource-record-sets --global \
+    changes:json="${changesJson}" \
+    zoneId="${zoneId}" '{
+        HostedZoneId: $zoneId,
+        ChangeBatch: {
+            Comment: "Via `dns add`",
+            Changes: $changes
+        }
+    }' \
+    :: --output=raw '.ChangeInfo.Id'
+)" \
+|| exit "$?"
 
-# TODO: Make final Route53 call.
+if (( waitForSync )); then
+    wait-for-dns-sync "${changeId}" \
+    || exit "$?"
+fi
 
-error-msg TODO
-exit 1
+resultArray="$(jval \
+    changeId="${changeId}" \
+    domain="${domain}" \
+    records:json="${recordsJson}" \
+    zoneId="${zoneId}" '[{
+        changeId:   $changeId,
+        domain:     $domain,
+        zoneId:     $zoneId,
+        newRecords: $records
+    }]'
+)"
+
+# TODO: Output postprocessing.
+jget "${resultArray}"
