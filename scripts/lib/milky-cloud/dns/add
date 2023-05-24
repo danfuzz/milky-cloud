@@ -182,7 +182,7 @@ function delete-list-from-arrays {
             type:   .[0].type,
             values: (
                 map(.value)
-                | sort
+                | unique
                 | if .[0] == "" then "*" else . end
             )
         })
@@ -211,7 +211,7 @@ function get-existing-records {
         ;
 
         def doExtract:
-            ($newRecords | map({ name, type }) | sort) as $salient
+            ($newRecords | map({ name, type }) | unique) as $salient
             |
             map(
                 simpleName(.Name) as $name
@@ -268,7 +268,7 @@ function merge-record-lists {
             name:   .[0].name,
             type:   .[0].type,
             ttl:    .[-1].ttl,
-            values: (map(.values) | add | sort)
+            values: (map(.values) | add | unique)
         })
         '
 }
