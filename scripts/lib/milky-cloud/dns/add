@@ -206,12 +206,45 @@ function merge-trees {
     jval \
         tree1:json="${tree1}" \
         tree2:json="${tree2}" '
+        def merge($v1; $v2):
 
-        reduce ($tree2 | to_entries[]) as { key: $name, value: $typeMap } (
-            $tree1;
-            # TODO: NOT DONE!!!!
-            .[$name].new = $typeMap
-        )
+            def mergeArrays($v1; $v2):
+                ($v1 + $v2) | unique
+            ;
+
+            def mergeObjects($v1; $v2):
+                reduce ($v2 | to_entries[]) as { key: $key, value: $sub2 } (
+                    $v1;
+                    . as $soFar
+                    |
+                    .[$key] as $sub1
+                    |
+                    merge($sub1; $sub2)
+                    |
+                    $soFar + { ($key): . }
+                )
+            ;
+
+            ($v1 | type) as $type1 # Assumes same type for `$v2`.
+            |
+            ($v2 | type) as $type2
+            |
+            if $v1 == null then
+                $v2
+            elif $v2 == null then
+                $v1
+            elif $type1 != $type2 then
+                halt_error("Type mismatch at (\($v1), \($v2)).")
+            elif $type1 == "array" then
+                mergeArrays($v1; $v2)
+            elif $type1 == "object" then
+                mergeObjects($v1; $v2)
+            else
+                halt_error("Cannot merge type \($type1) at  (\($v1), \($v2)).")
+            end
+        ;
+
+        merge($tree1; $tree2)
     '
 }
 
@@ -262,9 +295,9 @@ if (( doMerge )); then
 fi
 
 
-info-msg '########## TREE'
-jget "${treeJson}"
-info-msg '##########'
+#info-msg '########## TREE'
+#jget "${treeJson}"
+#info-msg '##########'
 
 # TODO: Retrieve any salient existing records (e.g. to determine add vs.
 # upsert, and provide the baseline for merges).
