@@ -319,12 +319,13 @@ function route53-change-list {
         $records
         |
         map({
-            Name: makeName(.name),
-            Type: .type | ascii_upcase,
-            TTL:  .ttl,
-            ResourceRecords: [
-                .values[]
-            ]
+            Action: "UPSERT",
+            ResourceRecordSet: {
+                Name: makeName(.name),
+                Type: .type | ascii_upcase,
+                TTL:  .ttl,
+                ResourceRecords: [.values[] | { Value: . }]
+            }
         })
         '
 }
