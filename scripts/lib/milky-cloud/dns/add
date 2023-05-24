@@ -538,7 +538,8 @@ resultArray="$(jval \
         domain:     $domain,
         zoneId:     $zoneId,
         oldRecords: $oldRecords,
-        newRecords: $newRecords
+        # Clean up the extra bits needed by deletes.
+        newRecords: ($newRecords | map(del(.oldValues)))
     }]'
 )"
 
