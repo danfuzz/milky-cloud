@@ -268,10 +268,6 @@ function record-list-from-tree {
     local ttl="$1"
     local treeJson="$2"
 
-    info-msg '###### ORIG'
-    info-msg --exec jget "${treeJson}"
-    info-msg '#######'
-
     jval \
         tree:json="${treeJson}" \
         ttl:json="${ttl}" '
@@ -304,10 +300,6 @@ function record-list-from-tree {
 function route53-change-list {
     local domain="$1"
     local recordsJson="$2"
-
-    info-msg '###### RECORDS'
-    info-msg --exec jget "${recordsJson}"
-    info-msg '#######'
 
     jval \
         domain="${domain}" \
@@ -351,10 +343,6 @@ for n in "${!bindNames[@]}"; do
     fi
 done
 
-for n in "${!bindNames[@]}"; do
-    info-msg "### >>${bindNames[n]}<< >>${bindTypes[n]}<< >>${bindValues[n]}<<"
-done
-
 # Look up the domain, and extract the name and ID. (We need to get the domain
 # name, because the original `--domain` might have been specified as an ID.)
 zoneInfo="$(lib dns find-zone --domain="${domain}")" || exit "$?"
@@ -372,11 +360,8 @@ treeJson="$(make-binding-tree \
 if (( doMerge )); then
     existingJson="$(get-existing-records "${domain}" "${zoneId}" "${treeJson}")" \
     || exit "$?"
-    info-msg '####### EXISTING'
-    jget "${existingJson}"
     treeJson="$(merge-trees "${existingJson}" "${treeJson}")" \
     || exit "$?"
-    info-msg '####### MERGED'
 fi
 
 # Form it into a list of records.
@@ -386,10 +371,6 @@ recordsJson="$(record-list-from-tree "${ttl}" "${treeJson}")" \
 # And further form it into the Route53 change list form.
 changesJson="$(route53-change-list "${domain}" "${recordsJson}")" \
 || exit "$?"
-
-info-msg '########## CHANGES'
-jget "${changesJson}"
-info-msg '##########'
 
 changeId="$(lib aws-json route53 change-resource-record-sets --global \
     changes:json="${changesJson}" \
