@@ -37,6 +37,8 @@ define-usage $'
       Merges records, keeping old values for a given name/type, and just adding
       to them. Without this option, existing records are replaced (and
       nonexistent records are created).
+    --ttl
+      TTL to use for all added records. Required.
     --[no-]wait
       Wait for the DNS records to be synchronized? `--wait` is the default.
 
@@ -59,6 +61,12 @@ opt-value --var=name --filter='/^[-_.a-z0-9]+$/' name
 
 # Merge instead of replace?
 opt-toggle --var=doMerge merge
+
+# TTL for records.
+opt-value --required --var=ttl --filter='/^[0-9]+/' ttl
+
+# Wait for DNS records to be in synch?
+opt-toggle --var=waitForSync --init=1 wait
 
 # List of bindings, as parallel arrays of name, type, and value.
 bindNames=()
@@ -96,30 +104,38 @@ process-args "$@" || usage --short
 #
 
 # Retrieves all existing records associated with any name/type mentioned in the
-# <bindings>. This is needed when merging.
+# <bindings>. This is used when merging records. Note that the result uses
+# names without the final domain and lowercase types.
 function get-existing-records {
-    local zoneId="$1"
-    local treeJson="$2"
+    local domain="$1"
+    local zoneId="$2"
+    local treeJson="$3"
 
     local result
     result="$(lib aws-json route53 list-resource-record-sets --global \
         zoneId="${zoneId}" '{ HostedZoneId: $zoneId }' \
         :: \
+        domain="${domain}" \
         tree:json="${treeJson}" '
+        def simpleName($name):
+            $name
+            | rtrimstr("\($domain).")
+            | if . == "" then "." else . end
+        ;
 
         def doExtract:
             ($tree | keys) as $names
             |
             map(
-                .Name as $name
+                simpleName(.Name) as $name
                 |
-                .Type as $type
+                (.Type | ascii_downcase) as $type
                 |
                 select($tree[$name][$type] != null)
                 |
                 {
-                    name:   .Name,
-                    type:   .Type,
+                    name:   $name,
+                    type:   $type,
                     values: (.ResourceRecords | map(.Value))
                 }
             )
@@ -146,48 +162,43 @@ function get-existing-records {
 }
 
 # Makes a tree out of the parallel arrays that define the bindings. The result
-# is along the lines of the following, and note that the names are fully
-# expanded and types are upcased:
+# is along the lines of the following:
 #
 # ```
 # {
-#   "florp.murtbo.net.": {
-#     "TXT": [
+#   "florp": {
+#     "txt": [
 #       "\"one\"",
 #       "\"two\""
 #     ]
 #   },
-#   "murtbo.net.": {
-#     "A": [
+#   ".": {
+#     "a": [
 #       "10.1.2.3"
 #     ],
-#     "AAAA": [
+#     "aaaa": [
 #       "10::10"
 #     ]
 #   }
 # }
 # ```
 function make-binding-tree {
-    local domain="$1"
-    local namesJson="$2"
-    local typesJson="$3"
-    local valuesJson="$4"
+    local namesJson="$1"
+    local typesJson="$2"
+    local valuesJson="$3"
 
     jval \
-        domain="${domain}" \
         names:json="${namesJson}" \
         types:json="${typesJson}" \
         values:json="${valuesJson}" '
 
-        def makeName($name):
-            if $name == "." then "\($domain)." else "\($name).\($domain)." end;
         [$names, $types, $values]
         |
         transpose
         |
         map({
-            name:  makeName(.[0]),
-            type:  (.[1] | ascii_upcase),
+            name:  .[0],
+            type:  .[1],
             value: .[2]
         })
         |
@@ -206,6 +217,7 @@ function merge-trees {
     jval \
         tree1:json="${tree1}" \
         tree2:json="${tree2}" '
+
         def merge($v1; $v2):
 
             def mergeArrays($v1; $v2):
@@ -248,6 +260,42 @@ function merge-trees {
     '
 }
 
+# Converts a tree of bindings to a list of changes as expected by the Route53
+# API. This includes expanding names (to include the domain), upcasing types,
+# and adding a TTL field.
+function change-list-from-tree {
+    local domain="$1"
+    local ttl="$2"
+    local treeJson="$3"
+
+    info-msg '###### ORIG'
+    info-msg --exec jget "${treeJson}"
+    info-msg '#######'
+
+    jval \
+        domain="${domain}" \
+        tree:json="${treeJson}" \
+        ttl:json="${ttl}" '
+
+        def makeName($name):
+            if $name == "." then "\($domain)." else "\($name).\($domain)." end
+        ;
+
+        [
+            $tree | to_entries[]
+            |
+            . as { key: $name, value: $typeMap }
+            |
+            {
+                name:   makeName($name),
+                type:   $typeMap,
+                ttl:    $ttl,
+                values: []
+            }
+        ]
+        '
+}
+
 
 #
 # Main script
@@ -277,7 +325,7 @@ zoneId="$(jget --output=raw "${zoneInfo}" '.id')"
 domain="$(jget --output=raw "${zoneInfo}" '.name')"
 
 # Convert bindings into a tree form.
-treeJson="$(make-binding-tree "${domain}" \
+treeJson="$(make-binding-tree \
     "$(jarray --input=strings "${bindNames[@]}")" \
     "$(jarray --input=strings "${bindTypes[@]}")" \
     "$(jarray --input=strings "${bindValues[@]}")"
@@ -285,19 +333,22 @@ treeJson="$(make-binding-tree "${domain}" \
 || exit "$?"
 
 if (( doMerge )); then
-    existingJson="$(get-existing-records "${zoneId}" "${treeJson}")" \
+    existingJson="$(get-existing-records "${domain}" "${zoneId}" "${treeJson}")" \
     || exit "$?"
     info-msg '####### EXISTING'
     jget "${existingJson}"
-    info-msg '####### MERGE'
-    merge-trees "${existingJson}" "${treeJson}"
-    info-msg '#######'
+    treeJson="$(merge-trees "${existingJson}" "${treeJson}")" \
+    || exit "$?"
+    info-msg '####### MERGED'
 fi
 
+# Form it into a list of changes.
+changesJson="$(change-list-from-tree "${domain}" "${ttl}" "${treeJson}")" \
+|| exit "$?"
 
-#info-msg '########## TREE'
-#jget "${treeJson}"
-#info-msg '##########'
+info-msg '########## CHANGES'
+jget "${changesJson}"
+info-msg '##########'
 
 # TODO: Retrieve any salient existing records (e.g. to determine add vs.
 # upsert, and provide the baseline for merges).
