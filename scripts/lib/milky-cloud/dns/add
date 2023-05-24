@@ -449,10 +449,6 @@ if (( anyAdds )); then
         "${ttl}" "${actionsJson}" "${namesJson}" "${typesJson}" "${valuesJson}"
     )" \
     || exit "$?"
-
-    info-msg '####### NEW'
-    jget "${newRecords}"
-    info-msg '#######'
 fi
 
 if (( anyDeletes )); then
@@ -460,10 +456,6 @@ if (( anyDeletes )); then
         "${actionsJson}" "${namesJson}" "${typesJson}" "${valuesJson}"
     )" \
     || exit "$?"
-
-    info-msg '####### DELETE'
-    jget "${deleteRecords}"
-    info-msg '#######'
 fi
 
 # Look up the domain, and extract the name and ID. (We need to get the domain
@@ -475,41 +467,24 @@ domain="$(jget --output=raw "${zoneInfo}" '.name')"
 # Merge on top of existing records, if so requested.
 oldRecords='[]'
 if (( doMerge )); then
-    info-msg '####### GETTING'
     oldRecords="$(get-existing-records "${domain}" "${zoneId}" "${newRecords}")" \
     || exit "$?"
-    info-msg '####### EXISTING'
-    jget "${oldRecords}"
-    info-msg '####### MERGING'
     newRecords="$(merge-record-lists "${oldRecords}" "${newRecords}")" \
     || exit "$?"
-    info-msg '####### NEW NEW'
-    jget "${newRecords}"
-    info-msg '#######'
     if (( anyDeletes )); then
-        info-msg '####### DELETES...'
         deleteRecords="$(process-deletes "${oldRecords}" "${deleteRecords}")" \
         || exit "$?"
-        info-msg '####### DELETES PROCESSED'
         jget "${deleteRecords}"
-        info-msg '####### MERGING AGAIN'
         newRecords="$(replace-records "${newRecords}" "${deleteRecords}")" \
         || exit "$?"
-        info-msg '####### NEW NEW NEW'
-        jget "${newRecords}"
     fi
 fi
-
-info-msg '########## CHANGES....'
 
 # Form the records into the Route53 change list form.
 changesJson="$(route53-change-list "${domain}" "${newRecords}")" \
 || exit "$?"
 
-info-msg '########## CHANGES'
-jget "${changesJson}"
-info-msg '#########'
-
+# Issue the actual change call. Whee!
 changeId="$(lib aws-json route53 change-resource-record-sets --global \
     changes:json="${changesJson}" \
     zoneId="${zoneId}" '{
@@ -538,7 +513,7 @@ resultArray="$(jval \
         domain:     $domain,
         zoneId:     $zoneId,
         oldRecords: $oldRecords,
-        # Clean up the extra bits needed by deletes.
+        # Clean up any extra bits that were needed by deletes.
         newRecords: ($newRecords | map(del(.oldValues)))
     }]'
 )"
