@@ -106,9 +106,69 @@ process-args "$@" || usage --short
 #
 
 # Retrieves all existing records associated with any name/type mentioned in the
+# <bindings>. This is used when merging records. The result is converted into
+# this project's standard form for a change list (e.g. names without the final
+# domain).
+function get-existing-records {
+    local domain="$1"
+    local zoneId="$2"
+    local newRecords="$3"
+
+    local result
+    result="$(lib aws-json route53 list-resource-record-sets --global \
+        zoneId="${zoneId}" '{ HostedZoneId: $zoneId }' \
+        :: \
+        domain="${domain}" \
+        newRecords:json="${newRecords}" '
+        def simpleName($name):
+            $name
+            | rtrimstr("\($domain).")
+            | if . == "" then "." else rtrimstr(".") end
+        ;
+
+        def doExtract:
+            ($newRecords | map({ name, type }) | sort) as $salient
+            |
+            map(
+                simpleName(.Name) as $name
+                |
+                (.Type | ascii_downcase) as $type
+                |
+                {
+                    name:   $name,
+                    type:   $type,
+                    ttl:    .TTL,
+                    values: (.ResourceRecords | map(.Value))
+                }
+                |
+                select(
+                      { name, type } as $key
+                    | ($salient | bsearch($key)) >= 0
+                )
+            )
+        ;
+
+        if .IsTruncated == true then
+            "truncated"
+        else
+            .ResourceRecordSets | doExtract
+        end
+        '
+    )" \
+    || exit "$?"
+
+    if [[ ${existingJson} == '"truncated"' ]]; then
+        error-msg 'Cannot handle truncated response from Route53. Sorry!'
+        return 1
+    fi
+
+    echo "${result}"
+}
+
+# Retrieves all existing records associated with any name/type mentioned in the
 # <bindings>. This is used when merging records. Note that the result uses
 # names without the final domain and lowercase types.
-function get-existing-records {
+function get-existing-records-tree {
     local domain="$1"
     local zoneId="$2"
     local treeJson="$3"
@@ -210,6 +270,30 @@ function make-binding-tree {
     '
 }
 
+# Merges two record lists (in the form used by this project) together, producing
+# a result with value arrays that contain the union of values of the two inputs
+# at each corresponding element. In case of overlap/mismatch (e.g. two different
+# TTLs for a particular record), the second list overrides the first.
+function merge-record-lists {
+    local list1="$1"
+    local list2="$2"
+
+    jval \
+        list1:json="${list1}" \
+        list2:json="${list2}" '
+        [$list1[], $list2[]]
+        |
+        group_by({ name, type })
+        |
+        map({
+            name:   .[0].name,
+            type:   .[0].type,
+            ttl:    .[-1].ttl,
+            values: (map(.values) | add | sort)
+        })
+        '
+}
+
 # Merges two trees (per above) together, producing value arrays that contain the
 # union of values of the two at each corresponding element.
 function merge-trees {
@@ -259,6 +343,42 @@ function merge-trees {
         ;
 
         merge($tree1; $tree2)
+    '
+}
+
+# Converts the parallel arrays that are formed from the arguments to this
+# command, along with a TTL value, into a list of records in the form used by
+# this project.
+function record-list-from-arrays {
+    local ttl="$1"
+    local namesJson="$2"
+    local typesJson="$3"
+    local valuesJson="$4"
+
+    jval \
+        ttl:json="${ttl}" \
+        names:json="${namesJson}" \
+        types:json="${typesJson}" \
+        values:json="${valuesJson}" '
+
+        [$names, $types, $values]
+        |
+        transpose
+        |
+        map({
+            name:  .[0],
+            type:  .[1],
+            value: .[2]
+        })
+        |
+        group_by([.name, .type])
+        |
+        map({
+            name:   .[0].name,
+            type:   .[0].type,
+            ttl:    $ttl,
+            values: map(.value)
+        })
     '
 }
 
@@ -343,33 +463,42 @@ for n in "${!bindNames[@]}"; do
     fi
 done
 
-# Look up the domain, and extract the name and ID. (We need to get the domain
-# name, because the original `--domain` might have been specified as an ID.)
-zoneInfo="$(lib dns find-zone --domain="${domain}")" || exit "$?"
-zoneId="$(jget --output=raw "${zoneInfo}" '.id')"
-domain="$(jget --output=raw "${zoneInfo}" '.name')"
-
-# Convert bindings into a tree form.
-treeJson="$(make-binding-tree \
+# Convert the binding arrays to an array of records.
+newRecords="$(record-list-from-arrays \
+    "${ttl}" \
     "$(jarray --input=strings "${bindNames[@]}")" \
     "$(jarray --input=strings "${bindTypes[@]}")" \
     "$(jarray --input=strings "${bindValues[@]}")"
 )" \
 || exit "$?"
 
+info-msg '####### NEW'
+jget "${newRecords}"
+info-msg '#######'
+
+# Look up the domain, and extract the name and ID. (We need to get the domain
+# name, because the original `--domain` might have been specified as an ID.)
+zoneInfo="$(lib dns find-zone --domain="${domain}")" || exit "$?"
+zoneId="$(jget --output=raw "${zoneInfo}" '.id')"
+domain="$(jget --output=raw "${zoneInfo}" '.name')"
+
+# Merge on top of existing records, if so requested.
+oldRecords='[]'
 if (( doMerge )); then
-    existingJson="$(get-existing-records "${domain}" "${zoneId}" "${treeJson}")" \
+    info-msg '####### GETTING'
+    oldRecords="$(get-existing-records "${domain}" "${zoneId}" "${newRecords}")" \
     || exit "$?"
-    treeJson="$(merge-trees "${existingJson}" "${treeJson}")" \
-    || exit "$?"
+    info-msg '####### EXISTING'
+    jget "${oldRecords}"
+    info-msg '####### MERGING'
+    newRecords="$(merge-record-lists "${oldRecords}" "${newRecords}")"
+    info-msg '####### NEW NEW'
+    jget "${newRecords}"
+    info-msg '#######'
 fi
 
-# Form it into a list of records.
-recordsJson="$(record-list-from-tree "${ttl}" "${treeJson}")" \
-|| exit "$?"
-
-# And further form it into the Route53 change list form.
-changesJson="$(route53-change-list "${domain}" "${recordsJson}")" \
+# Form the records into the Route53 change list form.
+changesJson="$(route53-change-list "${domain}" "${newRecords}")" \
 || exit "$?"
 
 changeId="$(lib aws-json route53 change-resource-record-sets --global \
@@ -393,12 +522,14 @@ fi
 resultArray="$(jval \
     changeId="${changeId}" \
     domain="${domain}" \
-    records:json="${recordsJson}" \
+    newRecords:json="${newRecords}" \
+    oldRecords:json="${oldRecords}" \
     zoneId="${zoneId}" '[{
         changeId:   $changeId,
         domain:     $domain,
         zoneId:     $zoneId,
-        newRecords: $records
+        oldRecords: $oldRecords,
+        newRecords: $newRecords
     }]'
 )"
 
