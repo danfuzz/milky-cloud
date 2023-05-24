@@ -14,11 +14,14 @@
 define-usage $'
     ${name} [<opt> ...] <binding> ...
 
-    Adds, merges, or replaces one or more DNS records. Prints out JSON information
-    about the DNS change which was created as a result, with records in the
-    same form as returned by `dns get`. Note that the returned `oldRecords` will
-    be empty unless `--merge` was specified (that is, unless old records were
-    actually retrieved).
+    Adds, merges, replaces, or deletes one or more DNS records. Prints out JSON
+    information about the DNS change which was created as a result, with records
+    in the same form as returned by `dns get`. Note that the returned
+    `oldRecords` will be empty unless `--merge` was specified (that is, unless
+    old records were actually retrieved).
+
+    Note: Due to the nature of Route53\'s design, when deleting records, it is
+    necessary to specify the `--merge` option.
 
     Note: This command only handles regular DNS records, and not aliases or
     other AWS-specific stuff.
@@ -29,6 +32,9 @@ define-usage $'
         it, then the `--name` option provides the name to bind. It is valid to
         repeat the same name and type multiple times; this indicates a
         multi-valued record.
+      ![<name>:]<type>=<value> -- Delete a single value as specified (leaving any
+        other values for the record intact).
+      ![<name>:]<type> -- Delete the entire record with the given name and type.
 
     --domain=<name-or-id>
       Main domain to operate on. Can be either a domain name per se or a Zone ID.
