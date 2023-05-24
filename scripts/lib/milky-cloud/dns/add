@@ -14,7 +14,8 @@ define-usage $'
     ${name} [<opt> ...] <binding> ...
 
     Adds, merges, or replaces one or more DNS records. Prints out JSON information
-    about the DNS change which was created as a result.
+    about the DNS change which was created as a result, with records in the
+    same form as returned by `dns get`.
 
     Note: This command only handles regular DNS records, and not aliases or
     other AWS-specific stuff.
@@ -102,52 +103,6 @@ process-args "$@" || usage --short
 #
 # Helper functions
 #
-
-# Converts a tree of bindings to a list of changes as expected by the Route53
-# API. This includes expanding names (to include the domain), upcasing types,
-# and adding a TTL field.
-function change-list-from-tree {
-    local domain="$1"
-    local ttl="$2"
-    local treeJson="$3"
-
-    info-msg '###### ORIG'
-    info-msg --exec jget "${treeJson}"
-    info-msg '#######'
-
-    jval \
-        domain="${domain}" \
-        tree:json="${treeJson}" \
-        ttl:json="${ttl}" '
-
-        def makeName($name):
-            if $name == "." then "\($domain)." else "\($name).\($domain)." end
-        ;
-
-        def expandTypeMap($name; $typeMap):
-            $typeMap | to_entries[]
-            |
-            . as { key: $type, value: $values }
-            |
-            {
-                Name: $name,
-                Type: $type | ascii_upcase,
-                TTL:  $ttl,
-                ResourceRecords: [
-                    $values[]
-                ]
-            }
-        ;
-
-        [
-            $tree | to_entries[]
-            |
-            . as { key: $name, value: $typeMap }
-            |
-            expandTypeMap(makeName($name); $typeMap)
-        ]
-        '
-}
 
 # Retrieves all existing records associated with any name/type mentioned in the
 # <bindings>. This is used when merging records. Note that the result uses
@@ -306,6 +261,74 @@ function merge-trees {
     '
 }
 
+# Converts a tree of bindings to a list of records in the form used by this
+# project.
+function record-list-from-tree {
+    local ttl="$1"
+    local treeJson="$2"
+
+    info-msg '###### ORIG'
+    info-msg --exec jget "${treeJson}"
+    info-msg '#######'
+
+    jval \
+        tree:json="${treeJson}" \
+        ttl:json="${ttl}" '
+
+        def expandTypeMap($name; $typeMap):
+            $typeMap | to_entries[]
+            |
+            . as { key: $type, value: $values }
+            |
+            {
+                name:   $name,
+                type:   $type,
+                ttl:    $ttl,
+                values: $values
+            }
+        ;
+
+        [
+            $tree | to_entries[]
+            |
+            . as { key: $name, value: $typeMap }
+            |
+            expandTypeMap($name; $typeMap)
+        ]
+        '
+}
+
+# Converts a record list in the form used in this project to the change list
+# form used by Route53.
+function route53-change-list {
+    local domain="$1"
+    local recordsJson="$2"
+
+    info-msg '###### RECORDS'
+    info-msg --exec jget "${recordsJson}"
+    info-msg '#######'
+
+    jval \
+        domain="${domain}" \
+        records:json="${recordsJson}" '
+
+        def makeName($name):
+            if $name == "." then "\($domain)." else "\($name).\($domain)." end
+        ;
+
+        $records
+        |
+        map({
+            Name: makeName(.name),
+            Type: .type | ascii_upcase,
+            TTL:  .ttl,
+            ResourceRecords: [
+                .values[]
+            ]
+        })
+        '
+}
+
 
 #
 # Main script
@@ -352,8 +375,12 @@ if (( doMerge )); then
     info-msg '####### MERGED'
 fi
 
-# Form it into a list of changes.
-changesJson="$(change-list-from-tree "${domain}" "${ttl}" "${treeJson}")" \
+# Form it into a list of records.
+recordsJson="$(record-list-from-tree "${ttl}" "${treeJson}")" \
+|| exit "$?"
+
+# And further form it into the Route53 change list form.
+changesJson="$(route53-change-list "${domain}" "${recordsJson}")" \
 || exit "$?"
 
 info-msg '########## CHANGES'
