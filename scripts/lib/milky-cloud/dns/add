@@ -103,6 +103,42 @@ process-args "$@" || usage --short
 # Helper functions
 #
 
+# Converts a tree of bindings to a list of changes as expected by the Route53
+# API. This includes expanding names (to include the domain), upcasing types,
+# and adding a TTL field.
+function change-list-from-tree {
+    local domain="$1"
+    local ttl="$2"
+    local treeJson="$3"
+
+    info-msg '###### ORIG'
+    info-msg --exec jget "${treeJson}"
+    info-msg '#######'
+
+    jval \
+        domain="${domain}" \
+        tree:json="${treeJson}" \
+        ttl:json="${ttl}" '
+
+        def makeName($name):
+            if $name == "." then "\($domain)." else "\($name).\($domain)." end
+        ;
+
+        [
+            $tree | to_entries[]
+            |
+            . as { key: $name, value: $typeMap }
+            |
+            {
+                name:   makeName($name),
+                type:   $typeMap,
+                ttl:    $ttl,
+                values: []
+            }
+        ]
+        '
+}
+
 # Retrieves all existing records associated with any name/type mentioned in the
 # <bindings>. This is used when merging records. Note that the result uses
 # names without the final domain and lowercase types.
@@ -258,42 +294,6 @@ function merge-trees {
 
         merge($tree1; $tree2)
     '
-}
-
-# Converts a tree of bindings to a list of changes as expected by the Route53
-# API. This includes expanding names (to include the domain), upcasing types,
-# and adding a TTL field.
-function change-list-from-tree {
-    local domain="$1"
-    local ttl="$2"
-    local treeJson="$3"
-
-    info-msg '###### ORIG'
-    info-msg --exec jget "${treeJson}"
-    info-msg '#######'
-
-    jval \
-        domain="${domain}" \
-        tree:json="${treeJson}" \
-        ttl:json="${ttl}" '
-
-        def makeName($name):
-            if $name == "." then "\($domain)." else "\($name).\($domain)." end
-        ;
-
-        [
-            $tree | to_entries[]
-            |
-            . as { key: $name, value: $typeMap }
-            |
-            {
-                name:   makeName($name),
-                type:   $typeMap,
-                ttl:    $ttl,
-                values: []
-            }
-        ]
-        '
 }
 
 
