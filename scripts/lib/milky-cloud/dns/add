@@ -66,16 +66,19 @@ opt-value --var=name --filter='/^[-_.a-z0-9]+$/' name
 # Merge instead of replace?
 opt-toggle --var=doMerge merge
 
-# TTL for records.
-opt-value --required --var=ttl --filter='/^[0-9]+/' ttl
+# TTL for added records.
+opt-value --var=ttl --filter='/^[0-9]+/' ttl
 
 # Wait for DNS records to be in synch?
 opt-toggle --var=waitForSync --init=1 wait
 
-# List of bindings, as parallel arrays of name, type, and value.
+# List of bindings, as parallel arrays.
+bindActions=()
 bindNames=()
 bindTypes=()
 bindValues=()
+anyAdds=0
+anyDeletes=0
 
 rest-arg --call=parse-bindings bindings
 function parse-bindings {
@@ -86,15 +89,35 @@ function parse-bindings {
         arg="$1"
         shift
 
-        if ! [[ ${arg} =~ ^([-_.a-zA-Z0-9]+:)?([a-z]+)=(.+)$ ]]; then
+        if ! [[ ${arg} =~ ^(!?[-_.a-zA-Z0-9]+:)?([a-z]+)(=.+)?$ ]]; then
             error-msg 'Could not parse binding:' "${arg}"
             error=1
             continue
         fi
 
-        bindNames+=("${BASH_REMATCH[1]%:}") # `%:` to remove the trailing colon.
-        bindTypes+=("${BASH_REMATCH[2]}")
-        bindValues+=("${BASH_REMATCH[3]}")
+        local name="${BASH_REMATCH[1]%:}" # `%:` to remove the trailing colon.
+        local type="${BASH_REMATCH[2]}"
+        local value="${BASH_REMATCH[3]:1}" # `:1` to remove the leading `=`.
+        local action
+
+        if [[ ${name:0:1} == '!' ]]; then
+            action='delete'
+            anyDeletes=1
+            name="${name:1}"
+        else
+            action='add'
+            anyAdds=1
+            if [[ ${value} == '' ]]; then
+                error-msg 'Could not parse binding (missing value):' "${arg}"
+                error=1
+                continue
+            fi
+        fi
+
+        bindActions+=("${action}")
+        bindNames+=("${name}")
+        bindTypes+=("${type}")
+        bindValues+=("${value}")
     done
 
     return "${error}"
@@ -102,10 +125,63 @@ function parse-bindings {
 
 process-args "$@" || usage --short
 
+if (( anyAdds )) && [[ ${ttl} == '' ]]; then
+    error-msg 'Must supply `--ttl` when adding records.'
+    usage --short
+    exit 1
+fi
+
+if (( anyDeletes && !doMerge )); then
+    error-msg 'Must pass `--merge` when deleting records.'
+    usage --short
+    exit 1
+fi
+
 
 #
 # Helper functions
 #
+
+# Converts the parallel arrays that are formed from the arguments to this
+# command, into a list of records to delete. Note: A `"*"` for `values` (instead
+# of an array) is used to indicate that all records of that name/type are to be
+# deleted.
+function delete-list-from-arrays {
+    local actionsJson="$1"
+    local namesJson="$2"
+    local typesJson="$3"
+    local valuesJson="$4"
+
+    jval \
+        actions:json="${actionsJson}" \
+        names:json="${namesJson}" \
+        types:json="${typesJson}" \
+        values:json="${valuesJson}" '
+        [$actions, $names, $types, $values]
+        |
+        transpose
+        |
+        map(select(.[0] == "delete"))
+        |
+        map({
+            name:  .[1],
+            type:  .[2],
+            value: .[3]
+        })
+        |
+        group_by([.name, .type])
+        |
+        map({
+            name:   .[0].name,
+            type:   .[0].type,
+            values: (
+                map(.value)
+                | sort
+                | if .[0] == "" then "*" else . end
+            )
+        })
+    '
+}
 
 # Retrieves all existing records associated with any name/type mentioned in the
 # <bindings>. This is used when merging records. The result is converted into
@@ -191,30 +267,80 @@ function merge-record-lists {
         '
 }
 
+# Processes the lists of record deletions with respect to the existing records.
+function process-deletes {
+    local oldRecords="$1"
+    local deleteRecords="$2"
+
+    jval \
+        deleteRecords:json="${deleteRecords}" \
+        oldRecords:json="${oldRecords}" '
+
+        ($oldRecords | map({ name, type } + { old: . }))
+            + ($deleteRecords | map({ name, type } + { delValues: .values }))
+        |
+        group_by({ name, type })
+        |
+        map(add)
+        |
+        # There is no actual delete to perform unless there is a delete entry
+        # which would interact with old (existing) data.
+        map(select((.old != null) and (.delValues != null)))
+        |
+        map(
+            .delValues as $delValues
+            |
+            .old.values as $oldValues
+            |
+            .old
+            |
+            if $delValues == "*" then
+                .values = []
+            else
+                .values -= $delValues
+            end
+            |
+            if .values == [] then
+                # It turns out we will be deleting an entire record. To do so,
+                # we need to save the old values, because Route53 requires us to
+                # name them during a full record delete.
+                .oldValues = $oldValues
+            else
+                .
+            end
+        )
+        '
+}
+
 # Converts the parallel arrays that are formed from the arguments to this
-# command, along with a TTL value, into a list of records in the form used by
-# this project.
+# command, along with a TTL value, into a list of records to add, in the form
+# used by this project.
 function record-list-from-arrays {
     local ttl="$1"
-    local namesJson="$2"
-    local typesJson="$3"
-    local valuesJson="$4"
+    local actionsJson="$2"
+    local namesJson="$3"
+    local typesJson="$4"
+    local valuesJson="$5"
 
     jval \
         ttl:json="${ttl}" \
+        actions:json="${actionsJson}" \
         names:json="${namesJson}" \
         types:json="${typesJson}" \
         values:json="${valuesJson}" '
-
-        [$names, $types, $values]
+        [$actions, $names, $types, $values]
         |
         transpose
         |
-        map({
-            name:  .[0],
-            type:  .[1],
-            value: .[2]
-        })
+        map(
+            .[0] as $action
+            |
+            {
+                name:  .[1],
+                type:  .[2],
+                value: (if $action == "add" then .[3] else null end)
+            }
+        )
         |
         group_by([.name, .type])
         |
@@ -222,9 +348,26 @@ function record-list-from-arrays {
             name:   .[0].name,
             type:   .[0].type,
             ttl:    $ttl,
-            values: map(.value)
+            values: map(.value | select(. != null))
         })
     '
+}
+
+# Overlays a second record list on top of a first one. Any name/type pairs that
+# appear in both will only contain the second one in the result.
+function replace-records {
+    local list1="$1"
+    local list2="$2"
+
+    jval \
+        list1:json="${list1}" \
+        list2:json="${list2}" '
+        [$list1[], $list2[]]
+        |
+        group_by({ name, type })
+        |
+        map(.[-1])
+        '
 }
 
 # Converts a record list in the form used in this project to the change list
@@ -241,17 +384,27 @@ function route53-change-list {
             if $name == "." then "\($domain)." else "\($name).\($domain)." end
         ;
 
-        $records
-        |
-        map({
-            Action: "UPSERT",
+        def makeChange($action): {
+            Action: $action | ascii_upcase,
             ResourceRecordSet: {
                 Name: makeName(.name),
                 Type: .type | ascii_upcase,
                 TTL:  .ttl,
                 ResourceRecords: [.values[] | { Value: . }]
             }
-        })
+        }
+        ;
+
+        ($records | map(select(.values != []) | makeChange("upsert")))
+        +
+        (
+            $records
+            | map(
+                select(.values == [])
+                | .values = .oldValues
+                | makeChange("delete")
+            )
+        )
         '
 }
 
@@ -275,18 +428,37 @@ for n in "${!bindNames[@]}"; do
     fi
 done
 
-# Convert the binding arrays to an array of records.
-newRecords="$(record-list-from-arrays \
-    "${ttl}" \
-    "$(jarray --input=strings "${bindNames[@]}")" \
-    "$(jarray --input=strings "${bindTypes[@]}")" \
-    "$(jarray --input=strings "${bindValues[@]}")"
-)" \
-|| exit "$?"
+# Convert the binding arrays to unified new-records and to-delete arrays.
 
-info-msg '####### NEW'
-jget "${newRecords}"
-info-msg '#######'
+actionsJson="$(jarray --input=strings "${bindActions[@]}")" || exit "$?"
+namesJson="$(jarray --input=strings "${bindNames[@]}")" || exit "$?"
+typesJson="$(jarray --input=strings "${bindTypes[@]}")" || exit "$?"
+valuesJson="$(jarray --input=strings "${bindValues[@]}")" || exit "$?"
+
+newRecords='[]'
+deleteRecords='[]'
+
+if (( anyAdds )); then
+    newRecords="$(record-list-from-arrays \
+        "${ttl}" "${actionsJson}" "${namesJson}" "${typesJson}" "${valuesJson}"
+    )" \
+    || exit "$?"
+
+    info-msg '####### NEW'
+    jget "${newRecords}"
+    info-msg '#######'
+fi
+
+if (( anyDeletes )); then
+    deleteRecords="$(delete-list-from-arrays \
+        "${actionsJson}" "${namesJson}" "${typesJson}" "${valuesJson}"
+    )" \
+    || exit "$?"
+
+    info-msg '####### DELETE'
+    jget "${deleteRecords}"
+    info-msg '#######'
+fi
 
 # Look up the domain, and extract the name and ID. (We need to get the domain
 # name, because the original `--domain` might have been specified as an ID.)
@@ -303,15 +475,34 @@ if (( doMerge )); then
     info-msg '####### EXISTING'
     jget "${oldRecords}"
     info-msg '####### MERGING'
-    newRecords="$(merge-record-lists "${oldRecords}" "${newRecords}")"
+    newRecords="$(merge-record-lists "${oldRecords}" "${newRecords}")" \
+    || exit "$?"
     info-msg '####### NEW NEW'
     jget "${newRecords}"
     info-msg '#######'
+    if (( anyDeletes )); then
+        info-msg '####### DELETES...'
+        deleteRecords="$(process-deletes "${oldRecords}" "${deleteRecords}")" \
+        || exit "$?"
+        info-msg '####### DELETES PROCESSED'
+        jget "${deleteRecords}"
+        info-msg '####### MERGING AGAIN'
+        newRecords="$(replace-records "${newRecords}" "${deleteRecords}")" \
+        || exit "$?"
+        info-msg '####### NEW NEW NEW'
+        jget "${newRecords}"
+    fi
 fi
+
+info-msg '########## CHANGES....'
 
 # Form the records into the Route53 change list form.
 changesJson="$(route53-change-list "${domain}" "${newRecords}")" \
 || exit "$?"
+
+info-msg '########## CHANGES'
+jget "${changesJson}"
+info-msg '#########'
 
 changeId="$(lib aws-json route53 change-resource-record-sets --global \
     changes:json="${changesJson}" \
