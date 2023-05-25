@@ -12,13 +12,17 @@
 #
 
 define-usage $'
-    ${name} [<opt> ...] <binding> ...
+    ${name} [<opt> ...] <binding> ... [:: [<out-opt> ...] [<jval-expr> ...]]
 
     Adds, merges, replaces, or deletes one or more DNS records. Prints out JSON
     information about the DNS change which was created as a result, with records
     in the same form as returned by `dns get`. Note that the returned
     `oldRecords` will be empty unless `--merge` was specified (that is, unless
     old records were actually retrieved).
+
+    An optional `::` followed by additional arguments causes the initial output
+    to be further processed by `json-val`, in a manner analogous to how
+    `aws-json` works, see which for details.
 
     Note: Due to the nature of Route53\'s design, when deleting records, it is
     necessary to specify the `--merge` option.
@@ -99,13 +103,18 @@ bindValues=()
 anyAdds=0
 anyDeletes=0
 
-rest-arg --call=parse-bindings bindings
-function parse-bindings {
-    local arg
+rest-arg --call=parse-rest rest
+function parse-rest {
     local error=0
 
+    # Parse bindings.
+
     while (( $# > 0 )); do
-        arg="$1"
+        local arg="$1"
+        if [[ ${arg} == '::' ]]; then
+            break
+        fi
+
         shift
 
         if ! [[ ${arg} =~ ^(!?[-_.a-zA-Z0-9]+:)?([a-z]+)(=.+)?$ ]]; then
@@ -139,10 +148,20 @@ function parse-bindings {
         bindValues+=("${value}")
     done
 
-    return "${error}"
+    if (( error )); then
+        return "${error}"
+    fi
+
+    # Pass the postprocessing arguments, if any, through to the helper library.
+    if [[ "$1" == '::' ]]; then
+        set-json-postproc-args "$@"
+    fi
 }
 
 process-args "$@" || usage --short
+
+check-json-output-args \
+|| exit "$?"
 
 if (( anyAdds )) && [[ ${ttl} == '' ]]; then
     error-msg 'Must supply `--ttl` when adding records.'
