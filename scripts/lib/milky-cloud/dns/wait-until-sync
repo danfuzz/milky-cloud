@@ -78,7 +78,7 @@ endTime=$(( timeNow + maxSecs ))
 first=1
 last=0
 
-progress-msg 'Waiting for DNS changes:'
+progress-msg 'Waiting for DNS changes to settle:'
 
 while (( (${#changes[@]} > 0) && !last )); do
     if (( !first )); then
