@@ -90,13 +90,17 @@ changesArray="$(
     jget "${recordsArray}" \
         domain="${domain}" \
         findValue="${findValue}" '
+        def makeName($name):
+            if $name == "." then "\($domain)." else "\($name).\($domain)." end
+        ;
+
         def makeResult($action; $record):
             $record
             |
             {
                 Action: $action,
                 ResourceRecordSet: {
-                    Name: "\(.name).\($domain).",
+                    Name: makeName(.name),
                     Type: (.type | ascii_upcase),
                     TTL:  .ttl,
                     ResourceRecords: [.values[] | { Value: . }]
