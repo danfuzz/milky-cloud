@@ -294,6 +294,11 @@ case "${outputStyle}" in
         echo "${instanceId}"
         ;;
     json)
-        lib instance info --id="${instanceId}.${zone}"
+        if [[ ${vpcNameOrId} == '' ]]; then
+            idSpec="${instanceId}.${zone}"
+        else
+            idSpec="${instanceId}.${vpcNameOrId}.${zone}"
+        fi
+        lib instance info --id="${idSpec}"
         ;;
 esac
