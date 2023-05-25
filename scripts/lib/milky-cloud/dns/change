@@ -476,19 +476,24 @@ zoneInfo="$(lib dns find-zone --domain="${domain}")" || exit "$?"
 zoneId="$(jget --output=raw "${zoneInfo}" '.id')"
 domain="$(jget --output=raw "${zoneInfo}" '.name')"
 
-# Merge on top of existing records, if so requested.
+# Grab old (existing) records, if necessary.
 oldRecords='[]'
-newRecords='[]'
 if (( doMerge )); then
     oldRecords="$(get-existing-records "${domain}" "${zoneId}" "${addRecords}")" \
     || exit "$?"
+fi
+
+# Construct the new records.
+
+newRecords='[]'
+
+if (( doMerge )); then
     newRecords="$(merge-record-lists "${oldRecords}" "${addRecords}")" \
     || exit "$?"
 else
     newRecords="${addRecords}"
 fi
 
-# Merge in all of the deletions, if any.
 if (( anyDeletes )); then
     newRecords="$(process-deletes \
         "${oldRecords}" "${newRecords}" "${deleteRecords}")" \
