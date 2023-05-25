@@ -257,8 +257,9 @@ function get-existing-records {
 
 # Merges two record lists (in the form used by this project) together, producing
 # a result with value arrays that contain the union of values of the two inputs
-# at each corresponding element. In case of overlap/mismatch (e.g. two different
-# TTLs for a particular record), the second list overrides the first.
+# at each corresponding element, uniqued and sorted. In case of overlap/mismatch
+# (e.g. two different TTLs for a particular record), the second list overrides
+# the first.
 function merge-record-lists {
     local list1="$1"
     local list2="$2"
@@ -266,7 +267,7 @@ function merge-record-lists {
     jval \
         list1:json="${list1}" \
         list2:json="${list2}" '
-        [$list1[], $list2[]]
+        ($list1 + $list2)
         |
         group_by({ name, type })
         |
@@ -485,14 +486,10 @@ fi
 
 # Construct the new records.
 
-newRecords='[]'
-
-if (( doMerge )); then
-    newRecords="$(merge-record-lists "${oldRecords}" "${addRecords}")" \
-    || exit "$?"
-else
-    newRecords="${addRecords}"
-fi
+# Note: This call uniques the values lists, so it's useful even when we aren't
+# doing a `--merge` per se.
+newRecords="$(merge-record-lists "${oldRecords}" "${addRecords}")" \
+|| exit "$?"
 
 if (( anyDeletes )); then
     newRecords="$(process-deletes \
