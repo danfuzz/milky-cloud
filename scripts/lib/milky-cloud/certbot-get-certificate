@@ -111,58 +111,33 @@ function authentication-hook {
     local validationData="${CERTBOT_VALIDATION}"
     local domain="${CERTBOT_DOMAIN}"
 
-    local zoneId
-    zoneId="$(find-zone-id "${domain}")" \
-    || return "$?"
+    # Split into name and main domain.
+
+    [[ ${domain} =~ ^(.*[.])?([^.]+[.][^.]+)$ ]] || {
+        error-msg "Could not parse domain: ${domain}"
+    }
+
+    local name="_acme-challenge.${BASH_REMATCH[1]}"
+    domain="${BASH_REMATCH[2]}"
+
+    # There will be at least one trailing `.` (two if we're doing the apex).
+    # Drop them
+    name="${name%.*}"
 
     # Note: When asking for a cert which covers both a domain name (with any
     # number of subdomains including zero) and a wildcard of that exact same
     # domain name, there might be two active ACME challenges which both want to
-    # use the same record name. So, before `UPSERT`ing, we need to get any
-    # existing `TXT` record, and then combine it with the new request.
-    local dataArray
-    dataArray="$(get-existing-record "${zoneId}" "${domain}")" \
-    || return "$?"
+    # use the same record name. So we always have to `--merge` records instead
+    # of just overwriting them.
 
-    dataArray="$(jval \
-        existing:json="${dataArray}" \
-        data="${validationData}" \
-        '$existing + [{ Value: ($data | @json) }]'
-    )" \
-    || return "$?"
+    # DNS format requires the value to be double-quoted.
+    validationData="\"${validationData}\""
 
-    local payload
-    payload="$(make-change-payload UPSERT "${domain}" "${dataArray}")" \
-    || return "$?"
-
-    local changeId
-    changeId="$(lib aws-json route53 change-resource-record-sets --global \
-        zoneId="${zoneId}" \
-        payload:json="${payload}" \
-        '{
-            HostedZoneId: $zoneId,
-            ChangeBatch: $payload
-        }' \
-        :: --output=raw '.ChangeInfo.Id')" \
-    || return "$?"
-
-    local i status
-    for (( i = 0; i < 30; i++ )); do
-        status="$(lib aws-json route53 get-change --global \
-            id="${changeId}" \
-            '{ Id: $id }' \
-            :: --output=raw '.ChangeInfo.Status'
-        )" \
-        || return "$?"
-        if [[ ${status} == 'INSYNC' ]]; then
-            break
-        fi
-        sleep 1
-    done
-
-    if [[ ${status} != 'INSYNC' ]]; then
-        info-msg 'DNS change failed to propagate. There may be trouble!'
-    fi
+    lib dns change --merge --ttl=60 --domain="${domain}" \
+        "${name}:txt=${validationData}" \
+    || {
+        info-msg 'There may be trouble!'
+    }
 }
 
 # The "cleanup" hook. This is (in effect) a callback from `certbot`.
@@ -245,31 +220,6 @@ function find-zone-id {
     || return "$?"
 }
 
-# Gets the existing record value for a given zone and domain name. Outputs a
-# JSON array suitable for concatenating into a `ResourceRecords` value. The
-# result is `[]` (the empty array) if there is no existing record.
-function get-existing-record {
-    local zoneId="$1"
-    local domain="$2"
-
-    local name="_acme-challenge.${domain}."
-
-    lib aws-json route53 list-resource-record-sets --global \
-        zoneId="${zoneId}" \
-        name="${name}" '{
-            HostedZoneId:    $zoneId,
-            MaxItems:        "1", # Yes, it is supposed to be a string.
-            StartRecordName: $name,
-            StartRecordType: "TXT"
-        }' :: \
-        name="${name}" '[
-            .ResourceRecordSets[]
-            | select((.Name == $name) and (.Type == "TXT"))
-            | .ResourceRecords[]
-        ]' \
-    || return "$?"
-}
-
 # Does a certificate lifetime check. Prints `keep` or `renew`.
 function lifetime-check {
     local minLifetimeDays="$1"
@@ -317,36 +267,6 @@ function lifetime-check {
         info-msg 'Renewing existing certificate.'
         echo 'renew'
     fi
-}
-
-# Makes a payload for a DNS change request. `data` should be a a JSON array of
-# `{ Value: "..." }` objects.
-function make-change-payload {
-    local action="$1"
-    local domain="$2"
-    local dataArray="$3"
-
-    # Note: The Route53 API requires the `Value` passed in for a `TXT` record to
-    # be surrounded by double quotes (for an at least _somewhat_ okay reason),
-    # hence the `| @json` below.
-    jval \
-        action="${action}" \
-        name="_acme-challenge.${domain}." \
-        dataArray:json="${dataArray}" \
-    '{
-        Comment: "Via Certbot wrapper script",
-        Changes: [
-            {
-                Action: $action,
-                ResourceRecordSet: {
-                    Name: $name,
-                    Type: "TXT",
-                    TTL: 60,
-                    ResourceRecords: $dataArray
-                }
-            }
-        ]
-    }'
 }
 
 
