@@ -281,12 +281,12 @@ function merge-record-lists {
         '
 }
 
-# Processes the lists of record deletions with respect to the existing records,
-# merging the results into the given new records.
+# Processes the lists of record deletions, with respect to the old (existing)
+# records. This produces a set of new records that reflects the deletions to
+# perform (whether via delete or upsert operation).
 function process-deletes {
     local oldRecords="$1"
-    local newRecords="$2"
-    local deleteRecords="$3"
+    local deleteRecords="$2"
 
     # Find the old record corresponding to each deletion, producing records that
     # "subtract" the deletion as appropriate.
@@ -338,9 +338,9 @@ function process-deletes {
     # binding passed in as an argument which ended up having no effect because
     # there wasn't a matching existing record.
     jval \
-        newRecords:json="${newRecords}" \
-        deleteRecords:json="${deleteRecords}" '
-        ($newRecords + $deleteRecords)
+        deleteRecords:json="${deleteRecords}" \
+        oldRecords:json="${oldRecords}" '
+        ($oldRecords + $deleteRecords)
         |
         group_by({ name, type })
         |
@@ -489,8 +489,7 @@ fi
 
 newRecords="${oldRecords}"
 if (( anyDeletes )); then
-    newRecords="$(process-deletes \
-        "${oldRecords}" "${newRecords}" "${deleteRecords}")" \
+    newRecords="$(process-deletes "${newRecords}" "${deleteRecords}")" \
     || exit "$?"
 fi
 
