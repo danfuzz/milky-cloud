@@ -46,14 +46,17 @@ define-usage $'
     --domain=<name-or-id>
       Main domain to operate on. Can be either a domain name per se or a Zone ID.
       Required.
-    --name=<name>
-      Name and subdomain (but not main domain name) to operate on, for <binding>s
-      that don\'t specify one. Use `.` to indicate an apex record. Required if
-      any <binding>s do not include a name.
+    --max-wait-secs=<secs>
+      Maximum time to wait for changes to settle. Only meaningful with `--wait`
+      (either explicit or implied).
     --merge
       Merges records, keeping old values for a given name/type, and just adding
       to them. Without this option, existing records are replaced (and
       nonexistent records are created).
+    --name=<name>
+      Name and subdomain (but not main domain name) to operate on, for <binding>s
+      that don\'t specify one. Use `.` to indicate an apex record. Required if
+      any <binding>s do not include a name.
     --output=<style> :: array json none
       What to output. This controls the initial output, not postprocessing if
       any (which can specify its own `--output`).
@@ -75,18 +78,19 @@ define-usage $'
 # Want help?
 opt-action --call='{ usage; exit }' help/h
 
-# TODO: Handle output postprocessing. It's hard here because we also take
-# other rest args.
 usual-json-output-args --no-rest
 
 # Domain to operate on.
 opt-value --required --var=domain --filter='/^[-./a-zA-Z0-9]+$/' domain
 
-# Name to operate on by default.
-opt-value --var=name --filter='/^[-_.a-z0-9]+$/' name
+# Maximum wait time in seconds.
+opt-value --var=maxWaitSecs --filter='/[0-9]+/' max-wait-secs
 
 # Merge instead of replace?
 opt-toggle --var=doMerge merge
+
+# Name to operate on by default.
+opt-value --var=name --filter='/^[-_.a-z0-9]+$/' name
 
 # TTL for added records.
 opt-value --var=ttl --filter='/^[0-9]+/' ttl
@@ -538,7 +542,11 @@ else
     || exit "$?"
 
     if (( waitForSync )); then
-        lib dns wait-until-sync "${changeId}" \
+        maxOpt=()
+        if [[ ${maxWaitSecs} != '' ]]; then
+            maxOpt=(--max-secs="${maxWaitSecs}")
+        fi
+        lib dns wait-until-sync "${maxOpt[@]}" "${changeId}" \
         || exit "$?"
     fi
 fi
