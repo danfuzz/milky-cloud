@@ -135,6 +135,9 @@ if (( anyAdds )) && [[ ${ttl} == '' ]]; then
     error-msg 'Must supply `--ttl` when adding records.'
     usage --short
     exit 1
+elif [[ ${ttl} == '' ]]; then
+    # Supply a valid JSON value, just so that it won't cause `jq` to choke.
+    ttl='["should not appear in result"]'
 fi
 
 if (( anyDeletes && !doMerge )); then
@@ -444,12 +447,10 @@ valuesJson="$(jarray --input=strings "${bindValues[@]}")" || exit "$?"
 newRecords='[]'
 deleteRecords='[]'
 
-if (( anyAdds )); then
-    newRecords="$(record-list-from-arrays \
-        "${ttl}" "${actionsJson}" "${namesJson}" "${typesJson}" "${valuesJson}"
-    )" \
-    || exit "$?"
-fi
+newRecords="$(record-list-from-arrays \
+    "${ttl}" "${actionsJson}" "${namesJson}" "${typesJson}" "${valuesJson}"
+)" \
+|| exit "$?"
 
 if (( anyDeletes )); then
     deleteRecords="$(delete-list-from-arrays \
@@ -474,7 +475,6 @@ if (( doMerge )); then
     if (( anyDeletes )); then
         deleteRecords="$(process-deletes "${oldRecords}" "${deleteRecords}")" \
         || exit "$?"
-        jget "${deleteRecords}"
         newRecords="$(replace-records "${newRecords}" "${deleteRecords}")" \
         || exit "$?"
     fi
