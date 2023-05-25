@@ -73,8 +73,8 @@ function check-one-change {
 
 progress-msg --enable
 
-startSecs="$(lib timey secs now)" || exit "$?"
-endTime=$(( startSecs + maxSecs ))
+timeNow="$(lib timey secs now)" || exit "$?"
+endTime=$(( timeNow + maxSecs ))
 first=1
 last=0
 
@@ -82,12 +82,14 @@ progress-msg 'Waiting for DNS changes:'
 
 while (( (${#changes[@]} > 0) && !last )); do
     if (( !first )); then
+        timePrev="${timeNow}"
         timeNow="$(lib timey secs now)" || exit "$?"
+
         if (( timeNow > endTime )); then
             last=1
+        elif (( (timeNow - timePrev) < 3 )); then
+            sleep $(( 3 - (timeNow - timePrev) ))
         fi
-
-        progress-msg '  (maybe sleep)'
     fi
 
     for n in "${!changes[@]}"; do
