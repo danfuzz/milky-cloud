@@ -300,8 +300,9 @@ function process-deletes {
     local deleteRecords="$2"
 
     # Find the old record corresponding to each deletion, producing records that
-    # "subtract" the deletion as appropriate.
-    deleteRecords="$(jval \
+    # "subtract" the deletion as appropriate. Old records that have no
+    # corresponding delete pass through to the result unchanged.
+    jval \
         deleteRecords:json="${deleteRecords}" \
         oldRecords:json="${oldRecords}" '
 
@@ -312,12 +313,12 @@ function process-deletes {
         |
         map(add)
         |
-        # There is no actual delete to perform unless there is a delete entry
-        # which would interact with old (existing) data.
-        map(select((.old != null) and (.delValues != null)))
+        # Drop any delete records that have no corresponding old record to
+        # modify.
+        map(select(.old != null))
         |
         map(
-            .delValues as $delValues
+            (.delValues // []) as $delValues
             |
             .old.values as $oldValues
             |
@@ -329,21 +330,6 @@ function process-deletes {
                 .values -= $delValues
             end
         )
-        '
-    )" \
-    || return "$?"
-
-    # Overlay the processed deletes from the previous step, on top of the
-    # new records to add. Unlike `merge-record-lists`, the delete records
-    # replace type/name matches from the new records entirely.
-    jval \
-        deleteRecords:json="${deleteRecords}" \
-        oldRecords:json="${oldRecords}" '
-        ($oldRecords + $deleteRecords)
-        |
-        group_by({ name, type })
-        |
-        map(.[-1])
         '
 }
 
