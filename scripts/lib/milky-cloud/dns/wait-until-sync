@@ -1,0 +1,120 @@
+#!/bin/bash
+#
+# Copyright 2022-2023 the Milky-cloud Authors (Dan Bornstein et alia).
+# SPDX-License-Identifier: Apache-2.0
+
+. "$(dirname "$(readlink -f "$0")")/_init.sh" || exit "$?"
+
+
+#
+# Argument parsing
+#
+
+define-usage $'
+    ${name} [<opt> ...] <change-id> ...
+
+    Waits for one or more Route53 changes to be considered live.
+
+    --max-secs=<secs>
+      Maximum number of seconds to wait for synchronization (approximately).
+      Default `60`.
+
+    ${name} [--help | -h]
+
+    Displays this message.
+'
+
+# Want help?
+opt-action --call='{ usage; exit }' help/h
+
+# Maximum wait time in seconds.
+opt-value --var=maxSecs --init=60 --filter='/[0-9]+/' max-secs
+
+# Change IDs
+rest-arg --var=changes --filter='/^[/a-zA-Z0-9]+$/' change-id
+
+process-args "$@" || usage --short
+
+if (( ${#changes[@]} == 0 )); then
+    error-msg 'Must specify at least one change.'
+    usage --short
+    exit 1
+fi
+
+
+#
+# Helper functions
+#
+
+# Checks the status of a single DNS change. Prints either `live`, or `pending`
+# plus the exact state string (downcased) if it's not actually "pending" per
+# se.
+function check-one-change {
+    local changeId="$1"
+
+    local status
+    status="$(lib aws-json route53 get-change --global \
+        id="${changeId}" '{ Id: $id }' \
+        :: --output=raw '.ChangeInfo.Status | ascii_downcase'
+    )" \
+    || return "$?"
+
+    case "${status}" in
+        insync)  echo 'live'                ;;
+        pending) echo 'pending  '           ;;
+        *)       echo "pending (${status})" ;;
+    esac
+}
+
+
+#
+# Main script
+#
+
+progress-msg --enable
+
+startSecs="$(lib timey secs now)" || exit "$?"
+endTime=$(( startSecs + maxSecs ))
+first=1
+last=0
+
+progress-msg 'Waiting for DNS changes:'
+
+while (( (${#changes[@]} > 0) && !last )); do
+    if (( !first )); then
+        timeNow="$(lib timey secs now)" || exit "$?"
+        if (( timeNow > endTime )); then
+            last=1
+        fi
+
+        progress-msg '  (maybe sleep)'
+    fi
+
+    for n in "${!changes[@]}"; do
+        status="$(check-one-change "${changes[n]}")" \
+        || exit "$?"
+
+        if [[ ${status} == 'live' ]]; then
+            if (( first )); then
+                progress-msg "  ${changes[n]}: Already synched."
+            else
+                progress-msg "  ${changes[n]}: Synched."
+            fi
+            unset changes[n];
+        elif (( last )); then
+            progress-msg "  ${changes[n]}: Timed out. Last status was ${status}."
+        else
+            progress-msg "  ${changes[n]}: Waiting..."
+        fi
+    done
+
+    first=0
+done
+
+if (( ${#changes[@]} > 0 )); then
+    progress-msg '  (Gave up.)'
+    error-msg 'Not all changes became synchronized.'
+    exit 1
+fi
+
+progress-msg 'All synched!'
