@@ -484,15 +484,10 @@ fi
 
 # Merge in all of the deletions, if any.
 if (( anyDeletes )); then
-    info-msg '####### B'
     newRecords="$(process-deletes \
         "${oldRecords}" "${newRecords}" "${deleteRecords}")" \
     || exit "$?"
 fi
-
-info-msg '####### D'
-jget "${newRecords}"
-info-msg '####### Cx'
 
 changeId=
 if [[ ${newRecords} == '[]' ]]; then
