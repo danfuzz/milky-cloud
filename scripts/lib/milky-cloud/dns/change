@@ -36,6 +36,9 @@ define-usage $'
         other values for the record intact).
       ![<name>:]<type> -- Delete the entire record with the given name and type.
 
+      Note: Record deletions are processed after record creations, which might
+      lead to the occasional surprise when mixing them.
+
     --domain=<name-or-id>
       Main domain to operate on. Can be either a domain name per se or a Zone ID.
       Required.
