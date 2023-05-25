@@ -140,8 +140,9 @@ if (( anyAdds )) && [[ ${ttl} == '' ]]; then
     usage --short
     exit 1
 elif [[ ${ttl} == '' ]]; then
-    # Supply a valid JSON value, just so that it won't cause `jq` to choke.
-    ttl='["should not appear in result"]'
+    # Supply a valid JSON value, which we sniff for later (especially when
+    # processing deletes).
+    ttl='"inherit"'
 fi
 
 if (( anyDeletes && !doMerge )); then
@@ -225,11 +226,14 @@ function get-existing-records {
                 |
                 (.Type | ascii_downcase) as $type
                 |
+                (.ResourceRecords | map(.Value) | unique) as $values
+                |
                 {
-                    name:   $name,
-                    type:   $type,
-                    ttl:    .TTL,
-                    values: (.ResourceRecords | map(.Value) | unique)
+                    name:      $name,
+                    type:      $type,
+                    ttl:       .TTL,
+                    oldValues: $values,
+                    values:    $values
                 }
                 |
                 select(
@@ -260,7 +264,8 @@ function get-existing-records {
 # a result with value arrays that contain the union of values of the two inputs
 # at each corresponding element, uniqued and sorted. In case of overlap/mismatch
 # (e.g. two different TTLs for a particular record), the second list overrides
-# the first.
+# the first. This also culls out any records that would turn into a no-op change
+# (same old and new values).
 function merge-record-lists {
     local list1="$1"
     local list2="$2"
@@ -272,15 +277,18 @@ function merge-record-lists {
         |
         group_by({ name, type })
         |
-        map({
-            name:      .[0].name,
-            type:      .[0].type,
-            ttl:       .[-1].ttl,
-            oldValues: (map(.oldValues // []) | add | unique),
-            values:    (map(.values) | add | unique)
-        })
-        |
-        map(if .oldValues == [] then del(.oldValues) else . end)
+        map(
+            {
+                name:      .[0].name,
+                type:      .[0].type,
+                ttl:       (map(.ttl | select(. != "inherit"))[-1] // "none"),
+                oldValues: (map(.oldValues // []) | add | unique),
+                values:    (map(.values) | add | unique)
+            }
+            |
+            # This culls out no-op changes.
+            select(.values != .oldValues)
+        )
         '
 }
 
@@ -320,15 +328,6 @@ function process-deletes {
             else
                 .values -= $delValues
             end
-            |
-            if .values == [] then
-                # It turns out we will be deleting an entire record. To do so,
-                # we need to save the old values, because Route53 requires us to
-                # name them during a full record delete.
-                .oldValues = $oldValues
-            else
-                .
-            end
         )
         '
     )" \
@@ -336,10 +335,7 @@ function process-deletes {
 
     # Overlay the processed deletes from the previous step, on top of the
     # new records to add. Unlike `merge-record-lists`, the delete records
-    # replace type/name matches from the new records entirely. In addition, this
-    # culls out any "nominal delete" records which resulted from a deletion
-    # binding passed in as an argument which ended up having no effect because
-    # there wasn't a matching existing record.
+    # replace type/name matches from the new records entirely.
     jval \
         deleteRecords:json="${deleteRecords}" \
         oldRecords:json="${oldRecords}" '
@@ -348,9 +344,6 @@ function process-deletes {
         group_by({ name, type })
         |
         map(.[-1])
-        |
-        # This culls out no-op deletions.
-        map(select(.values != (.oldValues // [])))
         '
 }
 
@@ -503,7 +496,7 @@ info-msg '###### AFTER DELS'
 jget "${newRecords}"
 
 # Note: This call uniques the values lists, so it's useful even when we aren't
-# doing a `--merge` per se.
+# doing a `--merge` per se. It also culls out no-op changes.
 newRecords="$(merge-record-lists "${newRecords}" "${addRecords}")" \
 || exit "$?"
 
@@ -522,6 +515,7 @@ else
 
     info-msg '##### CHANGES'
     jval "${changesJson}"
+    exit 1
 
     # Issue the actual change call. Whee!
     changeId="$(lib aws-json route53 change-resource-record-sets --global \
@@ -553,7 +547,7 @@ resultArray="$(jval \
         domain:     $domain,
         zoneId:     $zoneId,
         oldRecords: $oldRecords,
-        # Clean up any extra bits that were needed by deletes.
+        # Clean up the extra bits needed to figure out deletes.
         newRecords: ($newRecords | map(del(.oldValues)))
     }]'
 )"
