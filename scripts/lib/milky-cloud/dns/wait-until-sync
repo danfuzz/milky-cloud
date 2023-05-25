@@ -61,7 +61,7 @@ function check-one-change {
 
     case "${status}" in
         insync)  echo 'live'                ;;
-        pending) echo 'pending  '           ;;
+        pending) echo 'pending'             ;;
         *)       echo "pending (${status})" ;;
     esac
 }
@@ -85,10 +85,10 @@ while (( (${#changes[@]} > 0) && !last )); do
         timePrev="${timeNow}"
         timeNow="$(lib timey secs now)" || exit "$?"
 
-        if (( timeNow > endTime )); then
+        if (( timeNow >= endTime )); then
             last=1
-        elif (( (timeNow - timePrev) < 3 )); then
-            sleep $(( 3 - (timeNow - timePrev) ))
+        elif (( (timeNow - timePrev) < 5 )); then
+            sleep $(( 5 - (timeNow - timePrev) ))
         fi
     fi
 
@@ -104,7 +104,7 @@ while (( (${#changes[@]} > 0) && !last )); do
             fi
             unset changes[n];
         elif (( last )); then
-            progress-msg "  ${changes[n]}: Timed out. Last status was ${status}."
+            progress-msg "  ${changes[n]}: Timed out. Last status: ${status}"
         else
             progress-msg "  ${changes[n]}: Waiting..."
         fi
