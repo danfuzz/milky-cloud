@@ -328,7 +328,10 @@ function process-deletes {
 
     # Overlay the processed deletes from the previous step, on top of the
     # new records to add. Unlike `merge-record-lists`, the delete records
-    # replace type/name matches from the new records entirely.
+    # replace type/name matches from the new records entirely. In addition, this
+    # culls out any "nominal delete" records which resulted from a deletion
+    # binding passed in as an argument which ended up having no effect because
+    # there wasn't a matching existing record.
     jval \
         newRecords:json="${newRecords}" \
         deleteRecords:json="${deleteRecords}" '
@@ -337,6 +340,9 @@ function process-deletes {
         group_by({ name, type })
         |
         map(.[-1])
+        |
+        # This culls out no-op deletions.
+        map(select(.values != []))
         '
 }
 
