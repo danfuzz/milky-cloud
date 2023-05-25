@@ -52,7 +52,7 @@ define-usage $'
       to them. Without this option, existing records are replaced (and
       nonexistent records are created).
     --ttl
-      TTL to use for all added records. Required.
+      TTL to use for all added or modified records. Required.
     --[no-]wait
       Wait for the DNS records to be synchronized? `--wait` is the default.
 
@@ -386,9 +386,6 @@ function route53-change-list {
     local domain="$1"
     local recordsJson="$2"
 
-    info-msg '##### MAKING CHANGES'
-    info-msg --exec jget "${recordsJson}"
-
     jval \
         domain="${domain}" \
         records:json="${recordsJson}" '
@@ -484,16 +481,10 @@ if (( anyDeletes )); then
     || exit "$?"
 fi
 
-info-msg '###### AFTER DELS'
-jget "${newRecords}"
-
 # Note: This call uniques the values lists, so it's useful even when we aren't
 # doing a `--merge` per se. It also culls out no-op changes.
 newRecords="$(merge-record-lists "${newRecords}" "${addRecords}")" \
 || exit "$?"
-
-info-msg '###### AFTER MERGE'
-jget "${newRecords}"
 
 changeId=
 if [[ ${newRecords} == '[]' ]]; then
@@ -504,10 +495,6 @@ else
     # Form the records into the Route53 change list form.
     changesJson="$(route53-change-list "${domain}" "${newRecords}")" \
     || exit "$?"
-
-    info-msg '##### CHANGES'
-    jval "${changesJson}"
-    exit 1
 
     # Issue the actual change call. Whee!
     changeId="$(lib aws-json route53 change-resource-record-sets --global \
@@ -538,8 +525,8 @@ resultArray="$(jval \
         changeId:   (if $changeId == "" then null else $changeId end),
         domain:     $domain,
         zoneId:     $zoneId,
-        oldRecords: $oldRecords,
         # Clean up the extra bits needed to figure out deletes.
+        oldRecords: ($oldRecords | map(del(.oldValues))),
         newRecords: ($newRecords | map(del(.oldValues)))
     }]'
 )"
