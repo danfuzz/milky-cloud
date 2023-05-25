@@ -36,8 +36,9 @@ define-usage $'
         other values for the record intact).
       ![<name>:]<type> -- Delete the entire record with the given name and type.
 
-      Note: Record deletions are processed after record creations, which might
-      lead to the occasional surprise when mixing them.
+      Note: Record deletions are processed before record creations, which might
+      lead to the occasional surprise when mixing the two operations on a given
+      name/type combo.
 
     --domain=<name-or-id>
       Main domain to operate on. Can be either a domain name per se or a Zone ID.
@@ -486,23 +487,23 @@ fi
 
 # Construct the new records.
 
-# Note: This call uniques the values lists, so it's useful even when we aren't
-# doing a `--merge` per se.
-newRecords="$(merge-record-lists "${oldRecords}" "${addRecords}")" \
-|| exit "$?"
-
+newRecords="${oldRecords}"
 if (( anyDeletes )); then
     newRecords="$(process-deletes \
         "${oldRecords}" "${newRecords}" "${deleteRecords}")" \
     || exit "$?"
 fi
 
+# Note: This call uniques the values lists, so it's useful even when we aren't
+# doing a `--merge` per se.
+newRecords="$(merge-record-lists "${newRecords}" "${addRecords}")" \
+|| exit "$?"
+
 changeId=
 if [[ ${newRecords} == '[]' ]]; then
     info-msg 'Not taking any action: No actual changes to make.'
     changeId=''
     oldRecords='[]'
-    newRecords='[]'
 else
     # Form the records into the Route53 change list form.
     changesJson="$(route53-change-list "${domain}" "${newRecords}")" \
