@@ -455,10 +455,10 @@ namesJson="$(jarray --input=strings "${bindNames[@]}")" || exit "$?"
 typesJson="$(jarray --input=strings "${bindTypes[@]}")" || exit "$?"
 valuesJson="$(jarray --input=strings "${bindValues[@]}")" || exit "$?"
 
-newRecords='[]'
+addRecords='[]' # Also includes empty stubs for delete records.
 deleteRecords='[]'
 
-newRecords="$(record-list-from-arrays \
+addRecords="$(record-list-from-arrays \
     "${ttl}" "${actionsJson}" "${namesJson}" "${typesJson}" "${valuesJson}"
 )" \
 || exit "$?"
@@ -478,11 +478,14 @@ domain="$(jget --output=raw "${zoneInfo}" '.name')"
 
 # Merge on top of existing records, if so requested.
 oldRecords='[]'
+newRecords='[]'
 if (( doMerge )); then
-    oldRecords="$(get-existing-records "${domain}" "${zoneId}" "${newRecords}")" \
+    oldRecords="$(get-existing-records "${domain}" "${zoneId}" "${addRecords}")" \
     || exit "$?"
-    newRecords="$(merge-record-lists "${oldRecords}" "${newRecords}")" \
+    newRecords="$(merge-record-lists "${oldRecords}" "${addRecords}")" \
     || exit "$?"
+else
+    newRecords="${addRecords}"
 fi
 
 # Merge in all of the deletions, if any.
