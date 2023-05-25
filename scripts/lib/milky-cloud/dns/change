@@ -229,7 +229,7 @@ function get-existing-records {
                     name:   $name,
                     type:   $type,
                     ttl:    .TTL,
-                    values: (.ResourceRecords | map(.Value))
+                    values: (.ResourceRecords | map(.Value) | unique)
                 }
                 |
                 select(
@@ -273,11 +273,14 @@ function merge-record-lists {
         group_by({ name, type })
         |
         map({
-            name:   .[0].name,
-            type:   .[0].type,
-            ttl:    .[-1].ttl,
-            values: (map(.values) | add | unique)
+            name:      .[0].name,
+            type:      .[0].type,
+            ttl:       .[-1].ttl,
+            oldValues: (map(.oldValues // []) | add | unique),
+            values:    (map(.values) | add | unique)
         })
+        |
+        map(if .oldValues == [] then del(.oldValues) else . end)
         '
 }
 
@@ -347,7 +350,7 @@ function process-deletes {
         map(.[-1])
         |
         # This culls out no-op deletions.
-        map(select(.values != []))
+        map(select(.values != (.oldValues // [])))
         '
 }
 
@@ -397,6 +400,9 @@ function record-list-from-arrays {
 function route53-change-list {
     local domain="$1"
     local recordsJson="$2"
+
+    info-msg '##### MAKING CHANGES'
+    info-msg --exec jget "${recordsJson}"
 
     jval \
         domain="${domain}" \
@@ -493,10 +499,16 @@ if (( anyDeletes )); then
     || exit "$?"
 fi
 
+info-msg '###### AFTER DELS'
+jget "${newRecords}"
+
 # Note: This call uniques the values lists, so it's useful even when we aren't
 # doing a `--merge` per se.
 newRecords="$(merge-record-lists "${newRecords}" "${addRecords}")" \
 || exit "$?"
+
+info-msg '###### AFTER MERGE'
+jget "${newRecords}"
 
 changeId=
 if [[ ${newRecords} == '[]' ]]; then
@@ -507,6 +519,9 @@ else
     # Form the records into the Route53 change list form.
     changesJson="$(route53-change-list "${domain}" "${newRecords}")" \
     || exit "$?"
+
+    info-msg '##### CHANGES'
+    jval "${changesJson}"
 
     # Issue the actual change call. Whee!
     changeId="$(lib aws-json route53 change-resource-record-sets --global \
