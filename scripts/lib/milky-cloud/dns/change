@@ -51,6 +51,14 @@ define-usage $'
       Merges records, keeping old values for a given name/type, and just adding
       to them. Without this option, existing records are replaced (and
       nonexistent records are created).
+    --output=<style> :: array json none
+      What to output. This controls the initial output, not postprocessing if
+      any (which can specify its own `--output`).
+      * `array` -- Output a JSON array (instead of individual objects). Note:
+        This is not particularly useful with this command, in that there is only
+        ever one result object.
+      * `json` -- Output a sequence of JSON objects. This is the default.
+      * `none` -- Do not output anything.
     --ttl
       TTL to use for all added or modified records. Required.
     --[no-]wait
@@ -64,8 +72,9 @@ define-usage $'
 # Want help?
 opt-action --call='{ usage; exit }' help/h
 
-# TODO: Handle usual output arguments. It's hard here because we also take
+# TODO: Handle output postprocessing. It's hard here because we also take
 # other rest args.
+usual-json-output-args --no-rest
 
 # Domain to operate on.
 opt-value --required --var=domain --filter='/^[-./a-zA-Z0-9]+$/' domain
@@ -531,5 +540,4 @@ resultArray="$(jval \
     }]'
 )"
 
-# TODO: Output postprocessing.
-jget "${resultArray}"
+json-postproc-output "${resultArray}"
