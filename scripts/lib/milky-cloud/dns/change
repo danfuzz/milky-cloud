@@ -465,6 +465,7 @@ zoneInfo="$(lib dns find-zone --domain="${domain}")" || exit "$?"
 zoneId="$(jget --output=raw "${zoneInfo}" '.id')"
 domain="$(jget --output=raw "${zoneInfo}" '.name')"
 
+info-msg '####### B'
 # Merge on top of existing records, if so requested.
 oldRecords='[]'
 if (( doMerge )); then
@@ -480,27 +481,39 @@ if (( doMerge )); then
     fi
 fi
 
-# Form the records into the Route53 change list form.
-changesJson="$(route53-change-list "${domain}" "${newRecords}")" \
-|| exit "$?"
+info-msg '####### C'
+jget "${newRecords}"
+info-msg '####### Cx'
 
-# Issue the actual change call. Whee!
-changeId="$(lib aws-json route53 change-resource-record-sets --global \
-    changes:json="${changesJson}" \
-    zoneId="${zoneId}" '{
-        HostedZoneId: $zoneId,
-        ChangeBatch: {
-            Comment: "Via `dns add`",
-            Changes: $changes
-        }
-    }' \
-    :: --output=raw '.ChangeInfo.Id'
-)" \
-|| exit "$?"
-
-if (( waitForSync )); then
-    wait-for-dns-sync "${changeId}" \
+changeId=
+if [[ ${newRecords} == '[]' ]]; then
+    info-msg 'Not taking any action: No actual changes to make.'
+    changeId=''
+    oldRecords='[]'
+    newRecords='[]'
+else
+    # Form the records into the Route53 change list form.
+    changesJson="$(route53-change-list "${domain}" "${newRecords}")" \
     || exit "$?"
+
+    # Issue the actual change call. Whee!
+    changeId="$(lib aws-json route53 change-resource-record-sets --global \
+        changes:json="${changesJson}" \
+        zoneId="${zoneId}" '{
+            HostedZoneId: $zoneId,
+            ChangeBatch: {
+                Comment: "Via `dns add`",
+                Changes: $changes
+            }
+        }' \
+        :: -output=raw '.ChangeInfo.Id'
+    )" \
+    || exit "$?"
+
+    if (( waitForSync )); then
+        wait-for-dns-sync "${changeId}" \
+        || exit "$?"
+    fi
 fi
 
 resultArray="$(jval \
@@ -509,7 +522,7 @@ resultArray="$(jval \
     newRecords:json="${newRecords}" \
     oldRecords:json="${oldRecords}" \
     zoneId="${zoneId}" '[{
-        changeId:   $changeId,
+        changeId:   (if $changeId == "" then null else $changeId end),
         domain:     $domain,
         zoneId:     $zoneId,
         oldRecords: $oldRecords,
