@@ -301,7 +301,7 @@ function merge-record-lists {
             select(
                 (.values != .oldValues)
                 or
-                (($ttls | unique | length) != 1)
+                (($ttls | unique | length) > 1)
             )
         )
         '
