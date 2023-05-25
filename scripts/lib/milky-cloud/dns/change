@@ -4,7 +4,6 @@
 # This project is PROPRIETARY and UNLICENSED.
 
 . "$(dirname "$(readlink -f "$0")")/_init.sh" || exit "$?"
-. "$(this-cmd-dir)/dns-help.sh"
 
 
 #
