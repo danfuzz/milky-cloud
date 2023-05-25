@@ -276,12 +276,16 @@ function merge-record-lists {
         '
 }
 
-# Processes the lists of record deletions with respect to the existing records.
+# Processes the lists of record deletions with respect to the existing records,
+# merging the results into the given new records.
 function process-deletes {
     local oldRecords="$1"
-    local deleteRecords="$2"
+    local newRecords="$2"
+    local deleteRecords="$3"
 
-    jval \
+    # Find the old record corresponding to each deletion, producing records that
+    # "subtract" the deletion as appropriate.
+    deleteRecords="$(jval \
         deleteRecords:json="${deleteRecords}" \
         oldRecords:json="${oldRecords}" '
 
@@ -318,6 +322,21 @@ function process-deletes {
                 .
             end
         )
+        '
+    )" \
+    || return "$?"
+
+    # Overlay the processed deletes from the previous step, on top of the
+    # new records to add. Unlike `merge-record-lists`, the delete records
+    # replace type/name matches from the new records entirely.
+    jval \
+        newRecords:json="${newRecords}" \
+        deleteRecords:json="${deleteRecords}" '
+        ($newRecords + $deleteRecords)
+        |
+        group_by({ name, type })
+        |
+        map(.[-1])
         '
 }
 
@@ -360,23 +379,6 @@ function record-list-from-arrays {
             values: map(.value | select(. != null))
         })
     '
-}
-
-# Overlays a second record list on top of a first one. Any name/type pairs that
-# appear in both will only contain the second one in the result.
-function replace-records {
-    local list1="$1"
-    local list2="$2"
-
-    jval \
-        list1:json="${list1}" \
-        list2:json="${list2}" '
-        [$list1[], $list2[]]
-        |
-        group_by({ name, type })
-        |
-        map(.[-1])
-        '
 }
 
 # Converts a record list in the form used in this project to the change list
@@ -465,7 +467,6 @@ zoneInfo="$(lib dns find-zone --domain="${domain}")" || exit "$?"
 zoneId="$(jget --output=raw "${zoneInfo}" '.id')"
 domain="$(jget --output=raw "${zoneInfo}" '.name')"
 
-info-msg '####### B'
 # Merge on top of existing records, if so requested.
 oldRecords='[]'
 if (( doMerge )); then
@@ -473,15 +474,17 @@ if (( doMerge )); then
     || exit "$?"
     newRecords="$(merge-record-lists "${oldRecords}" "${newRecords}")" \
     || exit "$?"
-    if (( anyDeletes )); then
-        deleteRecords="$(process-deletes "${oldRecords}" "${deleteRecords}")" \
-        || exit "$?"
-        newRecords="$(replace-records "${newRecords}" "${deleteRecords}")" \
-        || exit "$?"
-    fi
 fi
 
-info-msg '####### C'
+# Merge in all of the deletions, if any.
+if (( anyDeletes )); then
+    info-msg '####### B'
+    newRecords="$(process-deletes \
+        "${oldRecords}" "${newRecords}" "${deleteRecords}")" \
+    || exit "$?"
+fi
+
+info-msg '####### D'
 jget "${newRecords}"
 info-msg '####### Cx'
 
@@ -506,7 +509,7 @@ else
                 Changes: $changes
             }
         }' \
-        :: -output=raw '.ChangeInfo.Id'
+        :: --output=raw '.ChangeInfo.Id'
     )" \
     || exit "$?"
 
