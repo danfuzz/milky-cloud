@@ -509,7 +509,7 @@ else
         zoneId="${zoneId}" '{
             HostedZoneId: $zoneId,
             ChangeBatch: {
-                Comment: "Via `dns add`",
+                Comment: "Via `dns change`",
                 Changes: $changes
             }
         }' \
