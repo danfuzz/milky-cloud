@@ -106,10 +106,17 @@ fi
 # Helper functions
 #
 
-# The "authentication" hook. This is (in effect) a callback from `certbot`.
-function authentication-hook {
-    local validationData="${CERTBOT_VALIDATION}"
-    local domain="${CERTBOT_DOMAIN}"
+function make-dns-change {
+    local action="$1"
+    local domain="$2" # Full domain, not just apex.
+    local validationData="$3"
+
+    local waitOpt=()
+    local prefix=''
+    if [[ ${action} == --delete ]]; then
+        prefix='!'
+        waitOpt=(--no-wait)
+    fi
 
     # Split into name and main domain.
 
@@ -133,11 +140,19 @@ function authentication-hook {
     # DNS format requires the value to be double-quoted.
     validationData="\"${validationData}\""
 
-    lib dns change --merge --ttl=60 --domain="${domain}" \
-        "${name}:txt=${validationData}" \
+    lib dns change "${waitOpt[@]}" --merge --ttl=60 --domain="${domain}" \
+        "${prefix}${name}:txt=${validationData}" \
     || {
         info-msg 'There may be trouble!'
     }
+}
+
+# The "authentication" hook. This is (in effect) a callback from `certbot`.
+function authentication-hook {
+    local validationData="${CERTBOT_VALIDATION}"
+    local domain="${CERTBOT_DOMAIN}"
+
+    make-dns-change --add "${domain}" "${validationData}"
 }
 
 # The "cleanup" hook. This is (in effect) a callback from `certbot`.
@@ -146,78 +161,7 @@ function cleanup-hook {
     local remainingChallenges="${CERTBOT_REMAINING_CHALLENGES}"
     local validationData="${CERTBOT_VALIDATION}"
 
-    # Note: Instead of paying attention to the given validation data, we treat
-    # each cleanup but the last as a no-op, and then at the end just delete all
-    # records that look like ACME challenges.
-
-    if [[ ${remainingChallenges} == 0 ]]; then
-        # No more challenges. Do the "extra cleanup" work.
-        extra-cleanup || return "$?"
-    fi
-}
-
-# "Extra clean" cleanup hook: Remove all the records from ACME (Certbot)
-# requests on all the domains used in this run.
-function extra-cleanup {
-    local allDomains="${CERTBOT_ALL_DOMAINS}"
-    allDomains=($(
-        tr <<<"${allDomains}" ',' '\n' \
-        | awk '
-            /[.].*[.]/ { $0 = substr($0, match($0, /[^.]*[.][^.]*$/)) }
-            { print }
-        ' \
-        | sort -u
-    ))
-
-    local domain zoneId
-    for domain in "${allDomains[@]}"; do
-        zoneId="$(find-zone-id "${domain}")" \
-        || return "$?"
-
-        local payload
-        payload="$(lib aws-json route53 list-resource-record-sets --global \
-            zoneId="${zoneId}" \
-            '{ HostedZoneId: $zoneId }' \
-            :: '
-              .ResourceRecordSets
-            | map(select(.Type == "TXT"))
-            | map(select(.Name | test("^_acme-challenge[.]")))
-            |
-            if length > 0
-            then {
-              Comment: "Via Cerbot wrapper extra-cleanup script",
-              Changes: map({
-                Action: "DELETE",
-                ResourceRecordSet: .
-              })
-            }
-            else null
-            end
-            '
-        )" \
-        || return "$?"
-
-        if [[ ${payload} != 'null' ]]; then
-            echo "Cleaning up challenges for domain: ${domain}"
-            lib aws-json route53 change-resource-record-sets --global \
-                zoneId="${zoneId}" \
-                payload:json="${payload}" \
-                '{
-                    HostedZoneId: $zoneId,
-                    ChangeBatch: $payload
-                }' \
-                :: --output=none \
-            || return "$?"
-        fi
-    done
-}
-
-# Finds the zone ID for a given domain name.
-function find-zone-id {
-    local domain="$1"
-
-    lib dns find-zone --output=id --domain="${domain}" \
-    || return "$?"
+    make-dns-change --delete "${domain}" "${validationData}"
 }
 
 # Does a certificate lifetime check. Prints `keep` or `renew`.
