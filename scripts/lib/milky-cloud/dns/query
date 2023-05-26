@@ -1,0 +1,276 @@
+#!/bin/bash
+#
+# Copyright 2022-2023 the Milk-prod Authors (Dan Bornstein et alia).
+# This project is PROPRIETARY and UNLICENSED.
+
+. "$(dirname "$(readlink -f "$0")")/_init.sh" || exit "$?"
+
+
+#
+# Argument parsing
+#
+
+define-usage $'
+    ${name} [<opt> ...] <query> ... [:: [<out-opt> ...] [<jval-expr> ...]]
+
+    Gets a set of DNS records that match the indicated query, by issuing one or
+    more "front-end" DNS queries (e.g. by using `dig`). On success, prints a
+    JSON result in a form similar to `dns get`.
+
+    An optional `::` followed by additional arguments causes the initial output
+    to be further processed by `json-val`, in a manner analogous to how
+    `aws-json` works, see which for details.
+
+    <query>
+      <name>[@<domain>]:<type> -- Find  a record of the given name and type.
+      `<name>` is the subdomain under the given <domain> or if not supplied the
+      `--domain` specified as an option. A <name> of `.` indicates an apex
+      record.
+
+    --domain=<name>
+      Main domain to match. Required if any of the <query>s are missing an
+      explicit domain name.
+    --not-found-ok
+      Do not report an error if fewer records were found than implied by the
+      given number of `<query>`s.
+    --output=<style> :: array json none
+      What to output. This controls the initial output, not postprocessing if
+      any (which can specify its own `--output`).
+      * `array` -- Output a JSON array (instead of individual objects).
+      * `json` -- Output a sequence of JSON objects. This is the default.
+      * `none` -- Do not output anything.
+
+    ${name} [--help | -h]
+
+    Displays this message.
+'
+
+# Want help?
+opt-action --call='{ usage; exit }' help/h
+
+# Handles `--output`.
+usual-json-output-args --no-rest
+
+# Domain to find.
+opt-value --var=domain --filter='/^[-.a-z0-9]+$/' domain
+
+# Ok if not all records found?
+opt-toggle --var=notFoundOk not-found-ok
+
+# List of queries, as parallel arrays.
+queryNames=()
+queryDomains=()
+queryTypes=()
+
+rest-arg --call=parse-rest rest
+function parse-rest {
+    local error=0
+
+    # Parse queries.
+    while (( $# > 0 )); do
+        local arg="$1"
+        if [[ ${arg} == '::' ]]; then
+            break
+        fi
+
+        shift
+
+        if ! [[ ${arg} =~ ^([-_.a-zA-Z0-9]+)(@[-.a-z0-9]+)?:([a-z]+)$ ]]; then
+            error-msg 'Could not parse query:' "${arg}"
+            error=1
+            continue
+        fi
+
+        local name="${BASH_REMATCH[1]}"
+        local domain="${BASH_REMATCH[2]:1}" # `:1` to remove the leading `@`.
+        local type="${BASH_REMATCH[3]}"
+
+        queryNames+=("${name}")
+        queryDomains+=("${domain}")
+        queryTypes+=("${type}")
+    done
+
+    if (( error )); then
+        return "${error}"
+    elif (( ${#queryNames[@]} == 0 )); then
+        error-msg 'Must pass at least one query.'
+        return 1
+    fi
+
+    # Pass the postprocessing arguments, if any, through to the helper library.
+    if [[ "$1" == '::' ]]; then
+        set-json-postproc-args "$@"
+    fi
+}
+
+process-args "$@" || usage --short
+
+check-json-output-args \
+|| exit "$?"
+
+# Canonicalize the `domain` by ensuring it does not end with a dot. In addition
+# check it for basic syntactic correctness.
+if [[ ${domain} =~ ^([^.]+[.][^.]+)[.]?$ ]]; then
+    domain="${BASH_REMATCH[1]}"
+elif [[ ${domain} != '' ]]; then
+    error-msg "Invalid domain: ${domain}"
+    usage --short
+    exit 1
+fi
+
+# Fill in the domain on queries that are lacking one.
+for n in "${!queryDomains[@]}"; do
+    if [[ ${queryDomains[n]} == '' ]]; then
+        if [[ ${domain} == '' ]]; then
+            error-msg 'Must pass --domain when any query lacks a domain.'
+            usage --short
+            exit 1
+        fi
+        queryDomains[n]="${domain}"
+    fi
+done
+
+
+#
+# Main script
+#
+
+# Construct the `dig` queries. Because `dig` doesn't seem to particularly like
+# multiple `-t` (record type) options on the direct commandline (it seems to
+# work but issues a warning nonetheless), what we do here is construct the
+# queries as a multi-line string which we ultimately pass in to `dig` via the
+# `-f` (file / batch) option, using the shell process subsitution form
+# (`<(...)`).
+
+queries="$(
+    for n in "${!queryNames[@]}"; do
+        name="${queryNames[n]}"
+        domain="${queryDomains[n]}"
+        type="${queryTypes[n]}"
+        if [[ ${name} == '.' ]]; then
+            fullName="${domain}."
+        else
+            fullName="${name}.${domain}."
+        fi
+
+        echo "-t ${queryTypes[n]} ${fullName}"
+    done
+)"
+
+# Call `dig` and collect the result.
+
+digArgs=(
+    +noadditional # Only output direct query results.
+    +noauthority  # Don't even include "authority" results.
+    +nocomments   # Minimize comment lines in the output.
+    +noquestion   # Do not output the queries as comments.
+    +nosplit      # Do not split long lines.
+    -c in         # Class `IN` (the usual one)
+)
+
+result="$(
+    dig "${digArgs[@]}" -f <(echo "${queries}")
+)" \
+|| exit "$?"
+
+# Filter out comments and blank lines, and split into an array of lines.
+#
+# Note: Even with `+noadditional`, sometimes this can still result in indirect
+# results which need to be ignored, before we can 100% determine whether or not
+# we got the right number of results.
+#set-array-from-lines result \
+#    "$(awk <<<"${result}" '/^[^;]/')"
+
+#printf '### >>%s\n' "${result[@]}"
+
+jval <<<"${result}" --input=raw '
+    # The regular expression that splits lines into fields.
+    "^
+       (?<fullName>\\S+)[.] \\s+
+       (?<ttl>\\S+)         \\s+IN\\s+
+       (?<type>\\S)+        \\s+
+       (?<value>.*)
+    $" as $lineRx
+
+    | gsub("^[ \t]+|[ \t]+$"; "")    # Trim whitespace at ends of line.
+    | select(test("^(;.*)?$") | not) # Filter out comments and blank lines.
+    | capture($lineRx; "x")          # Split into fields.
+    |
+
+    # Split `fullName` as defined by this project.
+    . + (.fullName | capture("^((?<name>.+)[.])?(?<domain>[^.]+[.][^.]+)$"))
+    | if .name == null then .name = "." else . end
+    | del(.fullName)
+
+
+'
+exit 1
+
+# Regular expression for `dig` result lines.
+spc=$'[ \t]+'
+str=$'[^ \t]+'
+num='[0-9]+'
+digLineRx="${spc}(${val})[.]${spc}(${num})${spc}IN${spc}(${str})${spc}(.*)"
+unset spc str num
+
+digLineRx="^${spc}(.*)$"
+
+for n in "${!result[@]}"; do
+    info-msg '### LINE' "${result[n]}"
+
+
+    [[ ${result[n]} =~ ^${digLineRx}$ ]] || {
+        error-msg 'Strange `dig` result line:'
+        error-msg "  ${result[n]}"
+        exit 1
+    }
+    info-msg '######## ONE'
+    printf '>>%s\n' "${BASH_REMATCH[@]}"
+    continue
+
+    fullName="${BASH_REMATCH[1]}"
+    ttl="${BASH_REMATCH[2]}"
+    type="${BASH_REMATCH[3]}"
+    value="${BASH_REMATCH[4]}"
+
+    [[ ${fullName} =~ ^(.*[.])?([^.]+[.][^.]+)$ ]] || {
+        error-msg "Strange hostname in \`dig\` result: ${fullName}"
+    }
+
+    name="${BASH_REMATCH[1]}"
+    domain="${BASH_REMATCH[2]}"
+
+    if [[ ${name} == '' ]]; then
+        name='.'
+    fi
+
+    jval \
+        domain="${domain}" \
+        name="${name}" \
+        ttl:json="${ttl}" \
+        type="${type}" \
+        value="${value}" '{
+            domain: $domain,
+            name:   $name,
+            type:   $type,
+            ttl:    $ttl,
+            values: [$value]
+        }'
+done
+
+# TODO: Convert to JSON.
+
+exit 1
+####### TODO
+
+if [[ ${resultArray} =~ ^'{' ]]; then
+    len="$(jget "${resultArray}" '.count')"
+    if (( len == 0 )); then
+        error-msg 'No matching records found.'
+    else
+        error-msg "Insufficient matching records found. (Found ${len}.)"
+    fi
+    exit 1
+fi
+
+json-postproc-output "${resultArray}"
