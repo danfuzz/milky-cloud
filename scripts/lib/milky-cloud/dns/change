@@ -30,14 +30,16 @@ define-usage $'
     other AWS-specific stuff.
 
     <binding>
-      [<name>:]<type>=<value> -- Create a record of the given type with the
-        given value. With `<name>`, uses that as the name-and-subdomain; without
-        it, then the `--name` option provides the name to bind. It is valid to
-        repeat the same name and type multiple times; this indicates a
-        multi-valued record.
-      ![<name>:]<type>=<value> -- Delete a single value as specified (leaving any
-        other values for the record intact).
-      ![<name>:]<type> -- Delete the entire record with the given name and type.
+      <name>:<type>=<value> -- Create a record of the given name, type, and
+        value. `<name>` is the subdomain under the `--domain`, or `.` to indicate
+        an apex record. It is valid to repeat the same name and type multiple
+        times; this indicates a multi-valued record.
+      !<name>:<type>=<value> -- Delete a single value as specified (leaving any
+        other values for the record intact). The same name and type may be
+        repeated multiple times to remove multiple values from a multi-valued
+        record.
+      !<name>:<type> -- Delete the entire record (all values) with the given
+       name and type.
 
       Note: Record deletions are processed before record creations, which might
       lead to the occasional surprise when mixing the two operations on a given
@@ -53,10 +55,6 @@ define-usage $'
       Merges records, keeping old values for a given name/type, and just adding
       to them. Without this option, existing records are replaced (and
       nonexistent records are created).
-    --name=<name>
-      Name and subdomain (but not main domain name) to operate on, for <binding>s
-      that don\'t specify one. Use `.` to indicate an apex record. Required if
-      any <binding>s do not include a name.
     --output=<style> :: array json none
       What to output. This controls the initial output, not postprocessing if
       any (which can specify its own `--output`).
@@ -89,9 +87,6 @@ opt-value --var=maxWaitSecs --filter='/[0-9]+/' max-wait-secs
 # Merge instead of replace?
 opt-toggle --var=doMerge merge
 
-# Name to operate on by default.
-opt-value --var=name --filter='/^[-_.a-z0-9]+$/' name
-
 # TTL for added records.
 opt-value --var=ttl --filter='/^[0-9]+/' ttl
 
@@ -120,7 +115,7 @@ function parse-rest {
 
         shift
 
-        if ! [[ ${arg} =~ ^(!?[-_.a-zA-Z0-9]+:)?([a-z]+)(=.+)?$ ]]; then
+        if ! [[ ${arg} =~ ^(!?[-_.a-zA-Z0-9]+:)([a-z]+)(=.+)?$ ]]; then
             error-msg 'Could not parse binding:' "${arg}"
             error=1
             continue
@@ -138,11 +133,6 @@ function parse-rest {
         else
             action='add'
             anyAdds=1
-            if [[ ${value} == '' ]]; then
-                error-msg 'Could not parse binding (missing value):' "${arg}"
-                error=1
-                continue
-            fi
         fi
 
         bindActions+=("${action}")
@@ -455,19 +445,6 @@ function route53-change-list {
 #
 
 progress-msg --enable
-
-# Fill in the name on any bindings that don't have one.
-
-for n in "${!bindNames[@]}"; do
-    if [[ ${bindNames[n]} == '' ]]; then
-        if [[ ${name} == '' ]]; then
-            error-msg 'Must supply `--name` when using nameless bindings.'
-            usage --short
-            exit 1
-        fi
-        bindNames[n]="${name}"
-    fi
-done
 
 # Convert the binding arrays to unified new-records and to-delete arrays.
 
