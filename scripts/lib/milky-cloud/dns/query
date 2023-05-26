@@ -175,14 +175,7 @@ rawResult="$(
 
 # Construct the expected JSON result form.
 
-if (( notFoundOk )); then
-    expectCount='null'
-else
-    expectCount="${#queryNames[@]}"
-fi
-
 resultArray="$(jval \
-    expectCount:json="${expectCount}" \
     rawResult="${rawResult}" '
     def parseOneLine:
         # The regular expression that splits lines into fields.
@@ -216,9 +209,39 @@ resultArray="$(jval \
     | map(.[0] as $base | $base + { values: (map(.value) | unique) })
     | sort_by([.domain, .name, .type])
     | map(canonicalResult)
+    '
+)" \
+|| exit "$?"
 
-    |
-    if ($expectCount == null) or ($expectCount == length) then
+# `dig` proactively follows `cname` records, and (per spec) is generally allowed
+# to return arbitrary results. So, we need to do one final pass to cull out
+# anything that wasn't specifically queried for. _Then_ we can see if we got the
+# expected number of results (if asked).
+
+if (( notFoundOk )); then
+    expectCount='null'
+else
+    expectCount="${#queryNames[@]}"
+fi
+
+resultArray="$(jval \
+    names:json="$(jarray --input=strings "${queryNames[@]}")" \
+    domains:json="$(jarray --input=strings "${queryDomains[@]}")" \
+    types:json="$(jarray --input=strings "${queryTypes[@]}")" \
+    expectCount:json="${expectCount}" \
+    result:json="${resultArray}" '
+
+    [$domains, $names, $types] | transpose
+        | map({ domain: .[0], name: .[1], type: .[2] })
+        as $queries
+
+    | $result
+    | map(
+        { domain, name, type } as $key
+        | select(($queries | index($key)) != null)
+    )
+
+    | if ($expectCount == null) or ($expectCount == length) then
         .
     else
         length
