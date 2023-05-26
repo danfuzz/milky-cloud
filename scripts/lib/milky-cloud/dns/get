@@ -13,8 +13,9 @@
 define-usage $'
     ${name} [<opt> ...] [:: [<out-opt> ...] [<jval-expr> ...]]
 
-    Gets a set of DNS records that match the indicated query. Prints a sequence
-    of JSON results or an array thereof (depending on options).
+    Gets a set of DNS records that match the indicated query, using the Route53
+    API (not "front-end" DNS queries). Prints a sequence of JSON results or an
+    array thereof (depending on options).
 
     An optional `::` followed by additional arguments causes the initial output
     to be further processed by `json-val`, in a manner analogous to how
