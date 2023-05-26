@@ -173,36 +173,43 @@ result="$(
 )" \
 || exit "$?"
 
-# Filter out comments and blank lines, and split into an array of lines.
-#
-# Note: Even with `+noadditional`, sometimes this can still result in indirect
-# results which need to be ignored, before we can 100% determine whether or not
-# we got the right number of results.
-#set-array-from-lines result \
-#    "$(awk <<<"${result}" '/^[^;]/')"
+# Construct the expected JSON result form.
 
-#printf '### >>%s\n' "${result[@]}"
+jval <<<"${result}" --input=raw:slurp '
+    def parseOneLine:
+        # The regular expression that splits lines into fields.
+        "^
+           (?<fullName>\\S+)[.] \\s+
+           (?<ttl>\\S+)         \\s+IN\\s+
+           (?<type>\\S+)        \\s+
+           (?<value>.*)
+        $" as $lineRx
 
-jval <<<"${result}" --input=raw '
-    # The regular expression that splits lines into fields.
-    "^
-       (?<fullName>\\S+)[.] \\s+
-       (?<ttl>\\S+)         \\s+IN\\s+
-       (?<type>\\S)+        \\s+
-       (?<value>.*)
-    $" as $lineRx
+        | gsub("^[ \t]+|[ \t]+$"; "")    # Trim whitespace at ends of line.
+        | select(test("^(;.*)?$") | not) # Filter out comments and blank lines.
+        | capture($lineRx; "x")          # Split into fields.
+        |
 
-    | gsub("^[ \t]+|[ \t]+$"; "")    # Trim whitespace at ends of line.
-    | select(test("^(;.*)?$") | not) # Filter out comments and blank lines.
-    | capture($lineRx; "x")          # Split into fields.
+        # Split `fullName` as defined by this project.
+        . + (.fullName | capture("^((?<name>.+)[.])?(?<domain>[^.]+[.][^.]+)$"))
+        | if .name == null then .name = "." else . end
+
+        | .type |= ascii_downcase # Downcase `type` as expected in this project.
+    ;
+
+    def canonicalResult:
+        { domain, name, type, ttl, values }
+    ;
+
+    map(parseOneLine)
     |
-
-    # Split `fullName` as defined by this project.
-    . + (.fullName | capture("^((?<name>.+)[.])?(?<domain>[^.]+[.][^.]+)$"))
-    | if .name == null then .name = "." else . end
-    | del(.fullName)
-
-
+    group_by({ domain, name, type })
+    |
+    map(.[0] as $base | $base + { values: (map(.value) | unique) })
+    |
+    sort_by([.domain, .name, .type])
+    |
+    map(canonicalResult)
 '
 exit 1
 
