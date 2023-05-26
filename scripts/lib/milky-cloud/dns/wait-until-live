@@ -143,7 +143,7 @@ function check-one {
         match)
             queryCmd+=(
                 value="${value}"
-                '(.values | index($value)) != null'
+                '((.[0].values // []) | index($value)) != null'
             )
             ;;
         present)
