@@ -74,8 +74,6 @@ function parse-rest {
             state='absent'
         elif [[ ${value} == '' ]]; then
             state='present'
-        else
-            state='match'
         fi
 
         expStates+=("${state}")
@@ -135,21 +133,18 @@ function check-one {
             "${name}@${domain}:${type}" ::
     )
 
-    local result
-    case "${state}" in
-        absent)
-            queryCmd+=('length == 0')
-            ;;
-        match)
-            queryCmd+=(
-                value="${value}"
-                '((.[0].values // []) | index($value)) != null'
-            )
-            ;;
-        present)
-            queryCmd+=('length != 0')
-            ;;
-    esac
+    if [[ ${value} == '' ]]; then
+        queryCmd+=('length != 0')
+    else
+        queryCmd+=(
+            value="${value}"
+            '((.[0].values // []) | index($value)) != null'
+        )
+    fi
+
+    if [[ ${state} == 'absent' ]]; then
+        queryCmd+=('| not')
+    fi
 
     queryCmd+=('| if . then 1 else 0 end')
 
