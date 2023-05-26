@@ -1,0 +1,231 @@
+#!/bin/bash
+#
+# Copyright 2022-2023 the Milk-prod Authors (Dan Bornstein et alia).
+# This project is PROPRIETARY and UNLICENSED.
+
+. "$(dirname "$(readlink -f "$0")")/_init.sh" || exit "$?"
+
+
+#
+# Argument parsing
+#
+
+define-usage $'
+    ${name} [<opt> ...] <expect> ...
+
+    Waits for a set of DNS queries to match the given expectations. <expect>
+    arguments are similar in form to `dns query` (see which for more details).
+
+    <expect>
+      <name>[@<domain>]:<type>=<value> -- Expect a specific value.
+      <name>[@<domain>]:<type> -- Expect the record to be defined.
+      !<name>[@<domain>]:<type> -- Expect no record to be defined.
+
+    --domain=<name>
+      Main domain to query. Required if any of the <expect>s are missing an
+      explicit domain name.
+    --max-secs=<secs>
+      Maximum number of seconds to wait for synchronization (approximately).
+      Default `60`.
+
+    ${name} [--help | -h]
+
+    Displays this message.
+'
+
+# Want help?
+opt-action --call='{ usage; exit }' help/h
+
+# Domain to find.
+opt-value --var=domain --filter='/^[-.a-z0-9]+$/' domain
+
+# Maximum wait time in seconds.
+opt-value --var=maxSecs --init=60 --filter='/[0-9]+/' max-secs
+
+# List of expectations, as parallel arrays.
+expState=()
+expNames=()
+expDomains=()
+expTypes=()
+expValues=()
+
+rest-arg --call=parse-rest rest
+function parse-rest {
+    local error=0
+
+    # Parse queries.
+    while (( $# > 0 )); do
+        local arg="$1"
+        shift
+
+        if ! [[ ${arg} =~ ^(!)?([-_.a-zA-Z0-9]+)(@[-.a-z0-9]+)?:([a-z]+)(=.+)?$ ]]; then
+            error-msg 'Could not parse expectation:' "${arg}"
+            error=1
+            continue
+        fi
+
+        local state="${BASH_REMATCH[1]}"
+        local name="${BASH_REMATCH[2]}"
+        local domain="${BASH_REMATCH[3]:1}" # `:1` to remove the leading `@`.
+        local type="${BASH_REMATCH[4]}"
+        local value="${BASH_REMATCH[5]:1}" # `:1` to remove the leading `=`.
+
+        if [[ ${state} == '!' ]]; then
+            state='absent'
+        elif [[ ${value} == '' ]]; then
+            state='present'
+        else
+            state='match'
+        fi
+
+        expStates+=("${state}")
+        expNames+=("${name}")
+        expDomains+=("${domain}")
+        expTypes+=("${type}")
+        expValues+=("${value}")
+    done
+
+    if (( error )); then
+        return "${error}"
+    elif (( ${#expStates[@]} == 0 )); then
+        error-msg 'Must pass at least one expectation.'
+        return 1
+    fi
+}
+
+process-args "$@" || usage --short
+
+# Canonicalize the `domain` by ensuring it does not end with a dot. In addition
+# check it for basic syntactic correctness.
+if [[ ${domain} =~ ^([^.]+[.][^.]+)[.]?$ ]]; then
+    domain="${BASH_REMATCH[1]}"
+elif [[ ${domain} != '' ]]; then
+    error-msg "Invalid domain: ${domain}"
+    usage --short
+    exit 1
+fi
+
+# Fill in the domain on queries that are lacking one.
+for n in "${!expDomains[@]}"; do
+    if [[ ${expDomains[n]} == '' ]]; then
+        if [[ ${domain} == '' ]]; then
+            error-msg 'Must pass --domain when any expectation lacks a domain.'
+            usage --short
+            exit 1
+        fi
+        expDomains[n]="${domain}"
+    fi
+done
+
+
+#
+# Helper functions
+#
+
+# Checks one expectation.
+function check-one {
+    local state="$1"
+    local name="$2"
+    local domain="$3"
+    local type="$4"
+    local value="$5"
+
+    local queryCmd=(
+        lib dns query --not-found-ok --output=array
+            "${name}@${domain}:${type}" ::
+    )
+
+    local result
+    case "${state}" in
+        absent)
+            queryCmd+=('length == 0')
+            ;;
+        match)
+            queryCmd+=(
+                value="${value}"
+                '(.values | index($value)) != null'
+            )
+            ;;
+        present)
+            queryCmd+=('length != 0')
+            ;;
+    esac
+
+    queryCmd+=('| if . then 1 else 0 end')
+
+    local result
+    result="$("${queryCmd[@]}")" \
+    || return "$?"
+
+    echo "${result}"
+}
+
+
+#
+# Main script
+#
+
+progress-msg --enable
+
+timeNow="$(lib timey secs now)" || exit "$?"
+endTime=$(( timeNow + maxSecs ))
+first=1
+last=0
+
+progress-msg 'Waiting for DNS to be live:'
+
+while (( (${#expStates[@]} > 0) && !last )); do
+    if (( !first )); then
+        timePrev="${timeNow}"
+        timeNow="$(lib timey secs now)" || exit "$?"
+        sleepFor=$(( 5 - (timeNow - timePrev) ))
+
+        if (( timeNow >= endTime )); then
+            last=1
+        elif (( sleepFor > 0 )); then
+            sleep "${sleepFor}"
+            (( timeNow += sleepFor ))
+        fi
+    fi
+
+    for n in "${!expStates[@]}"; do
+        state="${expStates[n]}"
+        name="${expNames[n]}"
+        domain="${expDomains[n]}"
+        type="${expTypes[n]}"
+        value="${expValues[n]}"
+
+        satisfied="$(
+            check-one "${state}" "${name}" "${domain}" "${type}" "${value}"
+        )" \
+        || exit "$?"
+
+        label="  ${name}@${domain}:${type}"
+        if [[ ${value} != '' ]]; then
+            label+='=...'
+        fi
+
+        if (( satisfied )); then
+            if (( first )); then
+                progress-msg "${label}: Already live."
+            else
+                progress-msg "${label}: Live."
+            fi
+            unset expStates[n];
+        elif (( last )); then
+            progress-msg "${label}: Timed out."
+        else
+            progress-msg "${label}: Waiting..."
+        fi
+    done
+
+    first=0
+done
+
+if (( ${#expStates[@]} > 0 )); then
+    progress-msg '  (Gave up.)'
+    error-msg 'Not all records became live.'
+    exit 1
+fi
+
+progress-msg 'All live!'
