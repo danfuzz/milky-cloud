@@ -84,11 +84,13 @@ while (( (${#changes[@]} > 0) && !last )); do
     if (( !first )); then
         timePrev="${timeNow}"
         timeNow="$(lib timey secs now)" || exit "$?"
+        sleepFor=$(( 5 - (timeNow - timePrev) ))
 
         if (( timeNow >= endTime )); then
             last=1
-        elif (( (timeNow - timePrev) < 5 )); then
-            sleep $(( 5 - (timeNow - timePrev) ))
+        elif (( sleepFor > 0 )); then
+            sleep "${sleepFor}"
+            (( timeNow += sleepFor ))
         fi
     fi
 
