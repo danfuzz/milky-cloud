@@ -168,14 +168,22 @@ digArgs=(
     -c in         # Class `IN` (the usual one)
 )
 
-result="$(
+rawResult="$(
     dig "${digArgs[@]}" -f <(echo "${queries}")
 )" \
 || exit "$?"
 
 # Construct the expected JSON result form.
 
-jval rawResult="${result}" '
+if (( notFoundOk )); then
+    expectCount='null'
+else
+    expectCount="${#queryNames[@]}"
+fi
+
+resultArray="$(jval \
+    expectCount:json="${expectCount}" \
+    rawResult="${rawResult}" '
     def parseOneLine:
         # The regular expression that splits lines into fields.
         "^
@@ -208,68 +216,19 @@ jval rawResult="${result}" '
     | map(.[0] as $base | $base + { values: (map(.value) | unique) })
     | sort_by([.domain, .name, .type])
     | map(canonicalResult)
-'
-exit 1
 
-# Regular expression for `dig` result lines.
-spc=$'[ \t]+'
-str=$'[^ \t]+'
-num='[0-9]+'
-digLineRx="${spc}(${val})[.]${spc}(${num})${spc}IN${spc}(${str})${spc}(.*)"
-unset spc str num
+    |
+    if ($expectCount == null) or ($expectCount == length) then
+        .
+    else
+        length
+    end
+    '
+)" \
+|| exit "$?"
 
-digLineRx="^${spc}(.*)$"
-
-for n in "${!result[@]}"; do
-    info-msg '### LINE' "${result[n]}"
-
-
-    [[ ${result[n]} =~ ^${digLineRx}$ ]] || {
-        error-msg 'Strange `dig` result line:'
-        error-msg "  ${result[n]}"
-        exit 1
-    }
-    info-msg '######## ONE'
-    printf '>>%s\n' "${BASH_REMATCH[@]}"
-    continue
-
-    fullName="${BASH_REMATCH[1]}"
-    ttl="${BASH_REMATCH[2]}"
-    type="${BASH_REMATCH[3]}"
-    value="${BASH_REMATCH[4]}"
-
-    [[ ${fullName} =~ ^(.*[.])?([^.]+[.][^.]+)$ ]] || {
-        error-msg "Strange hostname in \`dig\` result: ${fullName}"
-    }
-
-    name="${BASH_REMATCH[1]}"
-    domain="${BASH_REMATCH[2]}"
-
-    if [[ ${name} == '' ]]; then
-        name='.'
-    fi
-
-    jval \
-        domain="${domain}" \
-        name="${name}" \
-        ttl:json="${ttl}" \
-        type="${type}" \
-        value="${value}" '{
-            domain: $domain,
-            name:   $name,
-            type:   $type,
-            ttl:    $ttl,
-            values: [$value]
-        }'
-done
-
-# TODO: Convert to JSON.
-
-exit 1
-####### TODO
-
-if [[ ${resultArray} =~ ^'{' ]]; then
-    len="$(jget "${resultArray}" '.count')"
+if ! [[ ${resultArray} =~ ^'[' ]]; then
+    len="${resultArray}"
     if (( len == 0 )); then
         error-msg 'No matching records found.'
     else
