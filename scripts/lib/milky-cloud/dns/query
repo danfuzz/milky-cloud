@@ -175,7 +175,7 @@ result="$(
 
 # Construct the expected JSON result form.
 
-jval <<<"${result}" --input=raw:slurp '
+jval rawResult="${result}" '
     def parseOneLine:
         # The regular expression that splits lines into fields.
         "^
@@ -201,15 +201,13 @@ jval <<<"${result}" --input=raw:slurp '
         { domain, name, type, ttl, values }
     ;
 
-    map(parseOneLine)
-    |
-    group_by({ domain, name, type })
-    |
-    map(.[0] as $base | $base + { values: (map(.value) | unique) })
-    |
-    sort_by([.domain, .name, .type])
-    |
-    map(canonicalResult)
+      $rawResult
+    | split("\n")
+    | map(parseOneLine)
+    | group_by({ domain, name, type })
+    | map(.[0] as $base | $base + { values: (map(.value) | unique) })
+    | sort_by([.domain, .name, .type])
+    | map(canonicalResult)
 '
 exit 1
 
