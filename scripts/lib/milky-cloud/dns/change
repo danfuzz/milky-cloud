@@ -76,6 +76,7 @@ define-usage $'
 # Want help?
 opt-action --call='{ usage; exit }' help/h
 
+# Handles `--output`.
 usual-json-output-args --no-rest
 
 # Domain to operate on.
@@ -106,7 +107,6 @@ function parse-rest {
     local error=0
 
     # Parse bindings.
-
     while (( $# > 0 )); do
         local arg="$1"
         if [[ ${arg} == '::' ]]; then
@@ -143,6 +143,9 @@ function parse-rest {
 
     if (( error )); then
         return "${error}"
+    elif (( ${#bindActions[@]} == 0 )); then
+        error-msg 'Must pass at least one binding.'
+        return 1
     fi
 
     # Pass the postprocessing arguments, if any, through to the helper library.
