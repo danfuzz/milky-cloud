@@ -122,9 +122,9 @@ error=0
 # Preflight all the attribute names, so we don't try to do any modification
 # unless all names seem to be usable. This loop also converts all the values
 # into the correct JSON form for performing the actual commands.
-for (( n = 0; n < ${#assignNames[@]}; n++ )); do
-    name="${assignNames[${n}]}"
-    value="${assignValues[${n}]}"
+for n in "${!assignNames[@]}"; do
+    name="${assignNames[n]}"
+    value="${assignValues[n]}"
     valueType="$(jget --output=raw "${skeleton}" \
         name="${name}" '
         if (has($name) | not)
@@ -176,7 +176,7 @@ for (( n = 0; n < ${#assignNames[@]}; n++ )); do
         error-msg "Unparseable value for attribute: ${name}"
         error=1
     else
-        assignValues[${n}]="${value}"
+        assignValues[n]="${value}"
     fi
 done
 
@@ -185,9 +185,9 @@ if (( error )); then
 fi
 
 # Do all the commands.
-for (( n = 0; n < ${#assignNames[@]} && !error; n++ )); do
-    name="${assignNames[${n}]}"
-    value="${assignValues[${n}]}"
+for n in "${!assignNames[@]}"; do
+    name="${assignNames[n]}"
+    value="${assignValues[n]}"
 
     progress-msg "Setting ${name}..."
     ec2-json "${command}" \
@@ -196,7 +196,10 @@ for (( n = 0; n < ${#assignNames[@]} && !error; n++ )); do
         name="${name}" \
         value:json="${value}" \
         '$idArg | .[$name] = $value' \
-    || error=1
+    || {
+        error=1
+        break
+    }
 done
 
 if (( error )); then
