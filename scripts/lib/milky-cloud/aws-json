@@ -67,6 +67,9 @@ fi
 # Want help?
 opt-action --call='{ usage; exit }' help/h
 
+# Set up for postprocessing.
+usual-json-output-args --no-output --no-rest
+
 # Region, passed as either region per se or availability zone.
 opt-value --var=region --filter=region-from-location loc
 
@@ -81,16 +84,9 @@ opt-action --var=global global
 
 require-exactly-one-arg-of global loc skeleton
 
-# Output style (result post-processor option).
-outputStyle=json
-
 # Assignments and expression arguments to use to construct the value to pass to
 # the AWS command.
 argConstructor=()
-
-# Assignments and expression arguments to use to perform the result
-# post-processing.
-resultConstructor=()
 
 rest-arg --call=parse-rest jval-exprs
 function parse-rest {
@@ -101,7 +97,6 @@ function parse-rest {
     while (( $# > 0 )); do
         arg="$1"
         if [[ ${arg} == '::' ]]; then
-            shift
             break
         fi
 
@@ -109,35 +104,10 @@ function parse-rest {
         shift
     done
 
-    # Process result post-processor arguments.
-    while (( $# > 0 )); do
-        case "$1" in
-            --output=*)
-                outputStyle="${1#*=}"
-                if ! [[ "${outputStyle}" =~ ^(compact|json|lines|none|raw|words)$ ]]; then
-                    error-msg "Invalid result output style: ${outputStyle}"
-                    return 1
-                fi
-                ;;
-            --)
-                # Explicit end of options.
-                shift
-                break
-                ;;
-            -?*)
-                error-msg "Unknown result option: $1"
-                return 1
-                ;;
-            *)
-                # Non-option argument.
-                break
-                ;;
-        esac
-
-        shift
-    done
-
-    resultConstructor=("$@")
+    # Pass the postprocessing arguments, if any, through to the helper library.
+    if [[ "$1" == '::' ]]; then
+        set-json-postproc-args "$@"
+    fi
 }
 
 process-args "$@" || usage --short
@@ -273,19 +243,6 @@ result="$("${fullCommand[@]}")" \
     exit 1
 }
 
-# Note: Even if there's no result filter, we use `jget` to automatically get
-# color output when appropriate and to do "raw" output when requested.
-
-if (( ${#resultConstructor[@]} == 0 )); then
-    if [[ ${outputStyle} == 'none' ]]; then
-        # No need to run a nop-filter just to not produce output.
-        exit 0
-    fi
-    resultConstructor=('.')
-fi
-
-jget --output="${outputStyle}" -- "${result}" "${resultConstructor[@]}" \
-|| {
-    error-msg 'Trouble filtering result.'
-    exit 1
-}
+# Note: `json-postproc-output` wants a single-value array when there is just
+# one result value.
+json-postproc-output "[${result}]"
