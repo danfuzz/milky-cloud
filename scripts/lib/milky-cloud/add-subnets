@@ -121,16 +121,16 @@ progressArg="--progress=$(progress-msg --status)"
 results=()
 error=0
 
-for (( n = 0; n < azCount && !error; n++ )); do
-    az="${azList[${n}]}"
-    v4Subnet="${v4Subnets[${n}]}"
-    v6Subnet="${v6Subnets[${n}]}"
+for n in "${!azList[@]}"; do
+    az="${azList[n]}"
+    v4Subnet="${v4Subnets[n]}"
+    v6Subnet="${v6Subnets[n]}"
     result="$(ec2-json create-subnet \
         --loc="${region}" \
-        az="${azList[${n}]}" \
+        az="${azList[n]}" \
         tagSpec:json="${tagSpec}" \
-        v4Subnet="${v4Subnets[${n}]}" \
-        v6Subnet="${v6Subnets[${n}]}" \
+        v4Subnet="${v4Subnets[n]}" \
+        v6Subnet="${v6Subnets[n]}" \
         vpcId="${vpcId}" \
         '
         $tagSpec
@@ -152,11 +152,10 @@ for (( n = 0; n < azCount && !error; n++ )); do
         ' \
         :: --output=raw '.Subnet.SubnetId' \
     )" \
-    || error=1
-
-    if (( error )); then
+    || {
+        error=1
         break
-    fi
+    }
 
     results+=("${result}")
 
@@ -176,7 +175,10 @@ for (( n = 0; n < azCount && !error; n++ )); do
         MapPublicIpOnLaunch=true \
         PrivateDnsHostnameTypeOnLaunch=resource-name \
     && progress-msg "Made subnet: ${result}" \
-    || error=1
+    || {
+        error=1
+        break
+    }
 done
 
 if (( error )); then
