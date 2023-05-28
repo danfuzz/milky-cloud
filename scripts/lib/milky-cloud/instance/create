@@ -11,10 +11,12 @@
 #
 
 define-usage $'
-    ${name} [<opt> ...]
+    ${name} [<opt> ...] [:: [<out-opt> ...] [<jval-expr> ...]]
 
     Launches a standard-configured instance (standard for this project, that is).
-    On success, prints a JSON object salient info about the instance.
+    On success, prints JSON object salient info about the instance the same as
+    with `instance info`, which can be filtered with post-processing arguments
+    starting with `::` (again, as with `instance info`, see which for details).
 
     If neither `--security-group` nor `--vpc` is specified, then this command
     will launch the instance into the default security group of the default VPC
@@ -39,9 +41,6 @@ define-usage $'
       Name tag for the resulting instance.
     --os=<name>
       Which OS to install. See `find-ami` for details about default and options.
-    --output=<style> :: `id` `json` `none`
-      What to print on successful output. `id` is just the plain ID (no quotes).
-      `json` is the same as what is printed by `instance info`. Defaults to `id`.
     --security-group=<name-or-id>
       Name or ID of the security group to use for network access control. If
       specified, this is used to derive the VPC to use, and in conjunction with
@@ -89,9 +88,6 @@ opt-value --var=name --filter='/./' name
 # Which OS to install.
 opt-value --var=osName --filter='/./' os
 
-# Output style.
-opt-value --var=outputStyle --init='id' --enum='id json none' output
-
 # Progress messages?
 opt-toggle --call='{ progress-msg --set="$1" }' progress
 
@@ -107,17 +103,24 @@ opt-value --var=userDataFile --filter='/./' user-data-file
 # Name or ID of the VPC to be in.
 opt-value --var=vpcNameOrId --filter='/./' vpc
 
+# Rest args to pass through to the final `instance info` call.
+rest-arg --var=postArgs post-arg
+
 process-args "$@" || usage --short
 
 if [[ (${userData} != '') && (${userDataFile} != '') ]]; then
     error-msg 'Cannot specify both --user-data and --user-data-file.'
+    usage --short
     exit 1
 fi
 
 if [[ (${groupNameOrId} != '') && (${vpc} != '') ]]; then
     error-msg 'Cannot specify both --security-group and --vpc.'
+    usage --short
     exit 1
 fi
+
+jpostproc --check "${postArgs[@]}" || usage --short
 
 
 #
@@ -290,16 +293,10 @@ instanceId="$(ec2-json run-instances \
 progress-msg 'Launched!'
 progress-msg "Instance ID: ${instanceId}"
 
-case "${outputStyle}" in
-    id)
-        echo "${instanceId}"
-        ;;
-    json)
-        if [[ ${vpcNameOrId} == '' ]]; then
-            idSpec="${instanceId}.${zone}"
-        else
-            idSpec="${instanceId}.${vpcNameOrId}.${zone}"
-        fi
-        lib instance info --id="${idSpec}"
-        ;;
-esac
+if [[ ${vpcNameOrId} == '' ]]; then
+    idSpec="${instanceId}.${zone}"
+else
+    idSpec="${instanceId}.${vpcNameOrId}.${zone}"
+fi
+
+lib instance info --id="${idSpec}" "${postArgs[@]}"
