@@ -46,8 +46,8 @@ define-usage $'
       specified, this is used to derive the VPC to use, and in conjunction with
       the specified availability zone, the specific subnet within the VPC. It
       is not valid to specify both this option and `--vpc`.
-    --progress
-      Print progress messages to stderr.
+    --[no-]progress
+      Print progress messages to stderr. Defaults to `--progress`.
     --user-data=<data>
       User data for the instance, which is taken to be a script to run on
       first-boot of the instance. It is invalid to specify both this and the
@@ -89,6 +89,7 @@ opt-value --var=name --filter='/./' name
 opt-value --var=osName --filter='/./' os
 
 # Progress messages?
+progress-msg --enable
 opt-toggle --call='{ progress-msg --set="$1" }' progress
 
 # Name or ID of the security group to be in.
@@ -261,8 +262,8 @@ tagSpec="$(lib tag-spec --type='instance' --name="${name}" "${tagExtras[@]}")"
 # Note: Public IP and DNS are de facto (or at least usually) not set in the
 # output from `ec2 run-instances`, that is, they aren't known at the moment of
 # launch. However, they seem to become set very soon thereafter, which is why
-# JSON output makes a new EC2 call instead of trying to manipulate the results
-# of this call.
+# the output is produced via `instance info` (and therefore a new EC2 call)
+# instead of trying to manipulate the results of this call.
 instanceId="$(ec2-json run-instances \
     --loc="${zone}" \
     amiInfo:json="${amiInfo}" \
