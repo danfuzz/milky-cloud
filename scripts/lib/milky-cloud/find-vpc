@@ -124,13 +124,36 @@ function do-find {
             | . + {
                 id: .VpcId,
                 ipv4CidrBlocks: (
-                    .CidrBlockAssociationSet | map(.CidrBlock)
+                    (.CidrBlockAssociationSet // []) | map(.CidrBlock)
                 ),
                 ipv6CidrBlocks: (
-                    .Ipv6CidrBlockAssociationSet | map(.Ipv6CidrBlock)
+                    (.Ipv6CidrBlockAssociationSet // []) | map(.Ipv6CidrBlock)
                 ),
                 isDefault: .IsDefault,
                 name:      (.Tags | map(select(.Key == "Name") | .Value)[0]),
+                state: (
+                    if .State == "available" then
+                        (.CidrBlockAssociationSet | map(.CidrBlockState.State) | unique)
+                            as $ipv4States
+                        |
+                        (.Ipv6CidrBlockAssociationSet | map(.Ipv6CidrBlockState.State) | unique)
+                            as $ipv6States
+                        |
+                        if $ipv4States == ["associated"] then
+                            if $ipv6States == ["associated"] then
+                                "available"
+                            else
+                                "pending-ipv6"
+                            end
+                        elif $ipv6States == ["associated"] then
+                            "pending-ipv4"
+                        else
+                            "pending-ip"
+                        end
+                    else
+                        .State
+                    end
+                )
             }
         '
     fi
