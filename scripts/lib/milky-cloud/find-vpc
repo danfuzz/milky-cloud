@@ -121,16 +121,14 @@ function do-find {
         # project-friendly form, and then drop the AWS-specific stuff.
         jget --output="${outputStyle}" "${result}" '
             .Vpcs[0]
+            | (.CidrBlockAssociationSet // []) as $ipv4Assoc
+            | (.Ipv6CidrBlockAssociationSet // []) as $ipv6Assoc
             | . + {
-                id: .VpcId,
-                ipv4CidrBlocks: (
-                    (.CidrBlockAssociationSet // []) | map(.CidrBlock)
-                ),
-                ipv6CidrBlocks: (
-                    (.Ipv6CidrBlockAssociationSet // []) | map(.Ipv6CidrBlock)
-                ),
-                isDefault: .IsDefault,
-                name:      (.Tags | map(select(.Key == "Name") | .Value)[0]),
+                id:             .VpcId,
+                ipv4CidrBlocks: ($ipv4Assoc | map(.CidrBlock)),
+                ipv6CidrBlocks: ($ipv6Assoc | map(.Ipv6CidrBlock)),
+                isDefault:      .IsDefault,
+                name:           (.Tags | map(select(.Key == "Name") | .Value)[0]),
                 state: (
                     # It _might_ be the case that if the VPC state is
                     # `available`, then it is safe to assume that all network
@@ -138,20 +136,30 @@ function do-find {
                     # stated in the AWS docs, so we test explicitly for the
                     # network associations.
                     if .State == "available" then
-                        (.CidrBlockAssociationSet | map(.CidrBlockState.State) | unique)
+                        ($ipv4Assoc | map(.CidrBlockState.State) | unique)
                             as $ipv4States
                         |
-                        (.Ipv6CidrBlockAssociationSet | map(.Ipv6CidrBlockState.State) | unique)
+                        ($ipv6Assoc | map(.Ipv6CidrBlockState.State) | unique)
                             as $ipv6States
                         |
-                        if $ipv4States == ["associated"] then
-                            if $ipv6States == ["associated"] then
-                                "available"
-                            else
-                                "pending-ipv6"
-                            end
-                        elif $ipv6States == ["associated"] then
+                        (if ($ipv4States == ["associated"]) or ($ipv4States == []) then
+                            "ready"
+                        else
                             "pending-ipv4"
+                        end) as $ipv4State
+                        |
+                        (if ($ipv6States == ["associated"]) or ($ipv6States == []) then
+                            "ready"
+                        else
+                            "pending-ipv6"
+                        end) as $ipv6State
+                        |
+                        if ($ipv4State == "ready") and ($ipv6State == "ready") then
+                            "available"
+                        elif $ipv4State == "ready" then
+                            $ipv6State
+                        elif $ipv6State == "ready" then
+                            $ipv4State
                         else
                             "pending-ip"
                         end
