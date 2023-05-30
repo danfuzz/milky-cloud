@@ -177,11 +177,15 @@ parse-zone --output=none "${zone}" || {
     exit 1
 }
 
-vpcId="$(lib find-vpc --not-found-ok --loc="${zone}" "${vpcIdSpec}")" \
+groupId=
+vpcId=
+vpcName=
+vpcInfo="$(
+    lib find-vpc --not-found-ok --output=json --loc="${zone}" "${vpcIdSpec}"
+)" \
 || exit 1
 
-groupId=
-if [[ ${vpcId} == '' ]]; then
+if [[ ${vpcInfo} == '' ]]; then
     # See if we got a security group. If so, use it to derive the VPC.
     groupId="$(
         lib find-security-group --not-found-ok --loc="${zone}" "${vpcIdSpec}"
@@ -190,9 +194,13 @@ if [[ ${vpcId} == '' ]]; then
         error-msg "No such VPC or security group: ${vpcIdSpec}"
         exit 1
     }
-    vpcId="$(lib find-vpc --loc="${zone}" "${groupId}")" \
+    vpcInfo="$(lib find-vpc --output=json --loc="${zone}" "${groupId}")" \
     || exit 1
+    vpcId="$(jget --output=raw "${vpcInfo}" '.id')"
+    vpcName="$(jget --output=raw "${vpcInfo}" '.name')"
 else
+    vpcId="$(jget --output=raw "${vpcInfo}" '.id')"
+    vpcName="$(jget --output=raw "${vpcInfo}" '.name')"
     # Get the default security group for the VPC.
     groupId="$(lib find-security-group --loc="${zone}" "${vpcId}")" \
     || exit 1
@@ -203,7 +211,7 @@ subnetId="$(lib find-vpc-subnet --loc="${zone}" --vpc="${vpcId}")" \
 
 progress-msg "Launching instance ${name} in:"
 progress-msg "  zone:   ${zone}"
-progress-msg "  vpc:    ${vpcId}"
+progress-msg "  vpc:    ${vpcId} (${vpcName})"
 progress-msg "  subnet: ${subnetId}"
 progress-msg "  sg:     ${groupId}"
 
@@ -284,10 +292,4 @@ instanceId="$(ec2-json run-instances \
 
 progress-msg "Launched instance: ${instanceId}"
 
-if [[ ${vpcNameOrId} == '' ]]; then
-    idSpec="${instanceId}.${zone}"
-else
-    idSpec="${instanceId}.${vpcNameOrId}.${zone}"
-fi
-
-lib instance info --id="${idSpec}" "${postArgs[@]}"
+lib instance info --id="${instanceId}.${vpcName}.${zone}" "${postArgs[@]}"
