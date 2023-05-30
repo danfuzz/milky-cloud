@@ -127,7 +127,7 @@ fi
 
 # `describe-images` to find the most recent salient AMI.
 
-thisYear="$(date "+%Y")"
+thisYear="$(lib timey print now '+%Y')"
 filterSpec="$(lib filter-spec \
     architecture="${architecture}" \
     name="${amiNamePattern}" \

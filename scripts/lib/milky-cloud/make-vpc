@@ -106,8 +106,8 @@ function make-vpc-per-se {
 
         if [[ ${maxTime} == '' ]]; then
             # Retry for no more than 60 seconds total.
-            maxTime=$(($(date '+%s') + 60))
-        elif (( $(date '+%s') > maxTime )); then
+            maxTime=$(($(lib timey secs now) + 60))
+        elif (( $(lib timey secs now) > maxTime )); then
             error-msg 'Timed out while waiting for VPC to become ready.'
             error=1
             break
