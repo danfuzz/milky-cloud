@@ -83,11 +83,9 @@ function figure-out-name {
 vpcInfo="$(lib find-vpc --output=json --loc="${region}" "${vpcNameOrId}")" \
 || exit "$?"
 
-vpcId="$(jget --output=raw "${vpcInfo}" '.VpcId')"
-usesIpv4="$(jget "${vpcInfo}" \
-    'if .CidrBlockAssociationSet == null then 0 else 1 end')"
-usesIpv6="$(jget "${vpcInfo}" \
-    'if .Ipv6CidrBlockAssociationSet == null then 0 else 1 end')"
+vpcId="$(jget --output=raw "${vpcInfo}" '.id')"
+usesIpv4="$(jget "${vpcInfo}" 'if (.ipv4CidrBlocks | length) == 0 then 0 else 1 end')"
+usesIpv6="$(jget "${vpcInfo}" 'if (.ipv6CidrBlocks | length) == 0 then 0 else 1 end')"
 
 # Figure out the name to use if not passed as an option.
 if [[ ${name} == '' ]]; then

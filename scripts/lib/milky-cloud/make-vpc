@@ -16,13 +16,15 @@ define-usage $'
     Makes a new VPC, plus associated accouterments. On success, prints the ID
     of the created VPC.
 
+    --[no-]ipv6
+      Include IPv6 networking. The default is `--ipv6`.
     --loc=<region-or-zone>
       What region to make the VPC in. Must be specified. If specified as an
       availability zone, only the region portion matters.
     --name=<name>
       Name to assign to the constructed VPC. Must be specified.
-    --progress
-      Print progress messages to stderr.
+    --[no-]progress
+      Print progress messages to stderr. `--progress` is the default.
 
     ${name} [--help | -h]
 
@@ -32,6 +34,9 @@ define-usage $'
 # Want help?
 opt-action --call='{ usage; exit }' help/h
 
+# Do IPv6?
+opt-toggle --var=useIpv6 --init=1 ipv6
+
 # Region, passed as either region per se or availability zone.
 opt-value --required --var=region --filter=region-from-location loc
 
@@ -39,6 +44,7 @@ opt-value --required --var=region --filter=region-from-location loc
 opt-value --required --var=name --filter='/^[-_a-zA-Z0-9]+$/' name
 
 # Progress messages?
+progress-msg --enable
 opt-toggle --call='{ progress-msg --set="$1" }' progress
 
 process-args "$@" || usage --short
@@ -52,62 +58,42 @@ process-args "$@" || usage --short
 # success.
 function make-vpc-per-se {
     local error=0
-    local vpcId=''
+    local vpcId
     local vpcInfo
     local waitSec
     local maxTime
 
+    # Create the actual VPC.
+    vpcInfo="$(ec2-json create-vpc \
+        --loc="${region}" \
+        tagSpec:json="$(lib tag-spec --type='vpc' --name="${name}")" \
+        useIpv6:json="${useIpv6}" \
+        '
+            $tagSpec
+            +
+            if $useIpv6 == 1 then { AmazonProvidedIpv6CidrBlock: true } else {} end
+            +
+            {
+                CidrBlock: "10.1.0.0/16",
+                InstanceTenancy: "default"
+            }
+        ' \
+        :: '.Vpc'
+    )" \
+    || return "$?"
+
+    vpcId="$(jget --output=raw "${vpcInfo}" '.VpcId')"
+    progress-msg "Made VPC: ${vpcId}"
+
     while (( !error )); do
-        if [[ ${vpcId} == '' ]]; then
-            # Create the actual VPC.
-            vpcInfo="$(ec2-json create-vpc \
-                --loc="${region}" \
-                tagSpec:json="$(lib tag-spec --type='vpc' --name="${name}")" \
-                '
-                    $tagSpec +
-                    {
-                        CidrBlock: "10.1.0.0/16",
-                        AmazonProvidedIpv6CidrBlock: true,
-                        InstanceTenancy: "default"
-                    }
-                ' \
-                :: '.Vpc'
-            )" \
-            || return "$?"
+        vpcInfo="$(lib find-vpc --output=json --loc="${region}" "${vpcId}")" \
+        || {
+            error="$?"
+            break
+        }
 
-            vpcId="$(jget --output=raw "${vpcInfo}" '.VpcId')"
-            progress-msg "Made VPC: ${vpcId}"
-        else
-            # Re-fetch the VPC info.
-            vpcInfo="$(ec2-json describe-vpcs \
-                --loc="${region}" \
-                vpcId="${vpcId}" \
-                '{ VpcIds: [$vpcId] }' \
-                :: '.Vpcs[0]'
-            )" \
-            || error="$?"
-
-            if (( error )); then
-                break
-            fi
-        fi
-
-        # It _might_ be the case that if the whole VPC's state is `available`,
-        # then it's safe to assume that all network addresses are `associated`.
-        # However, that doesn't seem to be explicitly stated in the AWS docs, so
-        # we test explicitly for the network associations.
-        local ready="$(jget --output=raw "${vpcInfo}" '
-              .CidrBlockAssociationSet[0].CidrBlockState as $cidr4
-            | .Ipv6CidrBlockAssociationSet[0].Ipv6CidrBlockState as $cidr6
-            |
-                (.State == "available")
-            and ($cidr4 == null or $cidr4.State == "associated")
-            and ($cidr6 == null or $cidr6.State == "associated")
-            |
-            if . == true then 1 else 0 end
-        ')"
-
-        if (( ready )); then
+        local state="$(jget --output=raw "${vpcInfo}" '.state')"
+        if [[ ${state} == 'available' ]]; then
             break
         fi
 
@@ -128,7 +114,7 @@ function make-vpc-per-se {
         else
             progress-msg 'Not yet ready...'
             sleep "${waitSec}"
-            (( waitSec = waitSec * 3 / 2 + 1 ))
+            waitSec=5
         fi
     done
 

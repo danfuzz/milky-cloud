@@ -57,6 +57,33 @@ process-args "$@" || usage --short
 
 
 #
+# Helper functions
+#
+
+# Extracts a unique-to-network CIDR block from VPC info, or reports `none` or
+# `many`.
+function extractCidr {
+    local vpcInfo="$1"
+    local net="$2"
+
+    local field="${net}CidrBlocks"
+
+    jget --output=raw "${vpcInfo}" \
+        field="${field}" '
+        .[$field]
+        |
+        if length == 0 then
+            "none"
+        elif length == 1 then
+            .[0]
+        else
+            "many"
+        end
+    '
+}
+
+
+#
 # Main script
 #
 
@@ -67,33 +94,19 @@ azList=($(lib list-availability-zones --loc="${region}")) \
 vpcInfo="$(lib find-vpc --loc="${region}" --output=json "${vpcNameOrId}")" \
 || exit "$?"
 
-vpcId="$(jget --output=raw "${vpcInfo}" '.VpcId')"
+vpcId="$(jget --output=raw "${vpcInfo}" '.id')"
 
-cidr4="$(jget --output=raw "${vpcInfo}" '
-    .CidrBlockAssociationSet
-    |
-    if length == 0 then "none"
-    elif length == 1 then .[0].CidrBlock
-    else "many"
-    end
-')"
+cidr4="$(extractCidr "${vpcInfo}" ipv4)"
 
 if [[ ${cidr4} == 'many' ]]; then
-    error-msg 'Sorry, not set up to deal with multiple CIDRs (IPv4).'
+    error-msg 'Sorry, cannot deal with multiple CIDRs (IPv4).'
     exit 1
 fi
 
-cidr6="$(jget --output=raw "${vpcInfo}" '
-    .Ipv6CidrBlockAssociationSet
-    |
-    if length == 0 then "none"
-    elif length == 1 then .[0].Ipv6CidrBlock
-    else "many"
-    end
-')"
+cidr6="$(extractCidr "${vpcInfo}" ipv6)"
 
 if [[ ${cidr6} == 'many' ]]; then
-    error-msg 'Sorry, not set up to deal with multiple CIDRs (IPv6).'
+    error-msg 'Sorry, cannot deal with multiple CIDRs (IPv6).'
     exit 1
 fi
 
