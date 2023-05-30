@@ -27,6 +27,11 @@ define-usage $'
       Specify a host key to use, overriding the one(s) created during the
       instance\'s first boot. This can be used to avoid a potential MITM attack
       which relies on trusting the host key on first-connect.
+    --id=<id-spec>
+      ID (in the sense of this project) of the instance to create. Must be of the
+      form `<name>.<vpc>.<zone>`, where <vpc> is the ID (ID per se or name) of a
+      VPC or (as a special case) a security group ID (ID per se or group name).
+      And notably, <zone> must be an availability zone and not just a region.
     --instance-type=<type>
       What type of instance to install. Defaults to `t4g.nano`, for convenience.
     --key-name=<name>
@@ -37,15 +42,8 @@ define-usage $'
       the default userid on the new instance.
     --loc=<availability-zone>
       Availability zone to launch the instance in. Must be specified.
-    --name=<name>
-      Name tag for the resulting instance.
     --os=<name>
       Which OS to install. See `find-ami` for details about default and options.
-    --security-group=<name-or-id>
-      Name or ID of the security group to use for network access control. If
-      specified, this is used to derive the VPC to use, and in conjunction with
-      the specified availability zone, the specific subnet within the VPC. It
-      is not valid to specify both this option and `--vpc`.
     --[no-]progress
       Print progress messages to stderr. Defaults to `--progress`.
     --user-data=<data>
@@ -57,10 +55,6 @@ define-usage $'
     --user-data-file=<file>
       Name of a file containing user data for the instance. It is invalid to
       specify both this and the --user-data option.
-    --vpc=<name-or-id>
-      Name or ID of the VPC to launch into. If specified, then the instance
-      will be in the default security group of the indicated VPC. It is not
-      valid to specify both this option and `--security-group`.
 
     ${name} [--help | -h]
 
@@ -70,20 +64,17 @@ define-usage $'
 # Want help?
 opt-action --call='{ usage; exit }' help/h
 
-# Availability zone.
-opt-value --required --var=zone --call=parse-zone loc
-
 # Host key to use.
 opt-value --var=hostKey host-key
+
+# ID of the instance.
+opt-value --var=idSpec --filter='/^[-a-zA-Z0-9]+[.][^.]+[.][^.]+$/' id
 
 # Instance type.
 opt-value --var=instanceType --init='t4g.nano' instance-type
 
 # Name for the SSH keypair that allows for login access.
 opt-value --var=keyName --filter='/./' key-name
-
-# Name for the instance.
-opt-value --var=name --filter='/./' name
 
 # Which OS to install.
 opt-value --var=osName --filter='/./' os
@@ -92,17 +83,11 @@ opt-value --var=osName --filter='/./' os
 progress-msg --enable
 opt-toggle --call='{ progress-msg --set="$1" }' progress
 
-# Name or ID of the security group to be in.
-opt-value --var=groupNameOrId --filter='/./' security-group
-
 # Actual user data (first-boot script).
 opt-value --var=userData --filter='/./' user-data
 
 # Name of file containing user data.
 opt-value --var=userDataFile --filter='/./' user-data-file
-
-# Name or ID of the VPC to be in.
-opt-value --var=vpcNameOrId --filter='/./' vpc
 
 # Rest args to pass through to the final `instance info` call.
 rest-arg --var=postArgs post-arg
@@ -111,12 +96,6 @@ process-args "$@" || usage --short
 
 if [[ (${userData} != '') && (${userDataFile} != '') ]]; then
     error-msg 'Cannot specify both --user-data and --user-data-file.'
-    usage --short
-    exit 1
-fi
-
-if [[ (${groupNameOrId} != '') && (${vpc} != '') ]]; then
-    error-msg 'Cannot specify both --security-group and --vpc.'
     usage --short
     exit 1
 fi
@@ -179,6 +158,55 @@ function build-user-data {
 # Main script
 #
 
+# Parse the `idSpec` into components. Then resolve the VPC, security group, and
+# subnet IDs, as necessary.
+
+[[ ${idSpec} =~ ^([^.]+)[.]([^.]+)[.]([^.]+)$ ]] || {
+    # Shouldn't happen, because of the filter on the option value.
+    error-msg "Could not parse ID: ${idSpec}"
+    exit 1
+}
+
+name="${BASH_REMATCH[1]}"
+vpcIdSpec="${BASH_REMATCH[2]}"
+zone="${BASH_REMATCH[3]}"
+
+parse-zone --output=none "${zone}" || {
+    error-msg "Zone required in ID; got: ${zone}"
+    usage --short
+    exit 1
+}
+
+vpcId="$(lib find-vpc --not-found-ok --loc="${zone}" "${vpcIdSpec}")" \
+|| exit 1
+
+groupId=
+if [[ ${vpcId} == '' ]]; then
+    # See if we got a security group. If so, use it to derive the VPC.
+    groupId="$(
+        lib find-security-group --not-found-ok --loc="${zone}" "${vpcIdSpec}"
+    )" \
+    || {
+        error-msg "No such VPC or security group: ${vpcIdSpec}"
+        exit 1
+    }
+    vpcId="$(lib find-vpc --loc="${zone}" "${groupId}")" \
+    || exit 1
+else
+    # Get the default security group for the VPC.
+    groupId="$(lib find-security-group --loc="${zone}" "${vpcId}")" \
+    || exit 1
+fi
+
+subnetId="$(lib find-vpc-subnet --loc="${zone}" --vpc="${vpcId}")" \
+|| exit 1
+
+progress-msg "Launching instance ${name} in:"
+progress-msg "  zone:   ${zone}"
+progress-msg "  vpc:    ${vpcId}"
+progress-msg "  subnet: ${subnetId}"
+progress-msg "  sg:     ${groupId}"
+
 # Extract the SSH-auth version of the public key from the host private key, if
 # a host key is in fact being passed to the instance.
 if [[ ${hostKey} != '' ]]; then
@@ -208,44 +236,7 @@ jget --output=raw "${amiInfo}" '
     "  id:   " + .ImageId
 '
 
-# Resolve the VPC, security group, and subnet IDs, if necessary.
-
-vpcId=''
-groupId=''
-subnetId=''
-if [[ ${groupNameOrId} != '' ]]; then
-    # Resolve the security group ID, and then use it to find the VPC ID.
-    groupId="$(lib find-security-group --loc="${zone}" "${groupNameOrId}")" \
-    || exit 1
-    vpcId="$(lib find-vpc --loc="${zone}" "${groupId}")" \
-    || exit 1
-elif [[ ${vpcNameOrId} != '' ]]; then
-    # Resolve the VPC ID, and then use it to find the security group ID.
-    vpcId="$(lib find-vpc --loc="${zone}" "${vpcNameOrId}")" \
-    || exit 1
-    groupId="$(lib find-security-group --loc="${zone}" "${vpcId}")" \
-    || exit 1
-fi
-
-if [[ ${vpcId} != '' ]]; then
-    subnetId="$(lib find-vpc-subnet --loc="${zone}" --vpc="${vpcId}")" \
-    || exit 1
-fi
-
-progress-msg 'Where:'
-progress-msg "  zone:   ${zone}"
-progress-msg "  vpc:    ${vpcId}"
-progress-msg "  subnet: ${subnetId}"
-progress-msg "  group:  ${groupId}"
-
-# Make up a name if one wasn't provided.
-if [[ ${name} == '' ]]; then
-    name="$(lib timey now-stamp --suffix=-via-script)"
-fi
-
 # Form the main command, and do it!
-
-progress-msg "Launching instance: ${name}"
 
 tagExtras=()
 if [[ ${hostPublicKey} != '' ]]; then
@@ -291,8 +282,7 @@ instanceId="$(ec2-json run-instances \
 )" \
 || exit "$?"
 
-progress-msg 'Launched!'
-progress-msg "Instance ID: ${instanceId}"
+progress-msg "Launched instance: ${instanceId}"
 
 if [[ ${vpcNameOrId} == '' ]]; then
     idSpec="${instanceId}.${zone}"
