@@ -131,6 +131,23 @@ tagSpec="$(lib tag-spec --type='subnet' --name="${name}")"
 
 progressArg="--progress=$(progress-msg --status)"
 
+# Attributes to set on each subnet.
+attributes=(
+    PrivateDnsHostnameTypeOnLaunch=resource-name
+)
+if [[ ${cidr4} != 'none' ]]; then
+    attributes+=(
+        EnableResourceNameDnsARecordOnLaunch=true
+        MapPublicIpOnLaunch=true
+    )
+fi
+if [[ ${cidr6} != 'none' ]]; then
+    attributes+=(
+        AssignIpv6AddressOnCreation=true
+        EnableResourceNameDnsAAAARecordOnLaunch=true
+    )
+fi
+
 results=()
 error=0
 
@@ -179,16 +196,12 @@ for n in "${!azList[@]}"; do
     # * EnableResourceNameDnsARecordOnLaunch: Make DNS report an IPv4 address.
     # * EnableResourceNameDnsAAAARecordOnLaunch: Make DNS report an IPv6 address
     #   (it can legitimately report both).
-    # * MapPublicIpOnLaunch: Make instances publicly accessible (by default).
+    # * MapPublicIpOnLaunch: Make instances publicly accessible via IPv4 (by
+    #   default).
     # * PrivateDnsHostnameTypeOnLaunch: Private DNS name is based on the
     #   instance ID (not private DNS address).
     lib set-attributes \
-        --loc="${region}" --id="${result}" "${progressArg}" \
-        AssignIpv6AddressOnCreation=true \
-        EnableResourceNameDnsARecordOnLaunch=true \
-        EnableResourceNameDnsAAAARecordOnLaunch=true \
-        MapPublicIpOnLaunch=true \
-        PrivateDnsHostnameTypeOnLaunch=resource-name \
+        --loc="${region}" --id="${result}" "${progressArg}" "${attributes[@]}" \
     && progress-msg "Configured subnet: ${result}" \
     || {
         error=1
