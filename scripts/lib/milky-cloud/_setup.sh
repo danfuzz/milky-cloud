@@ -25,12 +25,12 @@ function is-vpc-id {
     [[ $1 =~ ^vpc-([0-9a-f]*[*][*0-9a-f]*|[0-9a-f]{10,20})$ ]]
 }
 
-# Calls `lib parse-location --input-zone`.
+# Calls `lib parse-location --input=zone`.
 function parse-zone {
     lib parse-location --input=zone "$@"
 }
 
-# Calls `lib parse-location --print-region`.
+# Calls `lib parse-location --output=region`.
 function region-from-location {
     lib parse-location --output=region "$@"
 }
