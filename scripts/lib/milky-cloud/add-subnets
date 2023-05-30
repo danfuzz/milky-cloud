@@ -172,6 +172,8 @@ for n in "${!azList[@]}"; do
 
     results+=("${result}")
 
+    progress-msg "Made subnet: ${result}"
+
     # Set attributes on the subnet:
     # * AssignIpv6AddressOnCreation: Make instances have an IPv6 address.
     # * EnableResourceNameDnsARecordOnLaunch: Make DNS report an IPv4 address.
@@ -187,7 +189,7 @@ for n in "${!azList[@]}"; do
         EnableResourceNameDnsAAAARecordOnLaunch=true \
         MapPublicIpOnLaunch=true \
         PrivateDnsHostnameTypeOnLaunch=resource-name \
-    && progress-msg "Made subnet: ${result}" \
+    && progress-msg "Configured subnet: ${result}" \
     || {
         error=1
         break
