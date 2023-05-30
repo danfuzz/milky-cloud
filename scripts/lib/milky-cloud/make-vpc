@@ -17,7 +17,7 @@ define-usage $'
     of the created VPC.
 
     --[no-]ipv6
-      Include IPv6 networking. The default is `--ipv6`.
+      Include public IPv6 networking. The default is `--ipv6`.
     --loc=<region-or-zone>
       What region to make the VPC in. Must be specified. If specified as an
       availability zone, only the region portion matters.
