@@ -132,6 +132,11 @@ function do-find {
                 isDefault: .IsDefault,
                 name:      (.Tags | map(select(.Key == "Name") | .Value)[0]),
                 state: (
+                    # It _might_ be the case that if the VPC state is
+                    # `available`, then it is safe to assume that all network
+                    # blocks are `associated`. However, that is not explicitly
+                    # stated in the AWS docs, so we test explicitly for the
+                    # network associations.
                     if .State == "available" then
                         (.CidrBlockAssociationSet | map(.CidrBlockState.State) | unique)
                             as $ipv4States
