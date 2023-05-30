@@ -284,10 +284,8 @@ elif [[ ${vpcSpec} != '*' ]]; then
     # Can't filter on VPC name, so we have to look up the VPC.
     vpcInfo="$(lib find-vpc --output=json --loc="${location}" "${vpcSpec}")" \
     || exit "$?"
-    vpcId="$(jget --output=raw "${vpcInfo}" '.VpcId')"
-    vpcName="$(jget --output=raw "${vpcInfo}" \
-        '(.Tags | map(select(.Key == "Name") | .Value)[0]) // ""'
-    )"
+    vpcId="$(jget --output=raw "${vpcInfo}" '.id')"
+    vpcName="$(jget --output=raw "${vpcInfo}" '.name')"
     filters+=(vpc-id="${vpcId}")
 fi
 
