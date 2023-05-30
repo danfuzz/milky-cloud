@@ -137,9 +137,9 @@ resourceName="standard-for-${name}"
 vpcInfo="$(make-vpc-per-se)" \
 || exit "$?"
 
-vpcId="$(jget --output=raw "${vpcInfo}" '.VpcId')"
-cidr4="$(jget --output=raw "${vpcInfo}" '.CidrBlockAssociationSet[0].CidrBlock')"
-cidr6="$(jget --output=raw "${vpcInfo}" '.Ipv6CidrBlockAssociationSet[0].Ipv6CidrBlock')"
+vpcId="$(jget --output=raw "${vpcInfo}" '.id')"
+cidr4="$(jget --output=raw "${vpcInfo}" '.ipv4CidrBlocks[0]')"
+cidr6="$(jget --output=raw "${vpcInfo}" '.ipv6CidrBlocks[0]')"
 
 progress-msg 'Networks:'
 progress-msg "  IPv4: ${cidr4}"
