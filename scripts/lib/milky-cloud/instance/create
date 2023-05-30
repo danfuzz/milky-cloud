@@ -171,7 +171,7 @@ name="${BASH_REMATCH[1]}"
 vpcIdSpec="${BASH_REMATCH[2]}"
 zone="${BASH_REMATCH[3]}"
 
-parse-zone --output=none "${zone}" || {
+parse-zone --quiet --output=none "${zone}" || {
     error-msg "Zone required in ID; got: ${zone}"
     usage --short
     exit 1
