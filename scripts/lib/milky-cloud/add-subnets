@@ -17,6 +17,9 @@ define-usage $'
     an associated routing table. Upon success, prints a JSON array of all the
     created subnets.
 
+    --[no-]ipv4
+      Include public IPv4 networking. The default is `--ipv4`. (Note: IPv6 usage
+      can be determined by observing the VPC info, but not IPv4.)
     --loc=<region-or-zone>
       What region to make the subnets in. Must be specified. If specified as an
       availability zone, only the region portion matters.
@@ -38,6 +41,9 @@ define-usage $'
 # Want help?
 opt-action --call='{ usage; exit }' help/h
 
+# Do public IPv4?
+opt-toggle --var=useIpv4 --init=1 ipv4
+
 # Region, passed as either region per se or availability zone.
 opt-value --required --var=region --filter=region-from-location loc
 
@@ -57,6 +63,33 @@ process-args "$@" || usage --short
 
 
 #
+# Helper functions
+#
+
+# Extracts a unique-to-network CIDR block from VPC info, or reports `none` or
+# `many`.
+function extractCidr {
+    local vpcInfo="$1"
+    local net="$2"
+
+    local field="${net}CidrBlocks"
+
+    jget --output=raw "${vpcInfo}" \
+        field="${field}" '
+        .[$field]
+        |
+        if length == 0 then
+            "none"
+        elif length == 1 then
+            .[0]
+        else
+            "many"
+        end
+    '
+}
+
+
+#
 # Main script
 #
 
@@ -67,47 +100,27 @@ azList=($(lib list-availability-zones --loc="${region}")) \
 vpcInfo="$(lib find-vpc --loc="${region}" --output=json "${vpcNameOrId}")" \
 || exit "$?"
 
-vpcId="$(jget --output=raw "${vpcInfo}" '.VpcId')"
+vpcId="$(jget --output=raw "${vpcInfo}" '.id')"
 
-cidr4="$(jget --output=raw "${vpcInfo}" '
-    .CidrBlockAssociationSet
-    |
-    if length == 0 then "none"
-    elif length == 1 then .[0].CidrBlock
-    else "many"
-    end
-')"
-
-if [[ ${cidr4} == 'many' ]]; then
-    error-msg 'Sorry, not set up to deal with multiple CIDRs (IPv4).'
-    exit 1
-fi
-
-cidr6="$(jget --output=raw "${vpcInfo}" '
-    .Ipv6CidrBlockAssociationSet
-    |
-    if length == 0 then "none"
-    elif length == 1 then .[0].Ipv6CidrBlock
-    else "many"
-    end
-')"
-
-if [[ ${cidr6} == 'many' ]]; then
-    error-msg 'Sorry, not set up to deal with multiple CIDRs (IPv6).'
-    exit 1
-fi
-
-azCount="${#azList[@]}"
+cidr4='none'
 v4Subnets=()
-v6Subnets=()
-
-if [[ ${cidr4} != 'none' ]]; then
-    v4Subnets=($(lib cidr-calc make-subnets "${cidr4}" "${azCount}"))
+if (( useIpv4 )); then
+    cidr4="$(extractCidr "${vpcInfo}" ipv4)"
+    if [[ ${cidr4} == 'many' ]]; then
+        error-msg 'Sorry, cannot deal with multiple CIDRs (IPv4).'
+        exit 1
+    fi
+    v4Subnets=($(lib cidr-calc make-subnets "${cidr4}" "${#azList[@]}"))
 fi
 
-if [[ ${cidr6} != 'none' ]]; then
+cidr6="$(extractCidr "${vpcInfo}" ipv6)"
+v6Subnets=()
+if [[ ${cidr6} == 'many' ]]; then
+    error-msg 'Sorry, cannot deal with multiple CIDRs (IPv6).'
+    exit 1
+elif [[ ${cidr6} != 'none' ]]; then
     # `64` because AWS requires V6 subnet networks to be exactly 64 bits.
-    v6Subnets=($(lib cidr-calc make-subnets "${cidr6}" "${azCount}" 64))
+    v6Subnets=($(lib cidr-calc make-subnets "${cidr6}" "${#azList[@]}" 64))
 fi
 
 if [[ ${name} == '' ]]; then
@@ -117,6 +130,23 @@ fi
 tagSpec="$(lib tag-spec --type='subnet' --name="${name}")"
 
 progressArg="--progress=$(progress-msg --status)"
+
+# Attributes to set on each subnet.
+attributes=(
+    PrivateDnsHostnameTypeOnLaunch=resource-name
+)
+if [[ ${cidr4} != 'none' ]]; then
+    attributes+=(
+        EnableResourceNameDnsARecordOnLaunch=true
+        MapPublicIpOnLaunch=true
+    )
+fi
+if [[ ${cidr6} != 'none' ]]; then
+    attributes+=(
+        AssignIpv6AddressOnCreation=true
+        EnableResourceNameDnsAAAARecordOnLaunch=true
+    )
+fi
 
 results=()
 error=0
@@ -159,22 +189,20 @@ for n in "${!azList[@]}"; do
 
     results+=("${result}")
 
+    progress-msg "Made subnet: ${result}"
+
     # Set attributes on the subnet:
     # * AssignIpv6AddressOnCreation: Make instances have an IPv6 address.
     # * EnableResourceNameDnsARecordOnLaunch: Make DNS report an IPv4 address.
     # * EnableResourceNameDnsAAAARecordOnLaunch: Make DNS report an IPv6 address
     #   (it can legitimately report both).
-    # * MapPublicIpOnLaunch: Make instances publicly accessible (by default).
+    # * MapPublicIpOnLaunch: Make instances publicly accessible via IPv4 (by
+    #   default).
     # * PrivateDnsHostnameTypeOnLaunch: Private DNS name is based on the
     #   instance ID (not private DNS address).
     lib set-attributes \
-        --loc="${region}" --id="${result}" "${progressArg}" \
-        AssignIpv6AddressOnCreation=true \
-        EnableResourceNameDnsARecordOnLaunch=true \
-        EnableResourceNameDnsAAAARecordOnLaunch=true \
-        MapPublicIpOnLaunch=true \
-        PrivateDnsHostnameTypeOnLaunch=resource-name \
-    && progress-msg "Made subnet: ${result}" \
+        --loc="${region}" --id="${result}" "${progressArg}" "${attributes[@]}" \
+    && progress-msg "Configured subnet: ${result}" \
     || {
         error=1
         break

@@ -16,11 +16,15 @@ define-usage $'
     Finds a security group by name or validates the existence of one by ID, and
     prints its information. If passed an ID, it can either be the ID of a
     security group per se, or it can be an ID of a VPC which is taken to refer
-    to the default security group for the indicated VPC.
+    to the default security group for the indicated VPC. If passed a name, it
+    must be the AWS `GroupName` and not its (tag) name.
 
     --loc=<region-or-zone>
       Where to look. Must be specified. If specified as an availability zone,
       only the region portion matters.
+    --not-found-ok
+      Do not report an error -- just don\'t print any output -- if there is
+      no security group with the given name or ID.
     --output=<style> :: `compact` `id` `json`
       What to output, as with `json-val`, except that `id` prints just the ID
       of the security group as a plain string. `id` is the default.
@@ -35,6 +39,9 @@ opt-action --call='{ usage; exit }' help/h
 
 # Region, passed as either region per se or availability zone.
 opt-value --required --var=region --filter=region-from-location loc
+
+# Ok if no security group found?
+opt-toggle --var=notFoundOk not-found-ok
 
 # Output style.
 opt-value --var=outputStyle --init=id --enum='compact id json' output
@@ -81,6 +88,9 @@ ec2-json describe-security-groups \
 count="$(jget "${result}" '.count')"
 
 if (( count == 0 )); then
+    if (( notFoundOk )); then
+        exit
+    fi
     error-msg "No such security group: ${nameOrId}"
     exit 1
 elif (( count != 1 )); then

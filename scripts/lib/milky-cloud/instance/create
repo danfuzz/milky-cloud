@@ -1,0 +1,295 @@
+#!/bin/bash
+#
+# Copyright 2022-2023 the Milky-cloud Authors (Dan Bornstein et alia).
+# SPDX-License-Identifier: Apache-2.0
+
+. "$(dirname "$(readlink -f "$0")")/_init.sh" || exit "$?"
+
+
+#
+# Argument parsing
+#
+
+define-usage $'
+    ${name} [<opt> ...] [:: [<out-opt> ...] [<jval-expr> ...]]
+
+    Launches a standard-configured instance (standard for this project, that is).
+    On success, prints JSON object salient info about the instance the same as
+    with `instance info`, which can be filtered with post-processing arguments
+    starting with `::` (again, as with `instance info`, see which for details).
+
+    If neither `--security-group` nor `--vpc` is specified, then this command
+    will launch the instance into the default security group of the default VPC
+    for the specified availability zone (which, TBQH, is probably not what you
+    want).
+
+    --host-key=<key>
+      Specify a host key to use, overriding the one(s) created during the
+      instance\'s first boot. This can be used to avoid a potential MITM attack
+      which relies on trusting the host key on first-connect.
+    --id=<id-spec>
+      ID (in the sense of this project) of the instance to create. Must be of the
+      form `<name>.<vpc>.<zone>`, where <vpc> is the ID (ID per se or name) of a
+      VPC or (as a special case) a security group ID (ID per se or group name).
+      And notably, <zone> must be an availability zone and not just a region.
+    --instance-type=<type>
+      What type of instance to install. Defaults to `t4g.nano`, for convenience.
+    --key-name=<name>
+      Name of the keypair to use for SSH access. If not specified, then
+      something else will have to have set up SSH access (e.g. the user data
+      script, or something baked into the AMI). Detail: This causes the public
+      key of the indicate keypair to be listed in `.ssh/authorized_keys` for
+      the default userid on the new instance.
+    --loc=<availability-zone>
+      Availability zone to launch the instance in. Must be specified.
+    --os=<name>
+      Which OS to install. See `find-ami` for details about default and options.
+    --[no-]progress
+      Print progress messages to stderr. Defaults to `--progress`.
+    --user-data=<data>
+      User data for the instance, which is taken to be a script to run on
+      first-boot of the instance. It is invalid to specify both this and the
+      `--user-data-file` option. Note: On the instance, the user data can be
+      found at `/var/lib/cloud/instance/user-data.txt`, and the log of running
+      it can be found at `/var/log/cloud-init-output.log`.
+    --user-data-file=<file>
+      Name of a file containing user data for the instance. It is invalid to
+      specify both this and the --user-data option.
+
+    ${name} [--help | -h]
+
+    Displays this message.
+'
+
+# Want help?
+opt-action --call='{ usage; exit }' help/h
+
+# Host key to use.
+opt-value --var=hostKey host-key
+
+# ID of the instance.
+opt-value --var=idSpec --filter='/^[-a-zA-Z0-9]+[.][^.]+[.][^.]+$/' id
+
+# Instance type.
+opt-value --var=instanceType --init='t4g.nano' instance-type
+
+# Name for the SSH keypair that allows for login access.
+opt-value --var=keyName --filter='/./' key-name
+
+# Which OS to install.
+opt-value --var=osName --filter='/./' os
+
+# Progress messages?
+progress-msg --enable
+opt-toggle --call='{ progress-msg --set="$1" }' progress
+
+# Actual user data (first-boot script).
+opt-value --var=userData --filter='/./' user-data
+
+# Name of file containing user data.
+opt-value --var=userDataFile --filter='/./' user-data-file
+
+# Rest args to pass through to the final `instance info` call.
+rest-arg --var=postArgs post-arg
+
+process-args "$@" || usage --short
+
+if [[ (${userData} != '') && (${userDataFile} != '') ]]; then
+    error-msg 'Cannot specify both --user-data and --user-data-file.'
+    usage --short
+    exit 1
+fi
+
+jpostproc --check "${postArgs[@]}" || usage --short
+
+
+#
+# Helper functions
+#
+
+# Builds the user data from all the possible sources.
+function build-user-data {
+    local hashBang='#!/bin/bash'
+    local passedIn="${userData}"
+    local keySetup=''
+
+    # Slurp the user data, if there is user data to be slurped.
+    if [[ ${userDataFile} != '' ]]; then
+        # We know `userData` is empty when the file name is specified, so it's
+        # a-okay to just set `passedIn` without concatenating.
+        passedIn="$(cat "${userDataFile}")" \
+        || return "$?"
+    fi
+
+    if [[ ${passedIn} =~ ^(#![^$'\n']+)$'\n'(.*)$ ]]; then
+        hashBang="${BASH_REMATCH[1]}"
+        passedIn="${BASH_REMATCH[2]}"
+    fi
+
+    # Build the code to do host key setup, if requested.
+    if [[ ${hostKey} != '' ]]; then
+        [[ "${hostPublicKey}" =~ ^ssh-([^ ]+)' ' ]] \
+        || return "$?"
+        local algorithm="${BASH_REMATCH[1]}"
+        local lines=(
+            'rm -f /etc/ssh/ssh_host_*key*'
+            "keyFile=/etc/ssh/ssh_host_${algorithm}_key"
+            "cat <<<'${hostKey}' >\${keyFile}"
+            "cat <<<'${hostPublicKey}' >\${keyFile}.pub"
+            'chmod 600 ${keyFile}'
+            'chown root:ssh_keys ${keyFile}'
+        )
+        keySetup="$(printf '%s\n' "${lines[@]}")"
+    fi
+
+    if [[ (${passedIn} != '') || (${keySetup} != '') ]]; then
+        cat <<<"${hashBang}"
+        if [[ ${keySetup} != '' ]]; then
+            cat <<<"${keySetup}"
+        fi
+        if [[ ${passedIn} != '' ]]; then
+            cat <<<"${passedIn}"
+        fi
+    fi
+}
+
+
+#
+# Main script
+#
+
+# Parse the `idSpec` into components. Then resolve the VPC, security group, and
+# subnet IDs, as necessary.
+
+[[ ${idSpec} =~ ^([^.]+)[.]([^.]+)[.]([^.]+)$ ]] || {
+    # Shouldn't happen, because of the filter on the option value.
+    error-msg "Could not parse ID: ${idSpec}"
+    exit 1
+}
+
+name="${BASH_REMATCH[1]}"
+vpcIdSpec="${BASH_REMATCH[2]}"
+zone="${BASH_REMATCH[3]}"
+
+parse-zone --quiet --output=none "${zone}" || {
+    error-msg "Zone required in ID; got: ${zone}"
+    usage --short
+    exit 1
+}
+
+groupId=
+vpcId=
+vpcName=
+vpcInfo="$(
+    lib find-vpc --not-found-ok --output=json --loc="${zone}" "${vpcIdSpec}"
+)" \
+|| exit 1
+
+if [[ ${vpcInfo} == '' ]]; then
+    # See if we got a security group. If so, use it to derive the VPC.
+    groupId="$(
+        lib find-security-group --not-found-ok --loc="${zone}" "${vpcIdSpec}"
+    )" \
+    || {
+        error-msg "No such VPC or security group: ${vpcIdSpec}"
+        exit 1
+    }
+    vpcInfo="$(lib find-vpc --output=json --loc="${zone}" "${groupId}")" \
+    || exit 1
+    vpcId="$(jget --output=raw "${vpcInfo}" '.id')"
+    vpcName="$(jget --output=raw "${vpcInfo}" '.name')"
+else
+    vpcId="$(jget --output=raw "${vpcInfo}" '.id')"
+    vpcName="$(jget --output=raw "${vpcInfo}" '.name')"
+    # Get the default security group for the VPC.
+    groupId="$(lib find-security-group --loc="${zone}" "${vpcId}")" \
+    || exit 1
+fi
+
+subnetId="$(lib find-vpc-subnet --loc="${zone}" --vpc="${vpcId}")" \
+|| exit 1
+
+progress-msg "Launching instance ${name} in:"
+progress-msg "  zone:   ${zone}"
+progress-msg "  vpc:    ${vpcId} (${vpcName})"
+progress-msg "  subnet: ${subnetId}"
+progress-msg "  sg:     ${groupId}"
+
+# Extract the SSH-auth version of the public key from the host private key, if
+# a host key is in fact being passed to the instance.
+if [[ ${hostKey} != '' ]]; then
+    hostPublicKey="$(lib extract-public-key <<<"${hostKey}" --output=ssh-auth)" \
+    || exit "$?"
+fi
+
+# Build the user data string.
+userData="$(build-user-data)" \
+|| exit "$?"
+
+# Figure out the correct AMI.
+amiInfo="$(
+    amiOpts=(--loc="${zone}" --instance-type="${instanceType}")
+    if [[ ${osName} != '' ]]; then
+        amiOpts+=(--os="${osName}")
+    fi
+    lib find-ami "${amiOpts[@]}"
+)" \
+|| exit "$?"
+
+progress-msg --exec \
+jget --output=raw "${amiInfo}" '
+    "Using AMI:",
+    "  desc: " + .Description,
+    "  name: " + .Name,
+    "  id:   " + .ImageId
+'
+
+# Form the main command, and do it!
+
+tagExtras=()
+if [[ ${hostPublicKey} != '' ]]; then
+    tagExtras=(host-public-key="${hostPublicKey}")
+fi
+tagSpec="$(lib tag-spec --type='instance' --name="${name}" "${tagExtras[@]}")"
+
+# Note: If a subnet ID is known, then it implies the availability zone, in which
+# case one doesn't also need to specify the availability zone explicitly.
+# However, it's easier just to include it because this script is also meant to
+# work when a subnet isn't known (which means we're just launching into the
+# default security group of the default VPC for the region).
+#
+# Note: Public IP and DNS are de facto (or at least usually) not set in the
+# output from `ec2 run-instances`, that is, they aren't known at the moment of
+# launch. However, they seem to become set very soon thereafter, which is why
+# the output is produced via `instance info` (and therefore a new EC2 call)
+# instead of trying to manipulate the results of this call.
+instanceId="$(ec2-json run-instances \
+    --loc="${zone}" \
+    amiInfo:json="${amiInfo}" \
+    zone="${zone}" \
+    instanceType="${instanceType}" \
+    keyName="${keyName}" \
+    groupId="${groupId}" \
+    subnetId="${subnetId}" \
+    tagSpec:json="${tagSpec}" \
+    userData="${userData}" \
+    '
+        {
+            ImageId:      $amiInfo.ImageId,
+            InstanceType: $instanceType,
+            MaxCount:     1,
+            Placement:    { AvailabilityZone: $zone }
+        }
+        + $tagSpec
+        + if $keyName == "" then {} else { KeyName: $keyName } end
+        + if $groupId == "" then {} else { SecurityGroupIds: [$groupId] } end
+        + if $subnetId == "" then {} else { SubnetId: $subnetId } end
+        + if $userData == "" then {} else { UserData: $userData } end
+    ' \
+    :: --output=raw '.Instances[0].InstanceId'
+)" \
+|| exit "$?"
+
+progress-msg "Launched instance: ${instanceId}"
+
+lib instance info --id="${instanceId}.${vpcName}.${zone}" "${postArgs[@]}"
