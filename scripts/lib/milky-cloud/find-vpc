@@ -117,13 +117,11 @@ function do-find {
             )" \
             || return "$?"
         fi
-        # TODO: Convert any other AWS-specific fields that are needed to our
-        # project-friendly form, and then drop the AWS-specific stuff.
         jget --output="${outputStyle}" "${result}" '
             .Vpcs[0]
             | (.CidrBlockAssociationSet // []) as $ipv4Assoc
             | (.Ipv6CidrBlockAssociationSet // []) as $ipv6Assoc
-            | . + {
+            | {
                 id:             .VpcId,
                 ipv4CidrBlocks: ($ipv4Assoc | map(.CidrBlock)),
                 ipv6CidrBlocks: ($ipv6Assoc | map(.Ipv6CidrBlock)),
