@@ -61,8 +61,6 @@ function instance-control-skeleton {
     check-json-output-args \
     || return "$?"
 
-    progress-msg --enable
-
     local infoArray
     infoArray="$(
         lib instance info --output=array "${_control_infoOpts[@]}"

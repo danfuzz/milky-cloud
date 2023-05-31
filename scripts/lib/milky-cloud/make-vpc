@@ -47,7 +47,6 @@ opt-value --required --var=region --filter=region-from-location loc
 opt-value --required --var=name --filter='/^[-_a-zA-Z0-9]+$/' name
 
 # Progress messages?
-progress-msg --enable
 opt-toggle --call='{ progress-msg --set="$1" }' progress
 
 process-args "$@" || usage --short

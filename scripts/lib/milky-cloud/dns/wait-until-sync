@@ -69,8 +69,6 @@ function check-one-change {
 # Main script
 #
 
-progress-msg --enable
-
 timeNow="$(lib timey secs now)" || exit "$?"
 endTime=$(( timeNow + maxSecs ))
 first=1

@@ -78,7 +78,6 @@ opt-value --var=keyName --filter='/./' key-name
 opt-value --var=osName --filter='/./' os
 
 # Progress messages?
-progress-msg --enable
 opt-toggle --call='{ progress-msg --set="$1" }' progress
 
 # Actual user data (first-boot script).

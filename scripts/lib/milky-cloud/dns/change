@@ -445,8 +445,6 @@ function route53-change-list {
 # Main script
 #
 
-progress-msg --enable
-
 # Convert the binding arrays to unified new-records and to-delete arrays.
 
 actionsJson="$(jarray --input=strings "${bindActions[@]}")" || exit "$?"
