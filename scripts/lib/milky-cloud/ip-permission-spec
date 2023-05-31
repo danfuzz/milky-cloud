@@ -19,7 +19,7 @@ define-usage $'
     and IPv6 entries. <port> must be a valid port number or `all`.
 
     --output=<style> :: `compact` `json`
-      Output style, as with `json-val`. Defaults to `json`.
+      Output style, as with `jval`. Defaults to `json`.
 
     ${help}
 '

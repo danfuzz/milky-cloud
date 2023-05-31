@@ -14,11 +14,11 @@ define-usage $'
     ${name} <cmd> <subcommand> [<opt> ...] [--] [<jval-expr> ...]
     [:: [<out-opt> ...] [<jval-expr> ...]]
 
-    Makes an AWS call with a JSON value constructed with `json-val`, and with
-    successful result optionally post-processed through `json-val`. If no
-    argument expression is supplied, the value `{}` (an empty object) is passed
-    to the command. When post-processing, the original result becomes the sole
-    input from stdin.
+    Makes an AWS call with a JSON value constructed with `jval`, and with
+    successful result optionally post-processed through `jval`. If no argument
+    expression is supplied, the value `{}` (an empty object) is passed to the
+    command. When post-processing, the original result becomes the sole input
+    from stdin.
 
     Of the options, exactly one of `--global`, `--loc`, or `--skeleton` must be
     used.
@@ -43,9 +43,9 @@ define-usage $'
     Output options:
 
     --output=<style> :: `compact` `json` `lines` `none` `raw` `words`
-      How to process the final output. All options are as with `json-val`, with
-      the addition of `none` which means that nothing should be output. The
-      default is `json`.
+      How to process the final output. All options are as with `jval`, with the
+      addition of `none` which means that nothing should be output. The default
+      is `json`.
 
     ${help}
 '

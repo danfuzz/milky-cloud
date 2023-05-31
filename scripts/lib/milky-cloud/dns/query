@@ -18,8 +18,8 @@ define-usage $'
     JSON result in a form similar to `dns get`.
 
     An optional `::` followed by additional arguments causes the initial output
-    to be further processed by `json-val`, in a manner analogous to how
-    `aws-json` works, see which for details.
+    to be further processed by `jval`, in a manner analogous to how `aws-json`
+    works, see which for details.
 
     <query>
       <name>[@<domain>]:<type> -- Find  a record of the given name and type.

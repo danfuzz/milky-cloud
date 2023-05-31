@@ -23,8 +23,8 @@ define-usage $'
       Do not report an error -- just don\'t print any output -- if there is
       no VPC with the given name or ID.
     --output=<style> :: `compact` `id` `json`
-      What to output, as with `json-val`, except that `id` prints just the ID
-      of the VPC as a plain string. `id` is the default.
+      What to output, as with `jval`, except that `id` prints just the ID of the
+      VPC as a plain string. `id` is the default.
 
     ${help}
 '

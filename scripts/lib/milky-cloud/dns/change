@@ -20,8 +20,8 @@ define-usage $'
     old records were actually retrieved).
 
     An optional `::` followed by additional arguments causes the initial output
-    to be further processed by `json-val`, in a manner analogous to how
-    `aws-json` works, see which for details.
+    to be further processed by `jval`, in a manner analogous to how `aws-json`
+    works, see which for details.
 
     Note: Due to the nature of Route53\'s design, when deleting records, it is
     necessary to specify the `--merge` option.

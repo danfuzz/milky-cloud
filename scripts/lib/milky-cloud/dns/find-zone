@@ -26,8 +26,8 @@ define-usage $'
       Do not report an error -- just don\'t print any output -- if there is
       no zone with the given name. This has no effect if given an ID.
     --output=<style> :: `id` `json`
-      What to output, as with `json-val`, except that `id` prints just the ID
-      of the zone as a plain string. `json` is the default.
+      What to output, as with `jval`, except that `id` prints just the ID of the
+      zone as a plain string. `json` is the default.
 
     ${help}
 '

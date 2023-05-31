@@ -18,8 +18,8 @@ define-usage $'
     array thereof (depending on options).
 
     An optional `::` followed by additional arguments causes the initial output
-    to be further processed by `json-val`, in a manner analogous to how
-    `aws-json` works, see which for details.
+    to be further processed by `jval`, in a manner analogous to how `aws-json`
+    works, see which for details.
 
     Note: This command only handles regular DNS records, and not aliases or
     other AWS-specific stuff.

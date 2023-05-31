@@ -23,8 +23,8 @@ define-usage $'
     a single instance is identified.
 
     An optional `::` followed by additional arguments causes the initial output
-    to be further processed by `json-val`, in a manner analogous to how
-    `aws-json` works, see which for details.
+    to be further processed by `jval`, in a manner analogous to how `aws-json`
+    works, see which for details.
 
     --attributes
       Add info about useful attributes (as in `ec2 describe-instance-attribute`)

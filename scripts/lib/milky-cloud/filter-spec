@@ -24,7 +24,7 @@ define-usage $'
         logical OR of the values.
 
     --output=<style> :: `compact` `json`
-      Output style, as with `json-val`. Defaults to `json`.
+      Output style, as with `jval`. Defaults to `json`.
 
     ${help}
 '
