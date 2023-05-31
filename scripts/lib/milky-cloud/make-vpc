@@ -176,7 +176,7 @@ fi
 # Create a subnet per availability zone.
 if (( !error )); then
     lib add-subnets \
-        --progress --quiet --loc="${region}" --vpc="${vpcId}" \
+        --progress --output=none --loc="${region}" --vpc="${vpcId}" \
         --ipv4="${useIpv4}" --name="${resourceName}" \
     || error=1
 fi
@@ -205,7 +205,7 @@ if (( error )); then
     fi
 
     progress-msg 'Deleting subnets...'
-    lib delete-subnets --quiet --loc="${region}" --vpc="${vpcId}" --all
+    lib delete-subnets --output=none --loc="${region}" --vpc="${vpcId}" --all
 
     progress-msg 'Deleting VPC...'
     ec2-json delete-vpc \

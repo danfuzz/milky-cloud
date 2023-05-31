@@ -19,15 +19,18 @@ define-usage $'
     similar to `aws-json`. This filter is expected to accept `Subnet` objects
     and then re-output the ones to be removed.
 
-    On success, prints a JSON array of the IDs of all removed subnets.
+    On success, prints the IDs of all removed subnets as JSON.
 
     --all
       Remove all subnets.
     --loc=<region-or-zone>
       What region to make the security group in. Must be specified. If
       specified as an availability zone, only the region portion matters.
-    --quiet
-      Suppress non-error output to stdout.
+    --output=<style> :: array json none
+      What to output.
+      * `array` -- Output a JSON array (instead of individual objects).
+      * `json` -- Output a sequence of JSON objects. This is the default.
+      * `none` -- Do not output anything.
     --vpc=<name-or-id>
       Name or ID of the VPC to operate on.
 
@@ -36,6 +39,9 @@ define-usage $'
 
 # Want help?
 opt-action --call='{ usage; exit }' help/h
+
+# Handles JSON `--output`.
+usual-json-output-args --no-rest
 
 # Region, passed as either region per se or availability zone.
 opt-value --required --var=region --filter=region-from-location loc
@@ -46,9 +52,6 @@ opt-value --required --var=vpcNameOrId --filter='/./' vpc
 # Simple filter for `--all` (degenerate choice option).
 opt-choice --var=simpleFilter \
     all='.'
-
-# Quiet?
-opt-toggle --var=quiet quiet
 
 # Filter arguments.
 rest-arg --var=filterArgs filter-exprs
@@ -103,6 +106,6 @@ for id in "${subnetIds[@]}"; do
     || exit "$?"
 done
 
-if (( !quiet )); then
-    jarray --input=strings "${subnetIds[@]}"
-fi
+resultArray="$(jarray --input=strings "${subnetIds[@]}")"
+
+json-postproc-output "${resultArray}"

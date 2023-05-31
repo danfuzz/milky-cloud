@@ -14,7 +14,7 @@ define-usage $'
     ${name} [<opt> ...]
 
     Adds a set of subnets to a VPC -- one per availability zone -- along with
-    an associated routing table. Upon success, prints a JSON array of all the
+    an associated routing table. Upon success, prints JSON info about all the
     created subnets.
 
     --[no-]ipv4
@@ -26,10 +26,13 @@ define-usage $'
     --name=<name>
       Name to use for the created subnets. If not specified, a name is
       generated programatically.
+    --output=<style> :: array json none
+      What to output.
+      * `array` -- Output a JSON array (instead of individual objects).
+      * `json` -- Output a sequence of JSON objects. This is the default.
+      * `none` -- Do not output anything.
     --progress
       Print progress messages to stderr.
-    --quiet (--no-quiet to disable)
-      Suppress non-error output to stdout.
     --vpc=<name-or-id>
       Name or ID of the VPC.
 
@@ -38,6 +41,9 @@ define-usage $'
 
 # Want help?
 opt-action --call='{ usage; exit }' help/h
+
+# Handles JSON `--output`.
+usual-json-output-args --no-rest
 
 # Do public IPv4?
 opt-toggle --var=useIpv4 --init=1 ipv4
@@ -50,9 +56,6 @@ opt-value --var=name --filter='/./' name
 
 # Progress messages?
 opt-toggle --call='{ progress-msg --set="$1" }' progress
-
-# Quiet?
-opt-toggle --var=quiet quiet
 
 # Name or ID of the VPC.
 opt-value --required --var=vpcNameOrId --filter='/./' vpc
@@ -229,6 +232,6 @@ fi
 
 progress-msg "Done making and configuring ${#results[@]} subnets."
 
-if (( !quiet )); then
-    jarray --input=strings "${results[@]}"
-fi
+resultArray="$(jarray --input=strings "${results[@]}")"
+
+json-postproc-output "${resultArray}"
