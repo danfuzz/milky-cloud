@@ -23,10 +23,10 @@ define-usage $'
     --name=<name>
       Name to assign to the constructed gateway. If not specified, a name is
       derived from the associated VPC.
-    --progress (--no-progress to disable)
-      Print progress messages to stderr.
     --vpc=<name-or-id>
       Name or ID of the VPC to be associated with. Must be specified.
+
+    ${stderr}
 
     ${help}
 '
@@ -34,14 +34,14 @@ define-usage $'
 # Want help?
 opt-action --call='{ usage; exit }' help/h
 
+# `--verbose` etc.
+usual-stderr-args
+
 # Region, passed as either region per se or availability zone.
 opt-value --required --var=region --filter=region-from-location loc
 
 # Name of the resulting gateway.
 opt-value --var=name --filter='/./' name
-
-# Progress messages?
-opt-toggle --call='{ progress-msg --set="$1" }' progress
 
 # Name or ID of the VPC.
 opt-value --required --var=vpcNameOrId --filter='/./' vpc
@@ -172,7 +172,7 @@ fi
 
 if (( error )); then
     error-msg 'Error(s) after gateway creation. Attempting cleanup!'
-    lib delete-internet-gateway --progress="$(progress-msg --status)" \
+    lib delete-internet-gateway "$(stderr-opt)" \
         --loc="${region}" --gateway="${gatewayId}"
     progress-msg 'Done with post-error gateway cleanup.'
     exit "${error}"

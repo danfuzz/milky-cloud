@@ -27,16 +27,19 @@ define-usage $'
     --name=<name>
       Name to assign to the constructed security group. If not specified, a
       name is derived from the associated VPC.
-    --progress (--no-progress to disable)
-      Print progress messages to stderr.
     --vpc=<name-or-id>
       Name or ID of the VPC to be associated with. Must be specified.
+
+    ${stderr}
 
     ${help}
 '
 
 # Want help?
 opt-action --call='{ usage; exit }' help/h
+
+# `--verbose` etc.
+usual-stderr-args
 
 # Region, passed as either region per se or availability zone.
 opt-value --required --var=region --filter=region-from-location loc
@@ -46,9 +49,6 @@ opt-value --var=description --filter='/./' description
 
 # Name for the resulting security group.
 opt-value --var=name --filter='/^[-_a-zA-Z0-9]+$/' name
-
-# Progress messages?
-opt-toggle --call='{ progress-msg --set="$1" }' progress
 
 # Name or ID of VPC to look up.
 opt-value --required --var=vpcNameOrId --filter='/./' vpc
@@ -129,8 +129,7 @@ progress-msg "  name: ${name}"
 
 error=0
 
-lib configure-security-group \
-    --progress="$(progress-msg --status)" \
+lib configure-security-group "$(stderr-opt)" \
     --loc="${region}" --security-group="${groupId}" \
 || error="$?"
 

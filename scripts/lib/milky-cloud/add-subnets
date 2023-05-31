@@ -31,16 +31,19 @@ define-usage $'
       * `array` -- Output a JSON array (instead of individual objects).
       * `json` -- Output a sequence of JSON objects. This is the default.
       * `none` -- Do not output anything.
-    --progress
-      Print progress messages to stderr.
     --vpc=<name-or-id>
       Name or ID of the VPC.
+
+    ${stderr}
 
     ${help}
 '
 
 # Want help?
 opt-action --call='{ usage; exit }' help/h
+
+# `--verbose` etc.
+usual-stderr-args
 
 # Handles JSON `--output`.
 usual-json-output-args --no-rest
@@ -53,9 +56,6 @@ opt-value --required --var=region --filter=region-from-location loc
 
 # Name for the subnets.
 opt-value --var=name --filter='/./' name
-
-# Progress messages?
-opt-toggle --call='{ progress-msg --set="$1" }' progress
 
 # Name or ID of the VPC.
 opt-value --required --var=vpcNameOrId --filter='/./' vpc
@@ -130,8 +130,6 @@ fi
 
 tagSpec="$(lib tag-spec --type='subnet' --name="${name}")"
 
-progressArg="--progress=$(progress-msg --status)"
-
 # Attributes to set on each subnet.
 attributes=(
     PrivateDnsHostnameTypeOnLaunch=resource-name
@@ -202,7 +200,7 @@ for n in "${!azList[@]}"; do
     # * PrivateDnsHostnameTypeOnLaunch: Private DNS name is based on the
     #   instance ID (not private DNS address).
     lib set-attributes \
-        --loc="${region}" --id="${result}" "${progressArg}" "${attributes[@]}" \
+        --loc="${region}" --id="${result}" "$(stderr-opt)" "${attributes[@]}" \
     && progress-msg "Configured subnet: ${result}" \
     || {
         error=1

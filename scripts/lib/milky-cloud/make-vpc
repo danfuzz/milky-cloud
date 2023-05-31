@@ -25,14 +25,17 @@ define-usage $'
       availability zone, only the region portion matters.
     --name=<name>
       Name to assign to the constructed VPC. Must be specified.
-    --[no-]progress
-      Print progress messages to stderr. `--progress` is the default.
+
+    ${stderr}
 
     ${help}
 '
 
 # Want help?
 opt-action --call='{ usage; exit }' help/h
+
+# `--verbose` etc.
+usual-stderr-args
 
 # Do public IPv4?
 opt-toggle --var=useIpv4 --init=1 ipv4
@@ -45,9 +48,6 @@ opt-value --required --var=region --filter=region-from-location loc
 
 # Name for the resulting VPC.
 opt-value --required --var=name --filter='/^[-_a-zA-Z0-9]+$/' name
-
-# Progress messages?
-opt-toggle --call='{ progress-msg --set="$1" }' progress
 
 process-args "$@" || usage --short
 
@@ -158,8 +158,8 @@ error=0
 # Note: The two attributes have to be turned on in this specific order, because
 # one depends on the other, and AWS will reject an invalid intermediate state.
 if (( !error )); then
-    lib set-attributes \
-        --progress --loc="${region}" --id="${vpcId}" \
+    lib set-attributes "$(stderr-opt)" \
+        --loc="${region}" --id="${vpcId}" \
         EnableDnsSupport=true \
         EnableDnsHostnames=true \
     || error=1
@@ -167,16 +167,16 @@ fi
 
 # Configure the default security group.
 if (( !error )); then
-    lib configure-security-group \
-        --progress --loc="${region}" --security-group="${vpcId}" \
+    lib configure-security-group "$(stderr-opt)" \
+        --loc="${region}" --security-group="${vpcId}" \
         --name="default-for-${vpcId}" \
     || error=1
 fi
 
 # Create a subnet per availability zone.
 if (( !error )); then
-    lib add-subnets \
-        --progress --output=none --loc="${region}" --vpc="${vpcId}" \
+    lib add-subnets "$(stderr-opt)" \
+        --output=none --loc="${region}" --vpc="${vpcId}" \
         --ipv4="${useIpv4}" --name="${resourceName}" \
     || error=1
 fi
@@ -185,9 +185,8 @@ fi
 gatewayAdded=0
 if (( !error )); then
     gatewayId="$(
-        lib add-internet-gateway \
-            --progress --loc="${region}" \
-            --vpc="${vpcId}" --name="${resourceName}" \
+        lib add-internet-gateway "$(stderr-opt)" \
+            --loc="${region}" --vpc="${vpcId}" --name="${resourceName}" \
     )" \
     && gatewayAdded=1 \
     || error=1

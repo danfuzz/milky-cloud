@@ -44,8 +44,6 @@ define-usage $'
       Availability zone to launch the instance in. Must be specified.
     --os=<name>
       Which OS to install. See `find-ami` for details about default and options.
-    --[no-]progress
-      Print progress messages to stderr. Defaults to `--progress`.
     --user-data=<data>
       User data for the instance, which is taken to be a script to run on
       first-boot of the instance. It is invalid to specify both this and the
@@ -56,11 +54,16 @@ define-usage $'
       Name of a file containing user data for the instance. It is invalid to
       specify both this and the --user-data option.
 
+    ${stderr}
+
     ${help}
 '
 
 # Want help?
 opt-action --call='{ usage; exit }' help/h
+
+# `--verbose` etc.
+usual-stderr-args
 
 # Host key to use.
 opt-value --var=hostKey host-key
@@ -76,9 +79,6 @@ opt-value --var=keyName --filter='/./' key-name
 
 # Which OS to install.
 opt-value --var=osName --filter='/./' os
-
-# Progress messages?
-opt-toggle --call='{ progress-msg --set="$1" }' progress
 
 # Actual user data (first-boot script).
 opt-value --var=userData --filter='/./' user-data
