@@ -19,7 +19,7 @@ define-usage $'
     arguments, similar to `aws-json`. This filter is expected to accept
     `SecurityGroupRule` objects and then re-output the ones to be removed.
 
-    On success, prints a JSON array of the IDs of all removed rules.
+    On success, prints the IDs of all removed rules as JSON.
 
     --all
       Remove all rules.
@@ -30,8 +30,11 @@ define-usage $'
     --loc=<region-or-zone>
       What region to make the security group in. Must be specified. If
       specified as an availability zone, only the region portion matters.
-    --quiet
-      Suppress non-error output to stdout.
+    --output=<style> :: array json none
+      What to output.
+      * `array` -- Output a JSON array (instead of individual objects).
+      * `json` -- Output a sequence of JSON objects. This is the default.
+      * `none` -- Do not output anything.
     --security-group=<name-or-id>
       Name or ID of the security group to operate on. Can also be a VPC ID, to
       indicate the default security group for that VPC.
@@ -41,6 +44,9 @@ define-usage $'
 
 # Want help?
 opt-action --call='{ usage; exit }' help/h
+
+# Handles JSON `--output`.
+usual-json-output-args --no-rest
 
 # Region, passed as either region per se or availability zone.
 opt-value --required --var=region --filter=region-from-location loc
@@ -53,9 +59,6 @@ opt-choice --var=simpleFilter \
     all='.' \
     all-egress='select(.IsEgress == true)' \
     all-ingress='select(.IsEgress == false)'
-
-# Quiet?
-opt-toggle --var=quiet quiet
 
 # Filter arguments.
 rest-arg --var=filterArgs filter-exprs
@@ -134,8 +137,9 @@ if [[ ${ingressRuleIds} != '[]' ]]; then
     || exit "$?"
 fi
 
-if (( !quiet )); then
-    jval \
-        ids:json="[${egressRuleIds}, ${ingressRuleIds}]" \
-        '$ids | flatten | sort'
-fi
+resultArray="$(jval \
+    ids:json="[${egressRuleIds}, ${ingressRuleIds}]" \
+    '$ids | flatten | sort'
+)"
+
+json-postproc-output "${resultArray}"

@@ -87,14 +87,14 @@ error=0
 # of a VPC) come with one or more rules, but relying on those details is
 # arguably not a wise idea.
 if (( !error )); then
-    lib delete-security-group-rules --quiet --loc="${region}" \
+    lib delete-security-group-rules --output=none --loc="${region}" \
         --security-group="${groupId}" --all \
     && progress-msg 'Removed old rules (if any).' \
     || error="$?"
 fi
 
 # Common args for all calls to `add-ip-security-group-rules`.
-commonArgs=(--quiet --loc="${region}" --security-group="${groupId}"
+commonArgs=(--output=none --loc="${region}" --security-group="${groupId}"
     --name="${name}")
 
 # Add egress rules.
