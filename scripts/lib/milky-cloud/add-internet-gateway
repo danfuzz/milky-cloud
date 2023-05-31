@@ -28,9 +28,7 @@ define-usage $'
     --vpc=<name-or-id>
       Name or ID of the VPC to be associated with. Must be specified.
 
-    ${name} [--help | -h]
-
-    Displays this message.
+    ${help}
 '
 
 # Want help?

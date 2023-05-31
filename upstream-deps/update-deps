@@ -21,9 +21,7 @@ define-usage $'
     --no-pull -- Don\'t do the `git pull` portion of the update.
     --no-copy -- Don\'t do the "copy into place" portion of the update.
 
-    ${name} [--help | -h]
-
-    Displays this message.
+    ${help}
 '
 
 # Want help?

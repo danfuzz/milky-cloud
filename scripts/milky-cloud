@@ -14,9 +14,7 @@ define-usage $'
     ${name} <subcommand> ... [<opt> ...] [--] [<arg> ...]
       Runs a subcommand. <opt>s and <arg>s depend on the specific subcommand.
 
-    ${name} [--help | -h]
-      Displays this message.
-'
+    ${help}
 
 # Want help?
 opt-action --call='{ usage; exit }' help/h

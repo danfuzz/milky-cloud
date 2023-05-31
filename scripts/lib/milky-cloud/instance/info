@@ -68,9 +68,7 @@ define-usage $'
       Instances in state `shutting-down` also count as terminated for the sake
       of this option. Default `exclude`.
 
-    ${name} [--help | -h]
-
-    Displays this message.
+    ${help}
 '
 
 # Want help?

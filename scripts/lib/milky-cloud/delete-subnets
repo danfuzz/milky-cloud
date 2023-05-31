@@ -31,9 +31,7 @@ define-usage $'
     --vpc=<name-or-id>
       Name or ID of the VPC to operate on.
 
-    ${name} [--help | -h]
-
-    Displays this message.
+    ${help}
 '
 
 # Want help?

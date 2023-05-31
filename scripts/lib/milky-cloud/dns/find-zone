@@ -29,9 +29,7 @@ define-usage $'
       What to output, as with `json-val`, except that `id` prints just the ID
       of the zone as a plain string. `json` is the default.
 
-    ${name} [--help | -h]
-
-    Displays this message.
+    ${help}
 '
 
 # Want help?

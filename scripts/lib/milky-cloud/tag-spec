@@ -34,9 +34,7 @@ define-usage $'
         the output is the `Tags` form suitable for `ec2 create-tags` or `ec2
         delete-tags`.
 
-    ${name} [--help | -h]
-
-    Displays this message.
+    ${help}
 '
 
 # Want help?

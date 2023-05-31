@@ -35,9 +35,7 @@ define-usage $'
     --progress (--no-progress to disable)
       Print progress messages to stderr.
 
-    ${name} [--help | -h]
-
-    Displays this message.
+    ${help}
 '
 
 # Want help?

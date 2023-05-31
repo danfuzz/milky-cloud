@@ -32,9 +32,7 @@ define-usage $'
     --quiet
       Do not print an error if the given <location> is invalid.
 
-    ${name} [--help | -h]
-
-    Displays this message.
+    ${help}
 '
 
 # Want help?

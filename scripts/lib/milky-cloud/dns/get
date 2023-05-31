@@ -45,9 +45,7 @@ define-usage $'
     --value=<value>
       Specific value which must be present in the matched records.
 
-    ${name} [--help | -h]
-
-    Displays this message.
+    ${help}
 '
 
 # Want help?

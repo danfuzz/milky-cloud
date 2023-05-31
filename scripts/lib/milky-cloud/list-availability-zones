@@ -22,9 +22,7 @@ define-usage $'
       Output style, as with `json-val`. Defaults to `lines`, which indicates
       _raw_ lines (no JSON decoration).
 
-    ${name} [--help | -h]
-
-    Displays this message.
+    ${help}
 '
 
 # Want help?

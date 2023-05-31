@@ -19,9 +19,7 @@ define-usage $'
       Maximum number of seconds to wait for synchronization (approximately).
       Default `60`.
 
-    ${name} [--help | -h]
-
-    Displays this message.
+    ${help}
 '
 
 # Want help?

@@ -26,9 +26,7 @@ define-usage $'
       What to output, as with `json-val`, except that `id` prints just the ID
       of the VPC as a plain string. `id` is the default.
 
-    ${name} [--help | -h]
-
-    Displays this message.
+    ${help}
 '
 
 # Want help?

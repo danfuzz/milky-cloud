@@ -50,9 +50,7 @@ define-usage $'
       Secret source and path for the private key. It is expected to be in the
       space-separated form used by `secret-access` (see which).
 
-    ${name} [--help | -h]
-
-    Displays this message.
+    ${help}
 '
 
 # Want help?

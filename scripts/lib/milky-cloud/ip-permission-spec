@@ -21,9 +21,7 @@ define-usage $'
     --output=<style> :: `compact` `json`
       Output style, as with `json-val`. Defaults to `json`.
 
-    ${name} [--help | -h]
-
-    Displays this message.
+    ${help}
 '
 
 # Want help?

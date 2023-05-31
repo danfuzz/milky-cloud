@@ -40,9 +40,7 @@ define-usage $'
       * `json` -- Output a sequence of JSON objects. This is the default.
       * `none` -- Do not output anything.
 
-    ${name} [--help | -h]
-
-    Displays this message.
+    ${help}
 '
 
 # Want help?

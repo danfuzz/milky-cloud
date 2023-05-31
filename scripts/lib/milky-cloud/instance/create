@@ -56,9 +56,7 @@ define-usage $'
       Name of a file containing user data for the instance. It is invalid to
       specify both this and the --user-data option.
 
-    ${name} [--help | -h]
-
-    Displays this message.
+    ${help}
 '
 
 # Want help?

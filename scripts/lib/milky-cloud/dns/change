@@ -68,9 +68,7 @@ define-usage $'
     --[no-]wait
       Wait for the DNS records to be synchronized? `--wait` is the default.
 
-    ${name} [--help | -h]
-
-    Displays this message.
+    ${help}
 '
 
 # Want help?

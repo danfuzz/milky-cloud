@@ -23,9 +23,7 @@ define-usage $'
       Path to an alternative SSH command to use. Must be argument-compatible
       with `instance ssh`.
 
-    ${name} [--help | -h]
-
-    Displays this message.
+    ${help}
 '
 
 # Want help?

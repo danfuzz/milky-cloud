@@ -41,9 +41,7 @@ define-usage $'
       (For debugging) Show all matches for the AMI name pattern, not just the
       most recent one.
 
-    ${name} [--help | -h]
-
-    Displays this message.
+    ${help}
 '
 
 # Want help?

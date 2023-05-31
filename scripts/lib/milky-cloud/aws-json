@@ -47,9 +47,7 @@ define-usage $'
       the addition of `none` which means that nothing should be output. The
       default is `json`.
 
-    ${name} [--help | -h]
-
-    Displays this message.
+    ${help}
 '
 
 # AWS command and subcommand. These are expected before any dashed options.

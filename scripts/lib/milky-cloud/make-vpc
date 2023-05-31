@@ -28,9 +28,7 @@ define-usage $'
     --[no-]progress
       Print progress messages to stderr. `--progress` is the default.
 
-    ${name} [--help | -h]
-
-    Displays this message.
+    ${help}
 '
 
 # Want help?
