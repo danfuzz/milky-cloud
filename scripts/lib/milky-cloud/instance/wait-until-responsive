@@ -57,6 +57,16 @@ process-args "$@" || usage --short
 # Helper functions
 #
 
+# Does the machine running this script seem to have IPv6? This cursed function
+# is needed because, as of this writing, GitHub Actions does not run user code
+# on machines that have IPv6. Blurgh!
+#
+# See <https://github.com/actions/runner-images/issues/668>.
+function is-ipv6-available {
+    # `-c 1` == one packet
+    ping6 >/dev/null 2>&1 -c 1 google.com
+}
+
 # Waits for just one instance to be in state `running`.
 function wait-for-one-running {
     local infoJson="$1"
@@ -154,6 +164,10 @@ function wait-for-one-ssh {
     # Don't bother re-checking the key; just care if we got one.
     if [[ ${gotKey} == '' ]]; then
         "${msg}" 'ssh unreachable via IPv6'
+        if ! is-ipv6-available; then
+            "${msg}" '(but IPv6 is not available at all here)'
+            return
+        fi
         return 1
     fi
 
