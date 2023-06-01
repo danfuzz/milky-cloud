@@ -46,7 +46,6 @@ if (( doPull )); then
     lib buildy pull-repo >/dev/null "${repoUrl}" \
     || exit "$?"
 fi
-exit 1
 
 if (( doCopy )); then
     rm -rf ${destDir}/lib/bashy-*
