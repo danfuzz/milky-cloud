@@ -206,7 +206,7 @@ fi
 subnetId="$(lib find-vpc-subnet --loc="${zone}" --vpc="${vpcId}")" \
 || exit 1
 
-progress-msg "Launching instance ${name} in:"
+progress-msg "Launching ${instanceType} instance \`${name}\` in:"
 progress-msg "  zone:   ${zone}"
 progress-msg "  vpc:    ${vpcId} (${vpcName})"
 progress-msg "  subnet: ${subnetId}"
