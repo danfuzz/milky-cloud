@@ -15,6 +15,7 @@ define-usage $'
       Runs a subcommand. <opt>s and <arg>s depend on the specific subcommand.
 
     ${help}
+'
 
 # Want help?
 opt-action --call='{ usage; exit }' help/h
