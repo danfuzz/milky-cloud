@@ -1,0 +1,114 @@
+#!/bin/bash
+#
+# Copyright 2022-2023 the Bashy-lib Authors (Dan Bornstein et alia).
+# SPDX-License-Identifier: Apache-2.0
+
+. "$(dirname "$(readlink -f "$0")")/_init.sh" || exit "$?"
+
+
+#
+# Argument parsing
+#
+
+define-usage $'
+    ${name} [<path> ...]
+
+    List files in the project at or under the given <path>s, respecting
+    `.gitignore` (etc.). With no <path>s, lists all project files.
+
+    This tool is inspired by (and based on) `git ls-files`, and is similar to
+    the non-git-specific `ls-files` in this library.
+
+    --full-paths
+      Output full canonicalized (absolute) paths. By default, outputs paths that
+      are relative to the project\'s base directory.
+    --include=<regex>
+      Regular expression indicating which files to include. This is treated as
+      an unanchored "extended" regex. Matching is performed on relative paths
+      from the project\'s base directory; that is, the absolute path to the
+      project is not part of the text being matched.
+    --output=<style> :: `json` `lines` `raw0`
+      * `json` -- Output a JSON array of all file paths. This is the default.
+      * `lines` -- Output newline-terminated file paths.
+      * `raw0` -- Output NUL-terminated file paths.
+
+    ${help}
+'
+
+# Want help?
+opt-action --call='{ usage; exit }' help/h
+
+# Full paths?
+opt-toggle --var=fullPaths full-paths
+
+# Include pattern.
+opt-value --var=includeRegex --init='.' --filter='/./' include
+
+# Output style.
+opt-value --var=outputStyle --init=json --enum='json lines raw0' output
+
+# The paths.
+rest-arg --var=paths --filter='/./' paths
+
+process-args "$@" || usage --short
+
+
+#
+# Main script
+#
+
+baseDir="$(base-dir)" || exit "$?"
+
+# Canonicalize the paths.
+error=0
+for i in "${!paths[@]}"; do
+    p="${paths[i]}"
+    newPath="$(readlink -f "${p}")" || {
+        error-msg "No such path: ${p}"
+        error=1
+        continue
+    }
+
+    if [[ ! ((${newPath} =~ ^"${baseDir}/") || (${newPath} == ${baseDir})) ]]; then
+        error-msg "Not a project path: ${p}"
+        error=1
+    fi
+    paths[i]="${newPath}"
+done
+
+if (( error )); then
+    exit 1
+fi
+
+cd "${baseDir}"
+
+results=()
+
+while IFS='' read -r -d $'\0' file; do
+    if [[ ${file} == $'\x01error' ]]; then
+        exit 1
+    fi
+    if [[ ${file} =~ ${includeRegex} ]]; then
+        if (( fullPaths )); then
+            file="${baseDir}/${file}"
+        fi
+        results+=("${file}")
+    fi
+done < <(
+    # Note: The `printf` contents are designed to make it possible for the loop
+    # above to (nearly) unambiguously notice errors.
+    git ls-files -z --cached --others --exclude-standard "${paths[@]}" \
+    || printf '\x01error\x00'
+)
+
+case "${outputStyle}" in
+    json)
+        jarray --input=strings "${results[@]}"
+        ;;
+    lines)
+        printf '%s\n' "${results[@]}"
+        ;;
+    raw0)
+        printf '%s\x00' "${results[@]}"
+        ;;
+esac

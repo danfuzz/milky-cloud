@@ -1,0 +1,390 @@
+#!/bin/bash
+#
+# Copyright 2022-2023 the Bashy-lib Authors (Dan Bornstein et alia).
+# SPDX-License-Identifier: Apache-2.0
+
+. "$(dirname "$(readlink -f "$0")")/_init.sh" || exit "$?"
+
+
+#
+# Argument parsing
+#
+
+define-usage $'
+    ${name} [<opt> ...] <project-name>
+
+    Builds a Node main module, pulling in all its local dependencies. The
+    result is deposited in a directory named <project-name> under the output
+    directory. The module used to build this is named `@this/main-<project-name>`
+    which is expected to be present in the modules directory.
+
+    This tool is opinionated: The modules directories are taken to define
+    submodules (in the Node sense) under the top-level name `@this`.
+
+    **Note:** Exactly one of the two `--modules-*` options must be specified.
+
+    --allow-platform-specific-files
+      If specified, the build does *not* check to see if any platform-specific
+      files ended up in the built output.
+    --modules-dir=<dir>
+      Path to a directory containing all module sources to be used.
+    --modules-dirs=<json>
+      JSON array of one or more paths to directories containing module sources.
+      If the same-named module exists in more than one modules directory, the
+      first one listed "wins."
+    --out=<dir>
+      Directory where built output goes. Defaults to `out` directly under the
+      main product directory.
+    --unsafely-run-npm-install-scripts
+      If specified, runs any install-time scripts defined by modules. This is
+      reasonably considered an unsafe practice (it is a vector for
+      developer-directed malware), which is why it is disabled by default. This
+      option exists to enable tactical problem-solving, with the hope that it
+      will be left on only ephemerally.
+
+    ${help}
+'
+
+# Want help?
+opt-action --call='{ usage; exit }' help/h
+
+# Allow the build to be platform-specific?
+opt-toggle --var=platformSpecific allow-platform-specific-files
+
+# Directory or directories containing all the modules.
+modulesOpt=''
+opt-value --call='{ modulesOpt="--modules-dir=$1" }' --filter='/./' modules-dir
+opt-value --call='{ modulesOpt="--modules-dirs=$1" }' --filter='/^\[.*\]$/' modules-dirs
+require-exactly-one-arg-of modules-dir modules-dirs
+
+# Built output directory.
+opt-value --var=outDir out
+
+# Run npm install-time scripts?
+opt-toggle --var=runNpmInstallScripts unsafely-run-npm-install-scripts
+
+# Project name.
+positional-arg --filter='/^[-a-z0-9]+$/' --var=projectName project-name
+
+process-args "$@" || usage --short
+
+
+#
+# Helper functions
+#
+
+# The main actions of this script.
+function build-project {
+    local projectName="$1"
+    local modulesOpt="$2"
+    local destDir="$3"
+
+    local destLibDir="${destDir}/lib"
+    local mainModule="main-${projectName}"
+    local localCodeDirName='code'
+    local destLocalCode="${destLibDir}/${localCodeDirName}"
+    local destLocalModules="${destLocalCode}/node_modules"
+
+    progress-msg "Main module: ${mainModule}"
+
+    mkdir -p "${destLocalModules}" \
+    || return "$?"
+
+    # Figure out local vs. external dependencies.
+
+    progress-msg 'Determining local and external dependencies...'
+
+    local deps
+    deps="$(
+        lib . find-module-dependencies "${modulesOpt}" "${mainModule}"
+    )" \
+    || return "$?"
+
+    # Construct a top-level package.json.
+
+    progress-msg 'Making `package.json` and `product-info.json`...'
+
+    local srcMainModule
+    srcMainModule="$(jget --output=raw "${deps}" '.localDirs[.main]')" \
+    || return 1
+    local srcPackageJson="${srcMainModule}/package.json"
+    local srcPackageLockJson="${srcMainModule}/package-lock.json"
+
+    jget >"${destLibDir}/package.json" \
+        --file="${srcPackageJson}" \
+        localCodeDirName="${localCodeDirName}" \
+        deps:json="${deps}" \
+        projectName="${projectName}" '
+    . | del(.imports) +
+    {
+        name:         ("top-of-" + $projectName),
+        dependencies: $deps.extDeps,
+        exports:      ("./" + $localCodeDirName + "/index.js")
+    }' \
+    || return "$?"
+
+    jval >"${destDir}/product-info.json" \
+        commitInfo="$(commit-info)" \
+        projectName="${projectName}" \
+        srcPackage:json:file="${srcPackageJson}" '
+    {
+        name: $projectName,
+        version: $srcPackage.version,
+        commit: $commitInfo
+    }' \
+    || return "$?"
+
+    if [[ -f "${srcPackageLockJson}" ]]; then
+        progress-msg 'Copying `package-lock.json`...'
+        cp "${srcPackageLockJson}" "${destLibDir}/package-lock.json"
+    fi
+
+    true \
+    && make-index-js "${destLocalCode}" \
+    && copy-scripts "${srcMainModule}" "${destDir}" \
+    && copy-local-modules "${destLocalModules}" "${deps}" \
+    && remove-dead-local-modules "${destLocalModules}" "${deps}" \
+    && npm-install "${destLibDir}" \
+    || return "$?"
+
+    cp "${destLibDir}/package-lock.json" "${srcPackageLockJson}"
+}
+
+# Figures out the pithy commit info to associate with the build.
+function commit-info {
+    cd "$(base-dir)"
+
+    if [[ ! -d ".git" ]]; then
+        echo '<unknown>'
+        return
+    fi
+
+    local infoWords
+    infoWords=("$(git rev-parse --short=8 HEAD)") \
+    || return "$?"
+
+    infoWords+=($(git tag --points-at HEAD)) \
+    || return "$?"
+
+    echo "${infoWords[*]}"
+}
+
+# Copies all the local modules for a project.
+function copy-local-modules {
+    local moduleDestDir="$1"
+    local deps="$2"
+
+    progress-msg 'Copying local modules...'
+
+    # The `jget` command outputs an `eval`able script to perform the copies,
+    # which is immediately `eval`ed.
+
+    local copyCmd
+    copyCmd="$(
+        jget --output=raw "${deps}" \
+            cmd='lib rsync-local' \
+            toDir="${moduleDestDir}" '
+          .localDirs
+        | to_entries
+        | map({ name: .key, fromPath: .value })
+        | map({
+            fromPath: ("\(.fromPath)/" | @sh),
+            toPath:   ("\($toDir)/\(.name)" | @sh)
+        })
+        | map(
+            "mkdir -p \(.toPath)",
+            "\($cmd) \(.fromPath) \(.toPath)"
+        )
+        | map("&& \(.) \\")
+        | ["true \\", .[], "&& true"]
+        | join("\n")
+        '
+    )" \
+    || return "$?"
+
+    eval "${copyCmd}"
+}
+
+# Copies the main module's script(s), if any.
+function copy-scripts {
+    local srcDir="$1/bin"
+    local destDir="$2/bin"
+
+    # Get a JSON array of all the files.
+    local fileList
+    fileList="$(lib ls-files --cd="${srcDir}" --depth=1)" \
+    || return "$?"
+
+    if [[ ${fileList} == '[]' ]]; then
+        return
+    fi
+
+    progress-msg 'Copying scripts...'
+
+    mkdir -p "${destDir}" \
+    || return "$?"
+
+    local file
+    while IFS='' read -r -d $'\0' file; do
+        local srcScript="${srcDir}/${file}"
+        local destScript="${destDir}/${file}"
+        if [[ -x "${srcScript}" ]]; then
+            error-msg 'Script is marked executable in the source directory:'
+            error-msg "  ${srcScript}"
+            error-msg 'It cannot actually be run from there. Do this:'
+            error-msg
+            error-msg --exec printf '  chmod -x %q\n' "${srcScript}"
+            error-msg
+            return 1
+        fi
+        progress-msg "  ${file}"
+        rm -rf "${destScript}"            || return "$?"
+        cp "${srcScript}" "${destScript}" || return "$?"
+        chmod +x "${destScript}"          || return "$?"
+    done < <(jget --output=raw0 "${fileList}" '.[]')
+}
+
+# Writes a top-level `index.js` for a project.
+function make-index-js {
+    local dir="$1"
+
+    progress-msg 'Making `index.js`...'
+
+    (
+        for (( n = 0; n < 10; n++ )); do
+            echo "// FILE GENERATED BY SCRIPT \`$(this-cmd-name)\`. DO NOT EDIT!"
+        done
+        echo ''
+        echo "import { default as main } from '@this/${mainModule}';"
+        echo ''
+        echo 'await main();'
+        echo ''
+        echo '// `main()` is not ever supposed to return.'
+        echo $'throw new Error(\'Shouldn\\\'t happen.\');'
+        echo ''
+        for (( n = 0; n < 10; n++ )); do
+            echo "// FILE GENERATED BY SCRIPT \`$(this-cmd-name)\`. DO NOT EDIT!"
+        done
+    ) > "${dir}/index.js"
+}
+
+# Does an `npm install` in the given directory.
+function npm-install {
+    local dir="$1"
+
+    progress-msg 'Fetching and installing external dependencies...'
+    progress-msg
+
+    local extraOpts=()
+    if (( !runNpmInstallScripts )); then
+        # `--ignore-scripts` is a tactic to avoid developer-targeted malware.
+        # (See the note in the usage message above.) As of this writing, none of
+        # the dependencies of any project using this system actually need to run
+        # install scripts, so there's nothing additional to do in order to cope
+        # with the flag (e.g., no need to run scripts in an "offline chroot" or
+        # somesuch).
+        extraOpts=(--ignore-scripts)
+    fi
+
+    (
+        cd "${dir}"
+        npm install --no-fund --omit=dev "${extraOpts[@]}"
+    ) \
+    || return "$?"
+}
+
+# Removes any local modules that are "dead" with respect to the current build.
+# These are modules that (presumably) used to be part of the build but got
+# dropped for whatever reason.
+function remove-dead-local-modules {
+    local dir="$1"
+    local deps="$2"
+
+    local deadModules
+    deadModules="$(
+        lib ls-files --cd="${dir}" --depth=2 --dirs \
+        | jval --input=read deps:json="${deps}" '. - $deps.localDeps'
+    )"
+
+    local mod first=1
+    while IFS='' read -r -d $'\0' mod; do
+        if (( first )); then
+            progress-msg 'Removing defunct local modules:'
+            first=0
+        fi
+
+        progress-msg "  ${mod}"
+        rm -rf "${dir}/${mod}" || return "$?"
+    done < <(jget --output=raw0 "${deadModules}" '.[]')
+
+    if (( !first )); then
+        progress-msg
+    fi
+}
+
+# Checks a `node_modules` directory (or similar) for "suspect" files, given a
+# desire to have a platform-agnostic build.
+function suspect-file-check {
+    local dir="$1"
+
+    if [[ ! -d ${dir} ]]; then
+        error-msg 'Missing directory for suspect file check:'
+        error-msg "  ${dir}"
+        return 1
+    fi
+
+    suspectFiles="$(
+        lib ls-files --cd="${dir}" \
+            --exclude='\.(cjs|js|json|html|md|mjs|ts|yml)$'
+    )" \
+    || return "$?"
+
+    local file first=1
+    while IFS='' read -r -d $'\0' file; do
+        local info="$(file -- "${dir}/${file}")"
+
+        if [[ ${info} =~ ASCII|JSON|PNG|UTF-8|empty|'short file' ]]; then
+            continue
+        fi
+
+        if (( first )); then
+            error-msg 'Files possibly containing platform-specific binaries:'
+            first=0
+        fi
+
+        error-msg "  ${file}"
+    done < <(jget --output=raw0 "${suspectFiles}" '.[]')
+
+    if (( !first )); then
+        return 1
+    fi
+}
+
+
+#
+# Main script
+#
+
+progress-msg "Building Node project ${projectName}..."
+
+outDir="$(lib buildy out-dir --out="${outDir}" --create --print --quiet)"
+
+outProjectDir="${outDir}/${projectName}"
+
+if [[ ! -d ${outProjectDir} ]]; then
+    progress-msg 'Creating project-specific output directory...'
+    mkdir -p "${outProjectDir}" \
+    || exit "$?"
+fi
+
+build-project "${projectName}" "${modulesOpt}" "${outProjectDir}" \
+|| exit "$?"
+
+if (( !platformSpecific )); then
+    progress-msg 'Checking for platform agnosticity...'
+    suspect-file-check "${outProjectDir}/lib/node_modules" \
+    || exit "$?"
+fi
+
+progress-msg
+progress-msg "Built Node project ${projectName}."
