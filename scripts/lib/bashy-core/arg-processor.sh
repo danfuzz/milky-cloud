@@ -31,7 +31,7 @@
 # * `--filter=/<regex>/` -- Matches each argument value against the regex. If
 #   the regex doesn't match, the argument is rejected.
 # * `--var=<name>` -- Sets the named variable to the argument value(s). The
-#   variable is always initialized to _some_, which is itself optionally
+#   variable is always initialized to _something_, which is itself optionally
 #   specified via `--init=<value>`. If `--init` isn't used (or isn't available),
 #   then the default initialized value depends on the specific function.
 #
@@ -249,6 +249,18 @@ function positional-arg {
     fi
 
     _argproc_positionalFuncs+=("_argproc:positional-${specName}")
+}
+
+# Adds a call to perform post-processing -- usually checking -- after an
+# otherwise successful call to `process-args`. This accepts a function name and
+# zero or more arguments.
+function post-process-args-call {
+    local args=("$@")
+    _argproc_janky-args --multi-arg \
+    || return 1
+
+    printf '%q ' "${args[@]}"
+    _argproc_preReturnStatements+=("$(printf '%q ' "${args[@]}")")
 }
 
 # Processes all of the given arguments, according to the configured handlers.
