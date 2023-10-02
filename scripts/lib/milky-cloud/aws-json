@@ -40,7 +40,7 @@ define-usage $'
       Instead of making a regular call, just print out a JSON "skeleton" of the
       parameters to the command. This can be filtered just like any other result.
 
-    Output options:
+    Output options (after the `::`):
 
     --output=<style> :: `compact` `json` `lines` `none` `raw` `raw0` `words`
       How to process the final output. All options are as with `jval`. The default
