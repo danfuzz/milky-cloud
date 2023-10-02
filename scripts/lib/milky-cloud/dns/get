@@ -71,9 +71,6 @@ opt-value --var=findValue --filter='/./' value
 
 process-args "$@" || usage --short
 
-check-json-output-args \
-|| exit "$?"
-
 
 #
 # Main script

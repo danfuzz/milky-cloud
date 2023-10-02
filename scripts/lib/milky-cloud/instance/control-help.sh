@@ -58,9 +58,6 @@ function instance-control-skeleton {
     shift 2
     local implArgs=("$@")
 
-    check-json-output-args \
-    || return "$?"
-
     local infoArray
     infoArray="$(
         lib instance info --output=array "${_control_infoOpts[@]}"

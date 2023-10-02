@@ -106,9 +106,6 @@ opt-value --var=terminated --init='exclude' --enum='exclude include only' termin
 
 process-args "$@" || usage --short
 
-check-json-output-args \
-|| exit "$?"
-
 if (( multipleResults )); then
     notFoundOk=1
 fi
