@@ -10,7 +10,7 @@
 # Argument parsing
 #
 
-define-usage $'
+define-usage --with-help $'
     ${name} [<opt> ...] <query> ... [:: [<out-opt> ...] [<jval-expr> ...]]
 
     Gets a set of DNS records that match the indicated query, by issuing one or
@@ -39,12 +39,7 @@ define-usage $'
       * `array` -- Output a JSON array (instead of individual objects).
       * `json` -- Output a sequence of JSON objects. This is the default.
       * `none` -- Do not output anything.
-
-    ${help}
 '
-
-# Want help?
-opt-action --call='{ usage; exit }' help/h
 
 # Handles `--output`.
 usual-json-output-args --no-rest

@@ -10,7 +10,7 @@
 # Argument parsing
 #
 
-define-usage $'
+define-usage --with-help $'
     ${name} [<opt> ...] <change-id> ...
 
     Waits for one or more Route53 changes to be considered live.
@@ -18,12 +18,7 @@ define-usage $'
     --max-secs=<secs>
       Maximum number of seconds to wait for synchronization (approximately).
       Default `60`.
-
-    ${help}
 '
-
-# Want help?
-opt-action --call='{ usage; exit }' help/h
 
 # Maximum wait time in seconds.
 opt-value --var=maxSecs --init=60 --filter='/[0-9]+/' max-secs

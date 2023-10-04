@@ -17,7 +17,7 @@ TAG_NAME='host-public-key'
 # Argument parsing
 #
 
-define-usage $'
+define-usage --with-help $'
     ${name} [<opt> ...] [:: [<out-opt> ...] [<jval-expr> ...]]
 
     Extracts the SSH host public key from one or more instances, storing it in
@@ -42,12 +42,7 @@ define-usage $'
       --not-found-ok
       --output (sort of; applies to final output)
       --protected
-
-    ${help}
 '
-
-# Want help?
-opt-action --call='{ usage; exit }' help/h
 
 # Options and arguments passed through to `instance info`.
 usual-info-args

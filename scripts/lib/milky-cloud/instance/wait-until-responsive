@@ -11,7 +11,7 @@
 # Argument parsing
 #
 
-define-usage $'
+define-usage --with-help $'
     ${name} [<opt> ...] [:: [<out-opt> ...] [<jval-expr> ...]]
 
     Waits until one or more instances are all responsive. "Responsive" in this
@@ -37,12 +37,7 @@ define-usage $'
       --not-found-ok
       --output (sort of; applies to final output)
       --protected
-
-    ${help}
 '
-
-# Want help?
-opt-action --call='{ usage; exit }' help/h
 
 # Options and arguments passed through to `instance info`.
 usual-info-args

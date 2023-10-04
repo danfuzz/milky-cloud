@@ -10,7 +10,7 @@
 # Argument parsing
 #
 
-define-usage $'
+define-usage --with-help $'
     ${name} [<opt> ...]
 
     Finds a DNS zone (Route53 "hosted zone") by name, or validates the
@@ -28,12 +28,7 @@ define-usage $'
     --output=<style> :: `id` `json`
       What to output, as with `jval`, except that `id` prints just the ID of the
       zone as a plain string. `json` is the default.
-
-    ${help}
 '
-
-# Want help?
-opt-action --call='{ usage; exit }' help/h
 
 # Ok if no zone found?
 opt-toggle --var=notFoundOk not-found-ok

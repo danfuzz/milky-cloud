@@ -10,7 +10,7 @@
 # Argument parsing
 #
 
-define-usage $'
+define-usage --with-help $'
     ${name} [<opt> ...] [:: [<out-opt> ...] [<jval-expr> ...]]
 
     Finds one or more instances by name or ID, with optional extra criteria, and
@@ -67,12 +67,7 @@ define-usage $'
       Whether or not to include terminated instances, or _only_ include them.
       Instances in state `shutting-down` also count as terminated for the sake
       of this option. Default `exclude`.
-
-    ${help}
 '
-
-# Want help?
-opt-action --call='{ usage; exit }' help/h
 
 # Handles JSON `--output` and post-processing arguments.
 usual-json-output-args

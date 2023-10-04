@@ -10,7 +10,7 @@
 # Argument parsing
 #
 
-define-usage $'
+define-usage --with-help $'
     ${name} [<opt> ...] <expect> ...
 
     Waits for a set of DNS queries to match the given expectations. <expect>
@@ -27,12 +27,7 @@ define-usage $'
     --max-secs=<secs>
       Maximum number of seconds to wait for synchronization (approximately).
       Default `60`.
-
-    ${help}
 '
-
-# Want help?
-opt-action --call='{ usage; exit }' help/h
 
 # Domain to find.
 opt-value --var=domain --filter='/^[-.a-z0-9]+$/' domain

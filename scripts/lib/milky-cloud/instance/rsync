@@ -9,7 +9,7 @@
 # Argument parsing
 #
 
-define-usage $'
+define-usage --with-help $'
     ${name} [<opt> ...] <rsync-arg> ...
 
     Uses `rsync` to copy files to or from the indicated instance, using
@@ -22,12 +22,7 @@ define-usage $'
     --ssh-cmd=<path>
       Path to an alternative SSH command to use. Must be argument-compatible
       with `instance ssh`.
-
-    ${help}
 '
-
-# Want help?
-opt-action --call='{ usage; exit }' help/h
 
 # Used when this script calls through to itself via `rsync`.
 opt-toggle --var=fromRsync from-rsync

@@ -10,7 +10,7 @@
 # Argument parsing
 #
 
-define-usage $'
+define-usage --with-help $'
     ${name} [<opt> ...] [:: [<out-opt> ...] [<jval-expr> ...]]
 
     Gets a set of DNS records that match the indicated query, using the Route53
@@ -44,12 +44,7 @@ define-usage $'
       Required.
     --value=<value>
       Specific value which must be present in the matched records.
-
-    ${help}
 '
-
-# Want help?
-opt-action --call='{ usage; exit }' help/h
 
 # Handles JSON `--output` and post-processing arguments.
 usual-json-output-args

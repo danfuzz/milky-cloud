@@ -10,7 +10,7 @@
 # Argument parsing
 #
 
-define-usage $'
+define-usage --with-help $'
     ${name} [<opt> ...] [<user>@]<instance> [<command> <arg> ...]
 
     Logs into the indicated instance (by name or IP address), either interactively
@@ -49,12 +49,7 @@ define-usage $'
     --secret=\'<source> <path>\'
       Secret source and path for the private key. It is expected to be in the
       space-separated form used by `secret-access` (see which).
-
-    ${help}
 '
-
-# Want help?
-opt-action --call='{ usage; exit }' help/h
 
 # Announce connection?
 opt-toggle --var=announce announce

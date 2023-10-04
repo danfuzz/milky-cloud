@@ -10,7 +10,7 @@
 # Argument parsing
 #
 
-define-usage $'
+define-usage --with-help $'
     ${name} [<opt> ...] <binding> ... [:: [<out-opt> ...] [<jval-expr> ...]]
 
     Adds, merges, replaces, or deletes one or more DNS records. Prints out JSON
@@ -67,12 +67,7 @@ define-usage $'
       TTL to use for all added or modified records. Required.
     --[no-]wait
       Wait for the DNS records to be synchronized? `--wait` is the default.
-
-    ${help}
 '
-
-# Want help?
-opt-action --call='{ usage; exit }' help/h
 
 # Handles `--output`.
 usual-json-output-args --no-rest
