@@ -10,7 +10,7 @@
 # Argument parsing
 #
 
-define-usage $'
+define-usage --with-help $'
     ${name} [<opt> ...]
 
     Configures a security group in a standard way. This involves removing all
@@ -34,12 +34,7 @@ define-usage $'
       indicate the default security group for that VPC.
 
     ${stderr}
-
-    ${help}
 '
-
-# Want help?
-opt-action --call='{ usage; exit }' help/h
 
 # `--verbose` etc.
 usual-stderr-args

@@ -10,18 +10,13 @@
 # Argument parsing
 #
 
-define-usage $'
+define-usage --with-help $'
     ${name}
 
     Simple wrapper around the AWS command `sts get-caller-identity`, which
     is valid for any valid AWS credentials, and will print out details about
     the identity which owns those credentials.
-
-    ${help}
 '
-
-# Want help?
-opt-action --call='{ usage; exit }' help/h
 
 process-args "$@" || usage --short
 

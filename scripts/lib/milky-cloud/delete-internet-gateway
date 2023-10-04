@@ -10,7 +10,7 @@
 # Argument parsing
 #
 
-define-usage $'
+define-usage --with-help $'
     ${name} [<opt> ...]
 
     Detaches and removes an internet gateway, including removing routing rules
@@ -23,12 +23,7 @@ define-usage $'
       availability zone, only the region portion matters.
 
     ${stderr}
-
-    ${help}
 '
-
-# Want help?
-opt-action --call='{ usage; exit }' help/h
 
 # `--verbose` etc.
 usual-stderr-args

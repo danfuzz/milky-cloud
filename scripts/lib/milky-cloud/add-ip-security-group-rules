@@ -10,7 +10,7 @@
 # Argument parsing
 #
 
-define-usage $'
+define-usage --with-help $'
     ${name} [<opt> ...]
 
     Adds one or more rules to a given security group to specify IP-based
@@ -43,12 +43,7 @@ define-usage $'
     --security-group=<name-or-id>
       Name or ID of the security group to add to. Can also be a VPC ID,
       to indicate the default security group for that VPC.
-
-    ${help}
 '
-
-# Want help?
-opt-action --call='{ usage; exit }' help/h
 
 # Handles JSON `--output`.
 usual-json-output-args --no-rest

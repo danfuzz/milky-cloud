@@ -10,7 +10,7 @@
 # Argument parsing
 #
 
-define-usage $'
+define-usage --with-help $'
     ${name} [<opt> ...]
 
     Creates an internet gateway and attaches it to a VPC, including adding all
@@ -27,12 +27,7 @@ define-usage $'
       Name or ID of the VPC to be associated with. Must be specified.
 
     ${stderr}
-
-    ${help}
 '
-
-# Want help?
-opt-action --call='{ usage; exit }' help/h
 
 # `--verbose` etc.
 usual-stderr-args

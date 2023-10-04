@@ -10,7 +10,7 @@
 # Argument parsing
 #
 
-define-usage $'
+define-usage --with-help $'
     ${name} [<opt> ...] [<assignment> ...] <filter-expr> ...
 
     Removes zero or more subnets, based on given filter criteria. Simple filters
@@ -33,12 +33,7 @@ define-usage $'
       * `none` -- Do not output anything.
     --vpc=<name-or-id>
       Name or ID of the VPC to operate on.
-
-    ${help}
 '
-
-# Want help?
-opt-action --call='{ usage; exit }' help/h
 
 # Handles JSON `--output`.
 usual-json-output-args --no-rest

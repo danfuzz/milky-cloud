@@ -10,7 +10,7 @@
 # Argument parsing
 #
 
-define-usage $'
+define-usage --with-help $'
     ${name} [<opt> ...] <name-or-id>
 
     Finds a VPC by name or security group ID, or validates the existence of one
@@ -25,12 +25,7 @@ define-usage $'
     --output=<style> :: `compact` `id` `json`
       What to output, as with `jval`, except that `id` prints just the ID of the
       VPC as a plain string. `id` is the default.
-
-    ${help}
 '
-
-# Want help?
-opt-action --call='{ usage; exit }' help/h
 
 # Region, passed as either region per se or availability zone.
 opt-value --required --var=region --filter=region-from-location loc

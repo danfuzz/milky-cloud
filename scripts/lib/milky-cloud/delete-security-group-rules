@@ -10,7 +10,7 @@
 # Argument parsing
 #
 
-define-usage $'
+define-usage --with-help $'
     ${name} [<opt> ...] [<assignment> ...] <filter-expr> ...
 
     Removes rules from an existing security group, based on given filter
@@ -38,12 +38,7 @@ define-usage $'
     --security-group=<name-or-id>
       Name or ID of the security group to operate on. Can also be a VPC ID, to
       indicate the default security group for that VPC.
-
-    ${help}
 '
-
-# Want help?
-opt-action --call='{ usage; exit }' help/h
 
 # Handles JSON `--output`.
 usual-json-output-args --no-rest

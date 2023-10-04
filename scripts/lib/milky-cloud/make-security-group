@@ -10,7 +10,7 @@
 # Argument parsing
 #
 
-define-usage $'
+define-usage --with-help $'
     ${name} [<opt> ...]
 
     Makes a new security group, configured in a standard way. On success, prints
@@ -31,12 +31,7 @@ define-usage $'
       Name or ID of the VPC to be associated with. Must be specified.
 
     ${stderr}
-
-    ${help}
 '
-
-# Want help?
-opt-action --call='{ usage; exit }' help/h
 
 # `--verbose` etc.
 usual-stderr-args

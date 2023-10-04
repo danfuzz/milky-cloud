@@ -10,7 +10,7 @@
 # Argument parsing
 #
 
-define-usage $'
+define-usage --with-help $'
     ${name} [<opt> ...] <location>
 
     Parses a location -- a region or availability zone -- and if valid then
@@ -31,12 +31,7 @@ define-usage $'
         This implies `--input=zone`.
     --quiet
       Do not print an error if the given <location> is invalid.
-
-    ${help}
 '
-
-# Want help?
-opt-action --call='{ usage; exit }' help/h
 
 # Input type.
 opt-value --var=inputType --init=any --enum='any region zone' input

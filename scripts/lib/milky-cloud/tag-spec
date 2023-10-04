@@ -10,7 +10,7 @@
 # Argument parsing
 #
 
-define-usage $'
+define-usage --with-help $'
     ${name} [<opt> ...] [--] [<spec> ...]
     Constructs and prints a JSON object suitable for use as the `Tags` argument
     to `ec2 create-tags` or the `TagSpecifications` argument to various other
@@ -33,12 +33,7 @@ define-usage $'
         Resource type, if `TagSpecifications` output is wanted. If not specified,
         the output is the `Tags` form suitable for `ec2 create-tags` or `ec2
         delete-tags`.
-
-    ${help}
 '
-
-# Want help?
-opt-action --call='{ usage; exit }' help/h
 
 # `Name` binding.
 opt-value --var=name --filter='/./' name

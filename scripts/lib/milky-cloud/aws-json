@@ -10,7 +10,7 @@
 # Argument parsing
 #
 
-define-usage $'
+define-usage --with-help $'
     ${name} <cmd> <subcommand> [<opt> ...] [--] [<jval-expr> ...]
     [:: [<out-opt> ...] [<jval-expr> ...]]
 
@@ -45,8 +45,6 @@ define-usage $'
     --output=<style> :: `compact` `json` `lines` `none` `raw` `raw0`
       How to process the final output. All options are as with `jval`. The default
       is `json`.
-
-    ${help}
 '
 
 # AWS command and subcommand. These are expected before any dashed options.
@@ -60,9 +58,6 @@ else
     subcommand="$2"
     shift 2
 fi
-
-# Want help?
-opt-action --call='{ usage; exit }' help/h
 
 # Set up for postprocessing.
 usual-json-output-args --no-output --no-rest

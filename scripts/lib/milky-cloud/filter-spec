@@ -10,7 +10,7 @@
 # Argument parsing
 #
 
-define-usage $'
+define-usage --with-help $'
     ${name} [<opt> ...] [--] [<spec> ...]
 
     Constructs and prints a JSON object suitable for use as a `Filters`
@@ -25,15 +25,10 @@ define-usage $'
 
     --output=<style> :: `compact` `json`
       Output style, as with `jval`. Defaults to `json`.
-
-    ${help}
 '
 
 # Output style.
 opt-value --var=outputStyle --init=json --enum='compact json' output
-
-# Want help?
-opt-action --call='{ usage; exit }' help/h
 
 # List of filter specifications, as parallel arrays of name and value.
 filterNames=()

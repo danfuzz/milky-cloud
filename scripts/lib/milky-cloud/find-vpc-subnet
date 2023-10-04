@@ -10,7 +10,7 @@
 # Argument parsing
 #
 
-define-usage $'
+define-usage --with-help $'
     ${name} [<opt> ...]
 
     Finds a VPC subnet that meets the indicated criteria. On success, prints
@@ -20,12 +20,7 @@ define-usage $'
       What availibility zone to look in. Must be specified.
     --vpc=<name-or-id>
       Name or ID of the VPC to look in. Must be specified.
-
-    ${help}
 '
-
-# Want help?
-opt-action --call='{ usage; exit }' help/h
 
 # Availability zone.
 opt-value --required --var=zone --call=parse-zone loc

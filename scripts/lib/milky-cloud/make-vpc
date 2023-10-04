@@ -10,7 +10,7 @@
 # Argument parsing
 #
 
-define-usage $'
+define-usage --with-help $'
     ${name} [<opt> ...]
 
     Makes a new VPC, plus associated accouterments. On success, prints the ID
@@ -27,12 +27,7 @@ define-usage $'
       Name to assign to the constructed VPC. Must be specified.
 
     ${stderr}
-
-    ${help}
 '
-
-# Want help?
-opt-action --call='{ usage; exit }' help/h
 
 # `--verbose` etc.
 usual-stderr-args

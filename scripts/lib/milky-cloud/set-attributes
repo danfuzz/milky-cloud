@@ -10,7 +10,7 @@
 # Argument parsing
 #
 
-define-usage $'
+define-usage --with-help $'
     ${name} [<opt> ...] [--] <assignment> ...
 
     Sets one or more attributes on a thing-that-has-attributes. Supported
@@ -26,12 +26,7 @@ define-usage $'
       availability zone, only the region portion matters.
 
     ${stderr}
-
-    ${help}
 '
-
-# Want help?
-opt-action --call='{ usage; exit }' help/h
 
 # `--verbose` etc.
 usual-stderr-args

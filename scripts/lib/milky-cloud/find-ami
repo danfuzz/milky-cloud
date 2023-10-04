@@ -22,7 +22,7 @@ amiNamePatterns='{
 # Argument parsing
 #
 
-define-usage $'
+define-usage --with-help $'
     ${name} [<opt> ...]
 
     Finds an AMI to use when launching an instance. On success, prints a JSON
@@ -40,12 +40,7 @@ define-usage $'
     --show-all
       (For debugging) Show all matches for the AMI name pattern, not just the
       most recent one.
-
-    ${help}
 '
-
-# Want help?
-opt-action --call='{ usage; exit }' help/h
 
 # Availability zone.
 opt-value --required --var=zone --call=parse-zone loc
