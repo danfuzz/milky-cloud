@@ -18,7 +18,7 @@ define-usage --with-help $'
     the identity which owns those credentials.
 '
 
-process-args "$@" || usage --short
+process-args "$@" || exit "$?"
 
 
 #

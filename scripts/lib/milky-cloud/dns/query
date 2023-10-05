@@ -96,7 +96,7 @@ function parse-rest {
     fi
 }
 
-process-args "$@" || usage --short
+process-args "$@" || exit "$?"
 
 # Canonicalize the `domain` by ensuring it does not end with a dot. In addition
 # check it for basic syntactic correctness.

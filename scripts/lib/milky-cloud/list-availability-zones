@@ -29,7 +29,7 @@ opt-value --required --var=region --filter=region-from-location loc
 # Output style.
 opt-value --var=outputStyle --init=lines --enum='compact json lines' output
 
-process-args "$@" || usage --short
+process-args "$@" || exit "$?"
 
 
 #

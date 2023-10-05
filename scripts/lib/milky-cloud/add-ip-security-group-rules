@@ -66,7 +66,7 @@ opt-value --required --var=port --filter='/^([0-9]+|all)$/' port
 # Protocol of the rule.
 opt-value --required --var=protocol --enum='all tcp udp' protocol
 
-process-args "$@" || usage --short
+process-args "$@" || exit "$?"
 
 
 #

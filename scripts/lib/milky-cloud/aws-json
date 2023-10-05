@@ -102,7 +102,7 @@ function parse-rest {
     fi
 }
 
-process-args "$@" || usage --short
+process-args "$@" || exit "$?"
 
 
 #

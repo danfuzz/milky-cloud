@@ -55,7 +55,7 @@ opt-toggle --var=off off
 
 require-exactly-one-arg-of after off
 
-process-args "$@" || usage --short
+process-args "$@" || exit "$?"
 
 # If `--off` was specified, make sure it wasn't `--no-off` (etc.).
 if (( !off )) && [[ ${afterTimeSecs} == '' ]]; then

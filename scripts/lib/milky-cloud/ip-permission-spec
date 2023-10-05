@@ -31,7 +31,7 @@ positional-arg --required --var=protocol --enum='all tcp udp' protocol
 # Port.
 positional-arg --required --var=port --filter='/^([0-9]+|all)$/' port
 
-process-args "$@" || usage --short
+process-args "$@" || exit "$?"
 
 
 #

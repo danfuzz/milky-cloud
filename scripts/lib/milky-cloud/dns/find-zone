@@ -39,7 +39,7 @@ opt-value --var=outputStyle --init=json --enum='id json' output
 # Domain name or ID to look up.
 opt-value --required --var=nameOrId --filter='/^[-./a-zA-Z0-9]+$/' domain
 
-process-args "$@" || usage --short
+process-args "$@" || exit "$?"
 
 
 #

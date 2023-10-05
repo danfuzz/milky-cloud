@@ -49,7 +49,7 @@ opt-value --call='{ sshOpts+=(--secret="$1") }' secret
 # Main arguments.
 rest-arg --var=args arg
 
-process-args "$@" || usage --short
+process-args "$@" || exit "$?"
 
 
 #

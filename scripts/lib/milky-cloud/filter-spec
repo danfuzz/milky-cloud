@@ -55,7 +55,7 @@ function parse-specs {
     return "${error}"
 }
 
-process-args "$@" || usage --short
+process-args "$@" || exit "$?"
 
 
 #

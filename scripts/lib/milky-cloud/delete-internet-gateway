@@ -34,7 +34,7 @@ opt-value --required --var=region --filter=region-from-location loc
 # ID of the gateway.
 opt-value --required --var=gatewayId --filter='/./' gateway
 
-process-args "$@" || usage --short
+process-args "$@" || exit "$?"
 
 
 #

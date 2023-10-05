@@ -28,7 +28,7 @@ opt-value --required --var=zone --call=parse-zone loc
 # Name or ID of VPC to look up.
 opt-value --required --var=nameOrId --filter='/./' vpc
 
-process-args "$@" || usage --short
+process-args "$@" || exit "$?"
 
 
 #

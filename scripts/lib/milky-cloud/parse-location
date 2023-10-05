@@ -45,7 +45,7 @@ opt-toggle --var=quiet quiet
 # Location to parse.
 positional-arg --required --var=location location
 
-process-args "$@" || usage --short
+process-args "$@" || exit "$?"
 
 
 #

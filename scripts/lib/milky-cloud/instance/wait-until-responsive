@@ -45,7 +45,7 @@ usual-info-args
 # Check the host keys?
 opt-toggle --var=checkHostKeys --init=1 check-host-keys
 
-process-args "$@" || usage --short
+process-args "$@" || exit "$?"
 
 
 #

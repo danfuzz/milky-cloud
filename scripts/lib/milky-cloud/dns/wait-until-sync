@@ -26,7 +26,7 @@ opt-value --var=maxSecs --init=60 --filter='/[0-9]+/' max-secs
 # Change IDs
 rest-arg --var=changes --filter='/^[/a-zA-Z0-9]+$/' change-id
 
-process-args "$@" || usage --short
+process-args "$@" || exit "$?"
 
 if (( ${#changes[@]} == 0 )); then
     error-msg 'Must specify at least one change.'

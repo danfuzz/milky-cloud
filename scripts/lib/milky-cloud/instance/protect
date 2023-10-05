@@ -49,7 +49,7 @@ opt-toggle --var=state on
 
 require-exactly-one-arg-of off on
 
-process-args "$@" || usage --short
+process-args "$@" || exit "$?"
 
 # If `--off` was specified, propagate its opposite to `state`.
 if [[ ${notState} != '' ]]; then

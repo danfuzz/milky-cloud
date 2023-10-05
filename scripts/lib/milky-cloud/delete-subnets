@@ -51,7 +51,7 @@ opt-choice --var=simpleFilter \
 # Filter arguments.
 rest-arg --var=filterArgs filter-exprs
 
-process-args "$@" || usage --short
+process-args "$@" || exit "$?"
 
 if (( ${#filterArgs[@]} == 0 )); then
     if [[ ${simpleFilter} == '' ]]; then

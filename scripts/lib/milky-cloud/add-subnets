@@ -55,7 +55,7 @@ opt-value --var=name --filter='/./' name
 # Name or ID of the VPC.
 opt-value --required --var=vpcNameOrId --filter='/./' vpc
 
-process-args "$@" || usage --short
+process-args "$@" || exit "$?"
 
 
 #

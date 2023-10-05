@@ -99,7 +99,7 @@ opt-value --var=protected --init='include' --enum='exclude include only' protect
 # Terminated instance inclusion.
 opt-value --var=terminated --init='exclude' --enum='exclude include only' terminated
 
-process-args "$@" || usage --short
+process-args "$@" || exit "$?"
 
 if (( multipleResults )); then
     notFoundOk=1

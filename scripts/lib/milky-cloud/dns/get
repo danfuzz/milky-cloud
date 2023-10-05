@@ -64,7 +64,7 @@ opt-value --required --var=types --filter='/^[ a-z]+$/' type
 # Value required to be in the result.
 opt-value --var=findValue --filter='/./' value
 
-process-args "$@" || usage --short
+process-args "$@" || exit "$?"
 
 
 #

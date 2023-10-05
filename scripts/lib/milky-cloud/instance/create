@@ -84,7 +84,7 @@ opt-value --var=userDataFile --filter='/./' user-data-file
 # Rest args to pass through to the final `instance info` call.
 rest-arg --var=postArgs post-arg
 
-process-args "$@" || usage --short
+process-args "$@" || exit "$?"
 
 if [[ (${userData} != '') && (${userDataFile} != '') ]]; then
     error-msg 'Cannot specify both --user-data and --user-data-file.'

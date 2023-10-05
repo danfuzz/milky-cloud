@@ -147,7 +147,7 @@ function parse-rest {
     fi
 }
 
-process-args "$@" || usage --short
+process-args "$@" || exit "$?"
 
 if (( anyAdds )) && [[ ${ttl} == '' ]]; then
     error-msg 'Must supply `--ttl` when adding records.'

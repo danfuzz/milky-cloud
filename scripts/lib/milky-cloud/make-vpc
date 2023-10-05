@@ -44,7 +44,7 @@ opt-value --required --var=region --filter=region-from-location loc
 # Name for the resulting VPC.
 opt-value --required --var=name --filter='/^[-_a-zA-Z0-9]+$/' name
 
-process-args "$@" || usage --short
+process-args "$@" || exit "$?"
 
 
 #

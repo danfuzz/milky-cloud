@@ -48,7 +48,7 @@ opt-value --var=name --filter='/^[-_a-zA-Z0-9]+$/' name
 # Name or ID of VPC to look up.
 opt-value --required --var=vpcNameOrId --filter='/./' vpc
 
-process-args "$@" || usage --short
+process-args "$@" || exit "$?"
 
 
 #

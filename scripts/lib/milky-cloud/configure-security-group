@@ -48,7 +48,7 @@ opt-value --var=name --filter='/./' name
 # Name or ID of the security group.
 opt-value --required --var=groupNameOrId --filter='/./' security-group
 
-process-args "$@" || usage --short
+process-args "$@" || exit "$?"
 
 
 #

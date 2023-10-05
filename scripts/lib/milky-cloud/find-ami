@@ -57,7 +57,7 @@ opt-value --var=osName --init='amazon-2023' \
 # Show all matches?
 opt-toggle --var=showAll show-all
 
-process-args "$@" || usage --short
+process-args "$@" || exit "$?"
 
 
 #

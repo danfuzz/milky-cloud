@@ -47,7 +47,7 @@ define-usage --with-help $'
 # Options and arguments passed through to `instance info`.
 usual-info-args
 
-process-args "$@" || usage --short
+process-args "$@" || exit "$?"
 
 
 #
