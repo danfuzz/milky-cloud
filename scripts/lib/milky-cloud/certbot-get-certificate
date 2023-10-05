@@ -91,7 +91,7 @@ if [[ ${runHook} == '' ]]; then
     # Directory to use for Certbot intermediate files.
     opt-value --var=workDir --init='out/certbot' work-dir
 
-    process-args "$@" || usage --short "$?"
+    process-args "$@" || exit "$?"
 fi
 
 
