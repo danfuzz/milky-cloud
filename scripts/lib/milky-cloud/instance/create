@@ -92,7 +92,10 @@ if [[ (${userData} != '') && (${userDataFile} != '') ]]; then
     exit 1
 fi
 
-jpostproc --check "${postArgs[@]}" || usage --short
+jpostproc --check "${postArgs[@]}" || {
+    usage --short
+    exit 1
+}
 
 
 #
