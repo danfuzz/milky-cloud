@@ -67,7 +67,7 @@ opt-value --var=hostKey host-key
 opt-value --var=idSpec --filter='/^[-a-zA-Z0-9]+[.][^.]+[.][^.]+$/' id
 
 # Instance type.
-opt-value --var=instanceType --init='t4g.nano' instance-type
+opt-value --var=instanceType --default='t4g.nano' instance-type
 
 # Name for the SSH keypair that allows for login access.
 opt-value --var=keyName --filter='/./' key-name

@@ -44,7 +44,7 @@ usual-stderr-args
 usual-json-output-args --no-rest
 
 # Do public IPv4?
-opt-toggle --var=useIpv4 --init=1 ipv4
+opt-toggle --var=useIpv4 --default=1 ipv4
 
 # Region, passed as either region per se or availability zone.
 opt-value --required --var=region --filter=region-from-location loc

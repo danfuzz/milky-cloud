@@ -85,7 +85,7 @@ opt-toggle --var=doMerge merge
 opt-value --var=ttl --filter='/^[0-9]+/' ttl
 
 # Wait for DNS records to be in synch?
-opt-toggle --var=waitForSync --init=1 wait
+opt-toggle --var=waitForSync --default=1 wait
 
 # List of bindings, as parallel arrays.
 bindActions=()

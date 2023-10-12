@@ -43,7 +43,7 @@ define-usage --with-help $'
 usual-info-args
 
 # Check the host keys?
-opt-toggle --var=checkHostKeys --init=1 check-host-keys
+opt-toggle --var=checkHostKeys --default=1 check-host-keys
 
 process-args "$@" || exit "$?"
 

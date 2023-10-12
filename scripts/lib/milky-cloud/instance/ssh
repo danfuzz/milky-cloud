@@ -61,7 +61,7 @@ opt-value --var=defaultLocation --filter='/./' default-loc
 opt-value --var=defaultUserid --filter='/./' default-userid
 
 # Default VPC (name or ID).
-opt-value --var=defaultVpc --init='*' --filter='/./' default-vpc
+opt-value --var=defaultVpc --default='*' --filter='/./' default-vpc
 
 # Path to the key file.
 opt-value --var=keyPath --filter='/./' key

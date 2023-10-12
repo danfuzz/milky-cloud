@@ -21,7 +21,7 @@ define-usage --with-help $'
 '
 
 # Maximum wait time in seconds.
-opt-value --var=maxSecs --init=60 --filter='/[0-9]+/' max-secs
+opt-value --var=maxSecs --default=60 --filter='/[0-9]+/' max-secs
 
 # Change IDs
 rest-arg --var=changes --filter='/^[/a-zA-Z0-9]+$/' change-id

@@ -44,7 +44,7 @@ define-usage --with-help $'
 usual-info-args
 
 # Protection state.
-opt-toggle --var=notState --init='' off
+opt-toggle --var=notState --default='' off
 opt-toggle --var=state on
 
 require-exactly-one-arg-of off on

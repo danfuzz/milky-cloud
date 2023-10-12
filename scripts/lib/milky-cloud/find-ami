@@ -50,7 +50,7 @@ opt-value --required --var=instanceType \
     --filter='/^[a-z0-9]+\.[a-z0-9]+$/' instance-type
 
 # Which OS.
-opt-value --var=osName --init='amazon-2023' \
+opt-value --var=osName --default='amazon-2023' \
     --enum='amazon-2 amazon-2023' \
     os
 

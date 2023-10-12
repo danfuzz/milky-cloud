@@ -27,7 +27,7 @@ define-usage --with-help $'
 opt-value --required --var=region --filter=region-from-location loc
 
 # Output style.
-opt-value --var=outputStyle --init=lines --enum='compact json lines' output
+opt-value --var=outputStyle --default=lines --enum='compact json lines' output
 
 process-args "$@" || exit "$?"
 

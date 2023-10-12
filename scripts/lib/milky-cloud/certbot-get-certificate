@@ -63,7 +63,7 @@ fi
 
 if [[ ${runHook} == '' ]]; then
     # Directory to use for final output.
-    opt-value --var=outDir --init='out/certs' out
+    opt-value --var=outDir --default='out/certs' out
 
     # Domain(s) to get a certificate for.
     certName='' # Primary name (minus wildcard, if any).
@@ -89,7 +89,7 @@ if [[ ${runHook} == '' ]]; then
     opt-toggle --var=useStaging staging
 
     # Directory to use for Certbot intermediate files.
-    opt-value --var=workDir --init='out/certbot' work-dir
+    opt-value --var=workDir --default='out/certbot' work-dir
 
     process-args "$@" || exit "$?"
 fi

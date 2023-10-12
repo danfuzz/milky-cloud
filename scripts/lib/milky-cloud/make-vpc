@@ -33,10 +33,10 @@ define-usage --with-help $'
 usual-stderr-args
 
 # Do public IPv4?
-opt-toggle --var=useIpv4 --init=1 ipv4
+opt-toggle --var=useIpv4 --default=1 ipv4
 
 # Do public IPv6?
-opt-toggle --var=useIpv6 --init=1 ipv6
+opt-toggle --var=useIpv6 --default=1 ipv6
 
 # Region, passed as either region per se or availability zone.
 opt-value --required --var=region --filter=region-from-location loc

@@ -28,7 +28,7 @@ define-usage --with-help $'
 '
 
 # Output style.
-opt-value --var=outputStyle --init=json --enum='compact json' output
+opt-value --var=outputStyle --default=json --enum='compact json' output
 
 # List of filter specifications, as parallel arrays of name and value.
 filterNames=()
