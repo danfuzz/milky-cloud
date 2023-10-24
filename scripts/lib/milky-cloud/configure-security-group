@@ -75,6 +75,9 @@ progress-msg "Configuring security group ${groupId}..."
 
 error=0
 
+# Common args for all calls to `*-security-group-rules`.
+commonArgs=(--output=none --loc="${region}" --security-group="${groupId}")
+
 # Start with a blank slate of rules by deleting any that are already associated
 # with the new security group.
 #
@@ -82,15 +85,13 @@ error=0
 # of a VPC) come with one or more rules, but relying on those details is
 # arguably not a wise idea.
 if (( !error )); then
-    lib delete-security-group-rules --output=none --loc="${region}" \
-        --security-group="${groupId}" --all \
+    lib delete-security-group-rules "${commonArgs[@]}" --all \
     && progress-msg 'Removed old rules (if any).' \
     || error="$?"
 fi
 
 # Common args for all calls to `add-ip-security-group-rules`.
-commonArgs=(--output=none --loc="${region}" --security-group="${groupId}"
-    --name="${name}")
+commonArgs+=(--name="${name}")
 
 # Add egress rules.
 
