@@ -21,13 +21,15 @@ define-usage --with-help $'
     IP address ranges (including notably treating "any IPv4" and "any IPv6" as
     different ranges).
 
+    --direction=<dir> :: egress ingress
+      Which direction the rule(s) are for.
     --egress
-      The rule is to be an egress rule.
+      Shorthand for `--direction=egress`.
     --ingress
-      The rule is to be an ingress rule.
+      Shorthand for `--direction=ingress`.
     --loc=<region-or-zone>
-      What region to make the security group in. Must be specified. If
-      specified as an availability zone, only the region portion matters.
+      What region to add the rule(s) in. Must be specified. If specified as an
+      availability zone, only the region portion matters.
     --name=<name>
       Name to attach to the rule, if any.
     --output=<style> :: array json none
@@ -39,17 +41,19 @@ define-usage --with-help $'
       Port for the rule, or an indicator to apply to all ports. Must be
       specified.
     --protocol=<spec> :: `all` `tcp` `udp`
-      Protocol(s) the rule applies to. Must be specified.
+      Protocol(s) restricted by the rule(s). Must be specified.
     --security-group=<name-or-id>
-      Name or ID of the security group to add to. Can also be a VPC ID,
+      Name or ID of the security group to add rule(s) to. Can also be a VPC ID,
       to indicate the default security group for that VPC.
 '
 
 # Handles JSON `--output`.
 usual-json-output-args --no-rest
 
-# Rule direction (`ingress` or `egress`).
-opt-choice --required --var=direction egress ingress
+# Rule direction (`ingress` or `egress`), and convenient shorthand aliases.
+opt-value --var=direction --enum='egress ingress' direction
+opt-alias egress  --direction=egress
+opt-alias ingress --direction=ingress
 
 # Name or ID of the security group.
 opt-value --required --var=groupNameOrId --filter='/./' security-group
