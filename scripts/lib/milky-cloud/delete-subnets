@@ -22,7 +22,10 @@ define-usage --with-help $'
     On success, prints the IDs of all removed subnets as JSON.
 
     --all
-      Remove all subnets.
+      Remove all subnets. Equivalent to `--filter=\'.\'`.
+    --filter=<filter-expr>
+      Alternative equivalent to passing <filter-expr> as a single non-option
+      argument. It is invalid to use this _and_ pass other filter arguments.
     --loc=<region-or-zone>
       What region to make the security group in. Must be specified. If
       specified as an availability zone, only the region portion matters.
@@ -38,15 +41,17 @@ define-usage --with-help $'
 # Handles JSON `--output`.
 usual-json-output-args --no-rest
 
+# Pass-all (no-op) filter.
+opt-alias all --filter='.'
+
+# Single filter expression.
+opt-value --var=simpleFilter --filter='/./' filter
+
 # Region, passed as either region per se or availability zone.
 opt-value --required --var=region --filter=region-from-location loc
 
 # Name or ID of the VPC.
 opt-value --required --var=vpcNameOrId --filter='/./' vpc
-
-# Simple filter for `--all` (degenerate choice option).
-opt-choice --var=simpleFilter \
-    all='.'
 
 # Filter arguments.
 rest-arg --var=filterArgs filter-exprs
