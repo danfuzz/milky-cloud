@@ -27,6 +27,9 @@ define-usage --with-help $'
       Remove all egress rules.
     --all-ingress
       Remove all ingress rules.
+    --filter=<filter-expr>
+      Alternative equivalent to passing <filter-expr> as a single non-option
+      argument. It is invalid to use this _and_ pass non-option filter arguments.
     --loc=<region-or-zone>
       What region to make the security group in. Must be specified. If
       specified as an availability zone, only the region portion matters.
@@ -43,17 +46,17 @@ define-usage --with-help $'
 # Handles JSON `--output`.
 usual-json-output-args --no-rest
 
+# Single filter expression, and aliases for specific values.
+opt-value --var=simpleFilter --filter='/./' filter
+opt-alias all         --filter='.'
+opt-alias all-egress  --filter='select(.IsEgress == true)'
+opt-alias all-ingress --filter='select(.IsEgress == false)'
+
 # Region, passed as either region per se or availability zone.
 opt-value --required --var=region --filter=region-from-location loc
 
 # Name or ID of the security group.
 opt-value --required --var=groupNameOrId --filter='/./' security-group
-
-# Simple filter.
-opt-choice --var=simpleFilter \
-    all='.' \
-    all-egress='select(.IsEgress == true)' \
-    all-ingress='select(.IsEgress == false)'
 
 # Filter arguments.
 rest-arg --var=filterArgs filter-exprs

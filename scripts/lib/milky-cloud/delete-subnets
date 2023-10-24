@@ -25,7 +25,7 @@ define-usage --with-help $'
       Remove all subnets. Equivalent to `--filter=\'.\'`.
     --filter=<filter-expr>
       Alternative equivalent to passing <filter-expr> as a single non-option
-      argument. It is invalid to use this _and_ pass other filter arguments.
+      argument. It is invalid to use this _and_ pass non-option filter arguments.
     --loc=<region-or-zone>
       What region to make the security group in. Must be specified. If
       specified as an availability zone, only the region portion matters.
