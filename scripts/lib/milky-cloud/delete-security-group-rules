@@ -53,7 +53,7 @@ opt-alias all-egress  --filter='select(.IsEgress == true)'
 opt-alias all-ingress --filter='select(.IsEgress == false)'
 
 # Region, passed as either region per se or availability zone.
-opt-value --required --var=region --filter=region-from-location loc
+opt-value --required --var=region --filter=region-from-location-filter loc
 
 # Name or ID of the security group.
 opt-value --required --var=groupNameOrId --filter='/./' security-group

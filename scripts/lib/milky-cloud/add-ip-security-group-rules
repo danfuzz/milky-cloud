@@ -59,7 +59,7 @@ opt-alias ingress --direction=ingress
 opt-value --required --var=groupNameOrId --filter='/./' security-group
 
 # Region, passed as either region per se or availability zone.
-opt-value --required --var=region --filter=region-from-location loc
+opt-value --required --var=region --filter=region-from-location-filter loc
 
 # Name of the rule.
 opt-value --var=name --filter='/./' name

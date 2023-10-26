@@ -39,7 +39,7 @@ opt-toggle --var=useIpv4 --default=1 ipv4
 opt-toggle --var=useIpv6 --default=1 ipv6
 
 # Region, passed as either region per se or availability zone.
-opt-value --required --var=region --filter=region-from-location loc
+opt-value --required --var=region --filter=region-from-location-filter loc
 
 # Name for the resulting VPC.
 opt-value --required --var=name --filter='/^[-_a-zA-Z0-9]+$/' name

@@ -29,7 +29,7 @@ define-usage --with-help $'
 usual-stderr-args
 
 # Region, passed as either region per se or availability zone.
-opt-value --required --var=region --filter=region-from-location loc
+opt-value --required --var=region --filter=region-from-location-filter loc
 
 # ID of the gateway.
 opt-value --required --var=gatewayId --filter='/./' gateway

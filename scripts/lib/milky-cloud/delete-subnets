@@ -48,7 +48,7 @@ opt-alias all --filter='.'
 opt-value --var=simpleFilter --filter='/./' filter
 
 # Region, passed as either region per se or availability zone.
-opt-value --required --var=region --filter=region-from-location loc
+opt-value --required --var=region --filter=region-from-location-filter loc
 
 # Name or ID of the VPC.
 opt-value --required --var=vpcNameOrId --filter='/./' vpc
