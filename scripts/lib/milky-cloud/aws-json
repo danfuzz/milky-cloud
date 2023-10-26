@@ -63,7 +63,7 @@ fi
 usual-json-output-args --no-output --no-rest
 
 # Region, passed as either region per se or availability zone.
-opt-value --var=region --filter=region-from-location loc
+opt-value --var=region --filter=region-from-location-filter loc
 
 # File to print the constructed command to.
 opt-value --filter='/./' --var=printCommandTo print-command-to

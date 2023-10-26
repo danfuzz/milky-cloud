@@ -34,3 +34,10 @@ function parse-zone {
 function region-from-location {
     lib parse-location --output=region "$@"
 }
+
+# Calls `region-from-location` (above) as an argument filter.
+function region-from-location-filter {
+    local region
+    region="$(lib parse-location --output=region "$@")" \
+    && replace-value "${region}"
+}

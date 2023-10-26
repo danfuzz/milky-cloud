@@ -31,7 +31,7 @@ define-usage --with-help $'
 '
 
 # Region, passed as either region per se or availability zone.
-opt-value --required --var=region --filter=region-from-location loc
+opt-value --required --var=region --filter=region-from-location-filter loc
 
 # Ok if no security group found?
 opt-toggle --var=notFoundOk not-found-ok
