@@ -114,15 +114,15 @@ function parse-rest {
             continue
         fi
 
-        local name="${BASH_REMATCH[1]%:}" # `%:` to remove the trailing colon.
+        local name="${BASH_REMATCH[1]%:}" # Remove the trailing `:`.
         local type="${BASH_REMATCH[2]}"
-        local value="${BASH_REMATCH[3]:1}" # `:1` to remove the leading `=`.
+        local value="${BASH_REMATCH[3]#=}" # Remove the leading `=`.
         local action
 
-        if [[ ${name:0:1} == '!' ]]; then
+        if [[ ${name} =~ ^!(.*)$ ]]; then
             action='delete'
             anyDeletes=1
-            name="${name:1}"
+            name="${BASH_REMATCH[1]}"
         else
             action='add'
             anyAdds=1

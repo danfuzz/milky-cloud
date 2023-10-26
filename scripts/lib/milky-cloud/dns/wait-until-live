@@ -59,9 +59,9 @@ function parse-rest {
 
         local state="${BASH_REMATCH[1]}"
         local name="${BASH_REMATCH[2]}"
-        local domain="${BASH_REMATCH[3]:1}" # `:1` to remove the leading `@`.
+        local domain="${BASH_REMATCH[3]#@}" # Remove the leading `@`.
         local type="${BASH_REMATCH[4]}"
-        local value="${BASH_REMATCH[5]:1}" # `:1` to remove the leading `=`.
+        local value="${BASH_REMATCH[5]#=}" # Remove the leading `=`.
 
         if [[ ${state} == '!' ]]; then
             state='absent'
