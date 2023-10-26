@@ -34,7 +34,7 @@ opt-value --required --var=region --filter=region-from-location loc
 opt-toggle --var=notFoundOk not-found-ok
 
 # What to print.
-opt-value --var=outputStyle --default=id --enum='compact id json' output
+opt-value --var=outputStyle --default=id --enum[]='compact id json' output
 
 # Name or ID to look up.
 positional-arg --required --var=nameOrId name-or-id

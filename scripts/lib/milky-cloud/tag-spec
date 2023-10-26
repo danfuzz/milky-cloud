@@ -39,7 +39,7 @@ define-usage --with-help $'
 opt-value --var=name --filter='/./' name
 
 # Output style.
-opt-value --var=outputStyle --default=json --enum='compact json' output
+opt-value --var=outputStyle --default=json --enum[]='compact json' output
 
 # Resource type.
 opt-value --var=resourceType --filter='/^[-a-z0-9]+$/' type

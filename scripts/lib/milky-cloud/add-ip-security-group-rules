@@ -51,7 +51,7 @@ define-usage --with-help $'
 usual-json-output-args --no-rest
 
 # Rule direction (`ingress` or `egress`), and convenient shorthand aliases.
-opt-value --var=direction --enum='egress ingress' direction
+opt-value --var=direction --enum[]='egress ingress' direction
 opt-alias egress  --direction=egress
 opt-alias ingress --direction=ingress
 
@@ -68,7 +68,7 @@ opt-value --var=name --filter='/./' name
 opt-value --required --var=port --filter='/^([0-9]+|all)$/' port
 
 # Protocol of the rule.
-opt-value --required --var=protocol --enum='all tcp udp' protocol
+opt-value --required --var=protocol --enum[]='all tcp udp' protocol
 
 process-args "$@" || exit "$?"
 

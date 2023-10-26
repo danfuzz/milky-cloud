@@ -82,7 +82,7 @@ opt-value --var=defaultLocation --filter='/./' default-loc
 opt-value --var=defaultVpc --default='*' --filter='/./' default-vpc
 
 # Expired instance inclusion.
-opt-value --var=expired --default='exclude' --enum='exclude include only' expired
+opt-value --var=expired --default='exclude' --enum[]='exclude include only' expired
 
 # ID spec of the instance(s), per docs (above).
 opt-value --required --var=idSpec --filter='/[-.*a-zA-Z0-9]+/' id
@@ -94,10 +94,10 @@ opt-toggle --var=multipleResults multiple
 opt-toggle --var=notFoundOk not-found-ok
 
 # Protected instance inclusion.
-opt-value --var=protected --default='include' --enum='exclude include only' protected
+opt-value --var=protected --default='include' --enum[]='exclude include only' protected
 
 # Terminated instance inclusion.
-opt-value --var=terminated --default='exclude' --enum='exclude include only' terminated
+opt-value --var=terminated --default='exclude' --enum[]='exclude include only' terminated
 
 process-args "$@" || exit "$?"
 

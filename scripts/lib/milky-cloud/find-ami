@@ -51,7 +51,7 @@ opt-value --required --var=instanceType \
 
 # Which OS.
 opt-value --var=osName --default='amazon-2023' \
-    --enum='amazon-2 amazon-2023' \
+    --enum[]='amazon-2 amazon-2023' \
     os
 
 # Show all matches?

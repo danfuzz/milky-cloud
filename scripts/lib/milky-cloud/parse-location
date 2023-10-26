@@ -34,10 +34,10 @@ define-usage --with-help $'
 '
 
 # Input type.
-opt-value --var=inputType --default=any --enum='any region zone' input
+opt-value --var=inputType --default=any --enum[]='any region zone' input
 
 # Item to output.
-opt-value --var=outputItem --default=none --enum='none json region zone zone-suffix' output
+opt-value --var=outputItem --default=none --enum[]='none json region zone zone-suffix' output
 
 # Quiet? (Suppress error messages?)
 opt-toggle --var=quiet quiet
