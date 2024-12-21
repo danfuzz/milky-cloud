@@ -81,8 +81,19 @@ function call-rsync {
     # when no files changed in them, in the case where date stamps don't match
     # (e.g. when sync'ing a rebuilt set of files).
     local rsyncCmd=(
-        rsync --rsh="${rshCmd[*]}" --omit-dir-times "${rsyncOpts[@]}" --
+        rsync --rsh="${rshCmd[*]}" --omit-dir-times
     )
+
+    # `rsyncOpts` elements are in the form `--opt=<N>` with `N` either `0` or
+    # `1`, but the actual `rsync` command wants an argumentless toggle.
+    local opt
+    for opt in "${rsyncOpts[@]}"; do
+        if [[ ${opt} =~ ^(--[^=]+)=1$ ]]; then
+            rsyncCmd+=("${BASH_REMATCH[1]}")
+        fi
+    done
+
+    rsyncCmd+=(--)
 
     exec "${rsyncCmd[@]}" "$@"
 }
