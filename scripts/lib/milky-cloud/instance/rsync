@@ -30,7 +30,7 @@ opt-toggle --var=fromRsync from-rsync
 # Alternative SSH command.
 opt-value --var=sshCmd --filter='/./' ssh-cmd
 
-# Passed through to `rsync`.
+# Passed through to `rsync` (after interpretation).
 rsyncOpts=()
 opt-toggle --call='{ rsyncOpts+=(--archive="$1") }' archive
 opt-toggle --call='{ rsyncOpts+=(--checksum="$1") }' checksum
@@ -84,12 +84,16 @@ function call-rsync {
         rsync --rsh="${rshCmd[*]}" --omit-dir-times
     )
 
-    # `rsyncOpts` elements are in the form `--opt=<N>` with `N` either `0` or
-    # `1`, but the actual `rsync` command wants an argumentless toggle.
+    # `rsyncOpts` elements are in the form `--<opt>=<N>` with `N` either `0` or
+    # `1`, but the actual `rsync` command wants `--<opt>` or `--no-<opt>`.
     local opt
     for opt in "${rsyncOpts[@]}"; do
-        if [[ ${opt} =~ ^(--[^=]+)=1$ ]]; then
-            rsyncCmd+=("${BASH_REMATCH[1]}")
+        if [[ ${opt} =~ ^--([^=]+)=(0|1)$ ]]; then
+            local maybeNo=''
+            if [[ ${BASH_REMATCH[2]} == '0' ]]; then
+                maybeNo='no-'
+            fi
+            rsyncCmd+=("--${maybeNo}${BASH_REMATCH[1]}")
         fi
     done
 
