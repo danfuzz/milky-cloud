@@ -36,6 +36,9 @@ define-usage --with-help $'
     --announce
       Announce info about the connection before connecting. Can be useful when
       connecting to instances named via wildcards.
+    --connect-timeout=<sec>
+      Number of seconds to wait for a connection, instead of the default TCP
+      timeout.
     --default-loc=<region-or-zone>
       Location to use if one is not specified in the <instance>.
     --default-vpc=<id-spec>
@@ -53,6 +56,9 @@ define-usage --with-help $'
 
 # Announce connection?
 opt-toggle --var=announce announce
+
+# Connect timeout in seconds.
+opt-value --var=connectTimeoutSec --filter='/^[0-9]+$/' connect-timeout
 
 # Default location (region or zone).
 opt-value --var=defaultLocation --filter='/./' default-loc
@@ -230,6 +236,10 @@ if [[ ${hostPublicKey} != '' ]]; then
 fi
 
 sshCommand=(ssh)
+
+if [[ ${connectTimeoutSec} != '' ]]; then
+    sshCommand+=(-o "ConnectTimeout ${connectTimeoutSec}")
+fi
 
 if [[ ${keyPath} != '' ]]; then
     sshCommand+=('-i' "${keyPath}")
