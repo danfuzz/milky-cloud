@@ -114,39 +114,52 @@ function wait-for-one-ssh {
     local tries=30
     local success=0
     local responsive=0
-    local shownKeyMsg=0
-    local shownBootMsg=0
+    local lastLogMsg=''
+    local nextLogMsg=''
+    local errorMsg='trouble checking ssh via IPv4'
 
     while (( !success && (tries-- > 0) )); do
-        local gotKey="$(
-            # `-T 60` == one minute timeout. `awk` to print just the key.
-            ssh-keyscan 2>/dev/null -T 60 -t ed25519 "${v4Addr}" \
-            | awk '{print $2, $3}'
-        )"
+        # `-T 60` == one minute timeout.
+        local keyscanOutput="$(ssh-keyscan 2>/dev/null -q -T 60 -t ed25519 "${v4Addr}")"
 
-        if [[ ${gotKey} == '' ]]; then
+        if [[ ${keyscanOutput} == '' ]]; then
             # Host is apparently unreachable, or it might be _almost_ ready.
-            if (( !shownBootMsg )); then
-                "${msg}" 'booting'
-                shownBootMsg=1
+            if (( responsive )); then
+                nextLogMsg='instance became unresponsive'
+                responsive=0
+            else
+                nextLogMsg='booting'
             fi
-            sleep 1
-        elif (( checkHostKeys )) &&
-                [[ (${expectedKey} != '') && (${expectedKey} != ${gotKey}) ]]; then
+            errorMsg='ssh unreachable via IPv4'
+        elif (( checkHostKeys )); then
             responsive=1
-            if (( !shownKeyMsg )); then
-                "${msg}" 'booting (host key not yet set)'
-                shownKeyMsg=1
+            if [[ ${expectedKey} == '' ]]; then
+                nextLogMsg='missing expected key from instance info!'
+            elif [[ ${keyscanOutput} =~ "${expectedKey}" ]]; then
+                "${msg}" 'got expected key'
+                nextLogMsg='ssh reachable via IPv4'
+                success=1
+            else
+                nextLogMsg='booting (configured host key not yet set)'
+                errorMsg='ssh reachable via IPv4, but host key never set'
             fi
-            sleep 1
         else
             "${msg}" 'ssh reachable via IPv4'
             success=1
         fi
+
+        if [[ ${lastLogMsg} != ${nextLogMsg} ]]; then
+            "${msg}" "${nextLogMsg}"
+            lastLogMsg=${nextLogMsg}
+        fi
+
+        if (( !success )); then
+            sleep 1
+        fi
     done
 
     if (( !success )); then
-        "${msg}" 'ssh unreachable via IPv4'
+        "${msg}" "${errorMsg}"
         return 1
     fi
 
