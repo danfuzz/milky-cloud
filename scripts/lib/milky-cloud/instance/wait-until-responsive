@@ -62,6 +62,20 @@ function is-ipv6-available {
     ping6 >/dev/null 2>&1 -c 1 google.com
 }
 
+# Gets the ed25519 host key of the given address, in the form `<type> <key>`.
+# Prints nothing if the host didn't answer.
+function scan-host-key {
+    local addr="$1"
+
+    # `-T 60` == one minute timeout. `awk` to drop the comment line which
+    # OpenSSH 9.8 and later emit on `stdout`, and to print just the key. Note:
+    # `-q` would suppress the comment line, but that option doesn't exist before
+    # 9.8, and notably GitHub Actions runners are still on 9.6 as of this
+    # writing.
+    ssh-keyscan 2>/dev/null -T 60 -t ed25519 "${addr}" \
+    | awk '$1 !~ /^#/ { print $2, $3 }'
+}
+
 # Waits for just one instance to be in state `running`.
 function wait-for-one-running {
     local infoJson="$1"
@@ -114,15 +128,15 @@ function wait-for-one-ssh {
     local tries=30
     local success=0
     local responsive=0
+    local gotKey=''
     local lastLogMsg=''
     local nextLogMsg=''
     local errorMsg='trouble checking ssh via IPv4'
 
     while (( !success && (tries-- > 0) )); do
-        # `-T 60` == one minute timeout.
-        local keyscanOutput="$(ssh-keyscan 2>/dev/null -q -T 60 -t ed25519 "${v4Addr}")"
+        gotKey="$(scan-host-key "${v4Addr}")"
 
-        if [[ ${keyscanOutput} == '' ]]; then
+        if [[ ${gotKey} == '' ]]; then
             # Host is apparently unreachable, or it might be _almost_ ready.
             if (( responsive )); then
                 nextLogMsg='instance became unresponsive'
@@ -131,21 +145,17 @@ function wait-for-one-ssh {
                 nextLogMsg='booting'
             fi
             errorMsg='ssh unreachable via IPv4'
-        elif (( checkHostKeys )); then
+        else
             responsive=1
-            if [[ ${expectedKey} == '' ]]; then
-                nextLogMsg='missing expected key from instance info!'
-            elif [[ ${keyscanOutput} =~ "${expectedKey}" ]]; then
-                "${msg}" 'got expected key'
+            if (( !checkHostKeys )) || [[ ${gotKey} == "${expectedKey}" ]]; then
                 nextLogMsg='ssh reachable via IPv4'
                 success=1
+            elif [[ ${expectedKey} == '' ]]; then
+                nextLogMsg='missing expected key from instance info!'
             else
                 nextLogMsg='booting (configured host key not yet set)'
                 errorMsg='ssh reachable via IPv4, but host key never set'
             fi
-        else
-            "${msg}" 'ssh reachable via IPv4'
-            success=1
         fi
 
         if [[ ${lastLogMsg} != ${nextLogMsg} ]]; then
@@ -163,11 +173,7 @@ function wait-for-one-ssh {
         return 1
     fi
 
-    local gotKey="$(
-        # `-T 60` == one minute timeout. `awk` to print just the key.
-        ssh-keyscan 2>/dev/null -T 60 -t ed25519 "${v6Addr}" \
-        | awk '{print $2, $3}'
-    )"
+    gotKey="$(scan-host-key "${v6Addr}")"
 
     # Don't bother re-checking the key; just care if we got one.
     if [[ ${gotKey} == '' ]]; then
