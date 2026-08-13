@@ -133,6 +133,11 @@ function build-user-data {
             "cat <<<'${hostPublicKey}' >\${keyFile}.pub"
             'chmod 600 ${keyFile}'
             'chown root:ssh_keys ${keyFile}'
+
+            # `sshd` may already be running, and it only reads its host keys at
+            # startup. `try-restart` (as opposed to `restart`) makes this a
+            # no-op if `sshd` hasn't started yet.
+            'systemctl try-restart sshd.service'
         )
         keySetup="$(printf '%s\n' "${lines[@]}")"
     fi
